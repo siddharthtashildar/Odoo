@@ -102,6 +102,15 @@ function MyWorkspace() {
   const myTickets = helpdesk.filter((t) => t.requesterId === me.id);
   const onCase = onboarding.find((o) => o.employeeId === me.id);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const myTodayRecord = myAttendance.find((a) => a.date === todayStr);
+  const isPunchedIn = Boolean(
+    myTodayRecord &&
+      myTodayRecord.checkIn &&
+      myTodayRecord.checkIn !== "—" &&
+      (!myTodayRecord.checkOut || myTodayRecord.checkOut === "—"),
+  );
+
   const saveContact = () => {
     if (!/^[+0-9 ()-]{8,}$/.test(phone)) {
       setError("Enter a valid contact number.");
