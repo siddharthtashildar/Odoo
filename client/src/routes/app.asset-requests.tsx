@@ -92,7 +92,12 @@ function AssetRequestsPage() {
 
   const visible = isIt
     ? assetRequests
-    : assetRequests.filter((r) => r.employeeId === myId || (myCode && r.employeeId === myCode));
+    : assetRequests.filter(
+        (r) =>
+          r.employeeId === myId ||
+          (myCode && (r.employeeId === myCode || (r as any).employeeCode === myCode)) ||
+          (me?.email && (r as any).employeeEmail?.toLowerCase() === me.email.toLowerCase()),
+      );
 
   const PAGE_SIZE = 5;
   const totalPages = Math.ceil(visible.length / PAGE_SIZE) || 1;

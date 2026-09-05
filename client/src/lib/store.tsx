@@ -213,9 +213,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Poll all key data slices to keep the UI in sync across all roles
   useEffect(() => {
     if (!hydrated) return;
-    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5001";
-    const isManager = state.role === "hr_manager" || state.role === "admin";
-    const intervalMs = isManager ? 5000 : 10000;
+    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
+    const intervalMs = 4000;
 
     const endpoints: Array<{ path: string; key: keyof State }> = [
       { path: "/api/leave", key: "leave" },
@@ -225,6 +224,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       { path: "/api/allowances", key: "allowances" },
       { path: "/api/helpdesk", key: "helpdesk" },
       { path: "/api/assets", key: "assets" },
+      { path: "/api/assets/requests", key: "assetRequests" },
     ];
 
     const poll = async () => {
@@ -500,6 +500,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         expenseDate: r.submittedDate,
         amount: r.amount,
         description: r.description,
+        receiptFileName: r.receiptFileName,
+        receiptUrl: (r as any).receiptUrl ?? r.receiptFileName,
       });
       const res = await api.reimbursements.list();
       if (Array.isArray(res)) {
@@ -702,14 +704,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         requiredFrom: req.requiredFrom,
         requiredUntil: req.requiredUntil,
       });
-      const res = await api.assets.requests();
-      if (Array.isArray(res)) {
-        setState((prev) => ({ ...prev, assetRequests: res as AssetRequest[] }));
-      }
+      await refreshSlice("assetRequests");
     } catch (err) {
       console.warn("[store] addAssetRequest sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const updateAssetRequest = useCallback(async (id: string, patch: Partial<AssetRequest> & { fulfilledAssetId?: string }) => {
     setState((s) => ({
@@ -718,18 +717,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
     try {
       await api.assets.patchRequest(id, patch as Record<string, unknown>);
-      const [reqRes, astRes] = await Promise.all([api.assets.requests(), api.assets.list()]);
-      if (Array.isArray(reqRes)) {
-        setState((prev) => ({
-          ...prev,
-          assetRequests: reqRes as AssetRequest[],
-          ...(Array.isArray(astRes) ? { assets: astRes as Asset[] } : {}),
-        }));
-      }
+      await refreshSlice("assetRequests");
+      await refreshSlice("assets");
     } catch (err) {
       console.warn("[store] updateAssetRequest sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const addSchedule = useCallback(async (s: WorkSchedule) => {
     try {
