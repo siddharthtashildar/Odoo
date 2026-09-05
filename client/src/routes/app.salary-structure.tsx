@@ -416,13 +416,9 @@ function SalaryStructurePage() {
                       form.components
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "earning")
-<<<<<<< HEAD
-                        .map(({ c, origIdx }) => {
-=======
                         .map(({ origIdx }) => {
                           const item = form.components[origIdx];
                           if (!item) return null;
->>>>>>> 7173ffbe0a0ecf23da40be4af1187aa9eab05c7f
                           return (
                             <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
                               <Input
@@ -486,13 +482,9 @@ function SalaryStructurePage() {
                       form.components
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "deduction")
-<<<<<<< HEAD
-                        .map(({ c, origIdx }) => {
-=======
                         .map(({ origIdx }) => {
                           const item = form.components[origIdx];
                           if (!item) return null;
->>>>>>> 7173ffbe0a0ecf23da40be4af1187aa9eab05c7f
                           return (
                             <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
                               <Input
