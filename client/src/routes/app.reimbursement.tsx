@@ -56,6 +56,37 @@ const emptyClaim = {
   receiptFileName: "",
 };
 
+interface ParsedAttachment {
+  name: string;
+  url: string;
+  type?: string;
+}
+
+function parseClaimAttachments(claim: ReimbursementClaim): ParsedAttachment[] {
+  const raw = (claim as any).receiptUrl || claim.receiptFileName;
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item: any, i: number) => ({
+        name: item.name || `Attachment_${i + 1}`,
+        url: item.url || "#",
+        type: item.type,
+      }));
+    }
+  } catch {
+    /* raw is a plain filename string */
+  }
+
+  if (typeof raw === "string" && raw.trim() && raw !== "Mock_Receipt.pdf") {
+    const names = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    return names.map((name) => ({ name, url: "#" }));
+  }
+
+  return [];
+}
+
 function ReimbursementPage() {
   const { reimbursements, employees, submitReimbursement, updateReimbursement, log, role, persona } = useApp();
   const nameOf = useEmployeeName();
@@ -70,7 +101,21 @@ function ReimbursementPage() {
 
   const [form, setForm] = useState(emptyClaim);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
-  const [simulatedFile, setSimulatedFile] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const selected = Array.from(e.target.files);
+    if (attachments.length + selected.length > 2) {
+      toast.warning("You can attach a maximum of 2 supporting files per claim.");
+    }
+    const updated = [...attachments, ...selected].slice(0, 2);
+    setAttachments(updated);
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const canApprove = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin";
   const isEmployeeOnly = role === "employee";
@@ -129,28 +174,47 @@ function ReimbursementPage() {
     setErrors(next);
     if (Object.keys(next).length) return;
 
+    let receiptPayload: string | undefined = undefined;
+    if (attachments.length > 0) {
+      const converted = await Promise.all(
+        attachments.map(
+          (file) =>
+            new Promise<{ name: string; type: string; url: string }>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve({ name: file.name, type: file.type, url: reader.result as string });
+              reader.onerror = () => resolve({ name: file.name, type: file.type, url: "#" });
+              reader.readAsDataURL(file);
+            }),
+        ),
+      );
+      receiptPayload = JSON.stringify(converted);
+    }
+
     const newClaim: ReimbursementClaim = {
       id: `CLM-${Date.now().toString().slice(-4)}`,
       employeeId: myId,
       category: form.category,
       amount: Number(form.amount),
       submittedDate: form.submittedDate,
-      receiptStatus: simulatedFile ? "Uploaded" : "Missing",
+      receiptStatus: attachments.length > 0 ? "Uploaded" : "Missing",
       approvalStatus: "pending",
       paymentStatus: "unpaid",
       description: form.description.trim(),
-      receiptFileName: simulatedFile ?? "Mock_Receipt.pdf",
+      receiptFileName: receiptPayload,
       paymentMethod: form.paymentMethod,
     };
+    (newClaim as any).receiptUrl = receiptPayload;
 
     await submitReimbursement(newClaim);
     log(`Submitted expense claim ${newClaim.id} for ${inr(newClaim.amount)}`, "Reimbursements");
     toast.success("Expense claim submitted", {
-      description: "Pending HR and Finance approval.",
+      description: attachments.length > 0
+        ? `Submitted with ${attachments.length} attachment(s).`
+        : "Submitted without attachments.",
     });
     setAddOpen(false);
     setForm(emptyClaim);
-    setSimulatedFile(null);
+    setAttachments([]);
   };
 
   const handleDecision = async (
@@ -464,17 +528,56 @@ function ReimbursementPage() {
               />
             </Field>
 
-            <Field label="Receipt Attachment">
-              <div
-                onClick={() => setSimulatedFile("Tax_Invoice_Reimbursement.pdf")}
-                className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-4 transition-colors hover:bg-muted/50"
-              >
-                <UploadCloud className="size-6 text-muted-foreground" />
-                <p className="mt-1 text-xs font-medium">
-                  {simulatedFile ? simulatedFile : "Click to simulate receipt upload (PDF/JPG)"}
-                </p>
-                <p className="text-[0.7rem] text-muted-foreground">
-                  {simulatedFile ? "File ready for submission" : "Max 10MB invoice or bill"}
+            <Field label="Supporting Attachments (Optional — Max 2 Files)">
+              <div className="space-y-2">
+                {attachments.length < 2 && (
+                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-3.5 transition-colors hover:bg-muted/50">
+                    <UploadCloud className="size-5 text-muted-foreground" />
+                    <span className="mt-1 text-xs font-medium text-foreground">
+                      Click to choose files (Receipts, Invoices, PDFs, Images)
+                    </span>
+                    <span className="text-[0.7rem] text-muted-foreground">
+                      {attachments.length === 0 ? "Optional · Up to 2 files" : "1 file attached · Add 1 more"}
+                    </span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx"
+                      onChange={handleFileChange}
+                    />
+                  </label>
+                )}
+
+                {attachments.length > 0 && (
+                  <div className="space-y-1.5">
+                    {attachments.map((file, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between rounded-md border border-border bg-background p-2 text-xs"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileText className="size-4 shrink-0 text-primary" />
+                          <span className="truncate font-medium">{file.name}</span>
+                          <span className="shrink-0 text-[0.68rem] text-muted-foreground">
+                            ({(file.size / 1024).toFixed(0)} KB)
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeAttachment(idx)}
+                        >
+                          <XCircle className="size-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[0.68rem] text-muted-foreground">
+                  UI Demonstration: Files are attached locally in session memory without server blob storage.
                 </p>
               </div>
             </Field>
@@ -534,20 +637,49 @@ function ReimbursementPage() {
                 </p>
               </div>
 
-              {viewClaim.receiptFileName && (
-                <div className="flex items-center justify-between rounded-md border border-border p-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="size-4 text-primary" />
-                    <span className="text-xs font-medium">{viewClaim.receiptFileName}</span>
+              {parseClaimAttachments(viewClaim).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Supporting Attachments ({parseClaimAttachments(viewClaim).length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {parseClaimAttachments(viewClaim).map((att, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between rounded-md border border-border bg-background p-2.5 text-xs"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileText className="size-4 shrink-0 text-primary" />
+                          <span className="truncate font-medium">{att.name}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            if (att.url && att.url !== "#") {
+                              const win = window.open();
+                              if (win) {
+                                if (att.type?.startsWith("image/")) {
+                                  win.document.write(
+                                    `<title>${att.name}</title><body style="margin:0;background:#111;display:flex;justify-content:center;align-items:center;height:100vh;"><img src="${att.url}" style="max-width:95vw;max-height:95vh;object-fit:contain;"/></body>`,
+                                  );
+                                } else {
+                                  win.document.write(
+                                    `<title>${att.name}</title><body style="margin:0;"><iframe src="${att.url}" style="width:100vw;height:100vh;border:none;"></iframe></body>`,
+                                  );
+                                }
+                              }
+                            } else {
+                              toast.info(`Opening attachment: ${att.name}`);
+                            }
+                          }}
+                        >
+                          <Eye className="mr-1 size-3.5 text-primary" /> View / Open
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() => handleDownloadReceipt(viewClaim)}
-                  >
-                    Download
-                  </Button>
                 </div>
               )}
 

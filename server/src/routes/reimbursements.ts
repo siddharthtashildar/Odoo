@@ -39,7 +39,9 @@ router.get("/", async (req, res) => {
         approvedAmount: r.approved_amount ? Number(r.approved_amount) : null,
         submittedDate: r.expense_date.toISOString().slice(0, 10),
         expenseDate: r.expense_date.toISOString().slice(0, 10),
-        receiptStatus: "Uploaded" as const,
+        receiptStatus: r.receipt_url ? ("Uploaded" as const) : ("Missing" as const),
+        receiptUrl: r.receipt_url ?? null,
+        receiptFileName: r.receipt_url ?? null,
         approvalStatus: approvalStatus as any,
         status: r.status,
         paymentStatus: paymentStatus as any,
@@ -61,12 +63,14 @@ router.get("/", async (req, res) => {
 // POST /api/reimbursements
 router.post("/", async (req, res) => {
   try {
-    const { employeeId, categoryName, expenseDate, amount, description } = req.body as {
+    const { employeeId, categoryName, expenseDate, amount, description, receiptUrl, receiptFileName } = req.body as {
       employeeId: string;
       categoryName: string;
       expenseDate: string;
       amount: number;
       description?: string;
+      receiptUrl?: string;
+      receiptFileName?: string;
     };
 
     const emp = await resolveEmployee(employeeId);
@@ -77,6 +81,7 @@ router.post("/", async (req, res) => {
       category = await prisma.reimbursement_categories.create({ data: { name: categoryName } });
     }
 
+    const savedUrl = receiptUrl || receiptFileName || null;
     const item = await prisma.reimbursements.create({
       data: {
         employee_id: emp.id,
@@ -84,6 +89,7 @@ router.post("/", async (req, res) => {
         expense_date: new Date(expenseDate || new Date().toISOString().slice(0, 10)),
         amount: Number(amount),
         description: description ?? null,
+        receipt_url: savedUrl,
         status: "submitted",
       },
       include: {
@@ -103,12 +109,15 @@ router.post("/", async (req, res) => {
         approvedAmount: null,
         submittedDate: item.expense_date.toISOString().slice(0, 10),
         expenseDate: item.expense_date.toISOString().slice(0, 10),
-        receiptStatus: "Uploaded" as const,
+        receiptStatus: item.receipt_url ? ("Uploaded" as const) : ("Missing" as const),
+        receiptUrl: item.receipt_url ?? null,
+        receiptFileName: item.receipt_url ?? null,
         approvalStatus: "pending" as const,
-        status: "submitted",
+        status: item.status,
         paymentStatus: "unpaid" as const,
         paymentMethod: "Bank Transfer" as const,
         description: item.description ?? "",
+        createdAt: item.created_at.toISOString(),
       },
     });
   } catch (err) {
