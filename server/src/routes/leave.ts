@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { resolveEmployee } from "../lib/resolve-employee";
+import { sendLeaveStatusEmail } from "../lib/email";
 
 const router = Router();
 
@@ -324,11 +325,25 @@ router.patch("/:id", async (req, res) => {
           ...(normStatus === "rejected" && { hr_decision: "rejected", hr_decided_at: new Date() }),
         },
         include: {
-          employees_leave_requests_employee_idToemployees: { select: { full_name: true, employee_code: true } },
+          employees_leave_requests_employee_idToemployees: { select: { full_name: true, employee_code: true, email: true } },
           leave_types: { select: { name: true, code: true } },
         },
       });
     });
+
+    const empInfo = updated.employees_leave_requests_employee_idToemployees;
+    if (empInfo?.email && (normStatus === "approved" || normStatus === "rejected")) {
+      sendLeaveStatusEmail({
+        to: empInfo.email,
+        employeeName: empInfo.full_name,
+        leaveType: updated.leave_types.name,
+        startDate: updated.start_date.toISOString().slice(0, 10),
+        endDate: updated.end_date.toISOString().slice(0, 10),
+        days: Number(updated.days),
+        status: normStatus as "approved" | "rejected",
+        reason: updated.reason ?? undefined,
+      }).catch((e) => console.warn("Leave status email error:", e));
+    }
 
     const typeName = updated.leave_types.name.replace(/ Leave/i, "");
     res.json({

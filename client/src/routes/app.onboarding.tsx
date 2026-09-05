@@ -1,14 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
   Clock,
+  Copy,
   Eye,
+  EyeOff,
   KeyRound,
+  Laptop,
+  Layers,
+  Lock,
   Mail,
+  Plus,
   RefreshCw,
+  RotateCcw,
   Send,
   ShieldCheck,
   Sparkles,
@@ -35,18 +43,36 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import { api } from "@/lib/api";
-import type { Employee, OnboardingCase, OnboardingStatus, ProvisioningRecord } from "@/lib/mock-data";
+import type { Employee, OnboardingCase, OnboardingStatus } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/onboarding")({
   head: () => ({
     meta: [
-      { title: "Onboarding & Account Provisioning · PeoplePay360" },
-      { name: "description", content: "End-to-end new hire onboarding, automated IT account provisioning and activation tracking." },
+      { title: "Onboarding · PeoplePay360" },
+      { name: "description", content: "End-to-end new hire onboarding and activation tracking." },
       { property: "og:title", content: "Onboarding · PeoplePay360" },
     ],
   }),
   component: OnboardingPage,
 });
+
+export interface ProvisionServiceItem {
+  serviceName: string;
+  category: string;
+  username: string;
+  password: string;
+  enabled: boolean;
+  showPassword?: boolean;
+}
+
+export function generateSecurePassword(prefix: string = "PP360"): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let randomPart = "";
+  for (let i = 0; i < 6; i++) {
+    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `${prefix}!${randomPart}#`;
+}
 
 const emptyHireForm = {
   name: "",
@@ -55,7 +81,7 @@ const emptyHireForm = {
   designation: "",
   joiningDate: new Date().toISOString().slice(0, 10),
   employmentType: "Full-time" as Employee["employmentType"],
-  manager: "Sana Iqbal",
+  manager: "",
   ctc: "1800000",
 };
 
@@ -63,11 +89,8 @@ export function OnboardingPage() {
   const {
     onboarding,
     employees,
-    provisioning,
-    update,
     log,
     patchEmployee,
-    retryProvisioning,
     role,
     addOnboardingCase,
     updateOnboardingTask,
@@ -79,20 +102,269 @@ export function OnboardingPage() {
   const [hireOpen, setHireOpen] = useState(false);
   const [hireForm, setHireForm] = useState(emptyHireForm);
   const [hireErrors, setHireErrors] = useState<Record<string, string | undefined>>({});
+  const [creatingHire, setCreatingHire] = useState(false);
 
   const [activeChecklistCaseId, setActiveChecklistCaseId] = useState<string | null>(null);
   const activeChecklistCase = onboarding.find((c) => c.id === activeChecklistCaseId) ?? null;
-  const [inviteSimCase, setInviteSimCase] = useState<OnboardingCase | null>(null);
-  const [simPassword, setSimPassword] = useState("");
-  const [simPasswordError, setSimPasswordError] = useState("");
-  const [simStep, setSimStep] = useState<"email" | "password" | "done">("email");
 
-  const [showProvisioningDetails, setShowProvisioningDetails] = useState<ProvisioningRecord | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  // ── Hardware Asset Allotment State ──
+  const [allotModalCase, setAllotModalCase] = useState<OnboardingCase | null>(null);
+  const [allotMode, setAllotMode] = useState<"inventory" | "new">("new");
+  const [availableAssets, setAvailableAssets] = useState<any[]>([]);
+  const [selectedAssetId, setSelectedAssetId] = useState<string>("");
+  const [assetForm, setAssetForm] = useState({
+    assetType: "MacBook Pro 16\" M3 Max",
+    assetCode: `AST-${Math.floor(1000 + Math.random() * 9000)}`,
+    serialNumber: "",
+    condition: "good",
+    location: "HQ Operations",
+  });
+  const [submittingAsset, setSubmittingAsset] = useState(false);
+
+  // ── Work Accounts Provisioning State ──
+  const [provisionModalCase, setProvisionModalCase] = useState<OnboardingCase | null>(null);
+  const [provisionServices, setProvisionServices] = useState<ProvisionServiceItem[]>([]);
+  const [submittingAccounts, setSubmittingAccounts] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // ── Loaded Extras for Active Checklist ──
+  const [caseAssets, setCaseAssets] = useState<any[]>([]);
+  const [caseAccounts, setCaseAccounts] = useState<any[]>([]);
+  const [loadingExtras, setLoadingExtras] = useState(false);
+
+  useEffect(() => {
+    if (!activeChecklistCaseId) {
+      setCaseAssets([]);
+      setCaseAccounts([]);
+      return;
+    }
+    let isSubscribed = true;
+    setLoadingExtras(true);
+    Promise.all([
+      api.onboarding.getAssets(activeChecklistCaseId).catch(() => []),
+      api.onboarding.getServiceAccounts(activeChecklistCaseId).catch(() => []),
+    ]).then(([assetsData, accountsData]) => {
+      if (isSubscribed) {
+        setCaseAssets(assetsData || []);
+        setCaseAccounts(accountsData || []);
+        setLoadingExtras(false);
+      }
+    });
+    return () => {
+      isSubscribed = false;
+    };
+  }, [activeChecklistCaseId]);
+
+  const openAllotModal = async (c: OnboardingCase) => {
+    setAllotModalCase(c);
+    setAssetForm({
+      assetType: "MacBook Pro 16\" M3 Max",
+      assetCode: `AST-${Math.floor(1000 + Math.random() * 9000)}`,
+      serialNumber: "",
+      condition: "good",
+      location: "HQ Operations",
+    });
+    try {
+      const list = await api.assets.list();
+      if (Array.isArray(list)) {
+        const available = (list as any[]).filter((a: any) => String(a.status).toLowerCase() === "available");
+        setAvailableAssets(available);
+        const first = available[0] as any;
+        if (first?.id) {
+          setSelectedAssetId(first.id);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch available assets", e);
+    }
+  };
+
+  const openProvisionModal = (c: OnboardingCase) => {
+    const emp = employees.find((e) => e.id === c.employeeId || e.code === c.employeeCode);
+    const empName = emp?.name || nameOf(c.employeeId);
+    const slug = empName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const dotSlug = empName.toLowerCase().replace(/[^a-z0-9]+/g, ".");
+    const email = emp?.email || `${dotSlug}@peoplepay360.io`;
+
+    setProvisionModalCase(c);
+    setProvisionServices([
+      {
+        serviceName: "GitHub Enterprise",
+        category: "Source Code & CI/CD",
+        username: `${slug}-dev`,
+        password: generateSecurePassword("Git"),
+        enabled: true,
+        showPassword: true,
+      },
+      {
+        serviceName: "Slack Workspace",
+        category: "Team Chat & Collaboration",
+        username: `@${dotSlug}`,
+        password: generateSecurePassword("Slk"),
+        enabled: true,
+        showPassword: true,
+      },
+      {
+        serviceName: "Google Workspace / Outlook",
+        category: "Official Corporate Email & GDrive",
+        username: email,
+        password: generateSecurePassword("Gwp"),
+        enabled: true,
+        showPassword: true,
+      },
+      {
+        serviceName: "Notion Knowledgebase",
+        category: "Documentation & SOPs",
+        username: email,
+        password: generateSecurePassword("Not"),
+        enabled: true,
+        showPassword: true,
+      },
+      {
+        serviceName: "Jira & Confluence",
+        category: "Sprint Boards & Product Trackers",
+        username: email,
+        password: generateSecurePassword("Jira"),
+        enabled: true,
+        showPassword: true,
+      },
+      {
+        serviceName: "AWS Cloud Console",
+        category: "Cloud Infrastructure Sandbox",
+        username: `${slug}-iam`,
+        password: generateSecurePassword("AWS"),
+        enabled: false,
+        showPassword: true,
+      },
+    ]);
+  };
+
+  const handleCopyPassword = (key: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    toast.success("Password copied to clipboard");
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleRegeneratePassword = (idx: number) => {
+    setProvisionServices((prev) =>
+      prev.map((s, i) =>
+        i === idx
+          ? {
+              ...s,
+              password: generateSecurePassword(
+                s.serviceName.slice(0, 3).trim().replace(/[^a-zA-Z]/g, "") || "PP"
+              ),
+            }
+          : s
+      )
+    );
+  };
+
+  const handleRegenerateAllPasswords = () => {
+    setProvisionServices((prev) =>
+      prev.map((s) => ({
+        ...s,
+        password: generateSecurePassword(
+          s.serviceName.slice(0, 3).trim().replace(/[^a-zA-Z]/g, "") || "PP"
+        ),
+      }))
+    );
+    toast.info("Generated fresh temporary passwords for all accounts");
+  };
+
+  const handleToggleSelectAll = () => {
+    const allEnabled = provisionServices.every((s) => s.enabled);
+    setProvisionServices((prev) =>
+      prev.map((s) => ({ ...s, enabled: !allEnabled }))
+    );
+  };
+
+  const handleAllotAsset = async () => {
+    if (!allotModalCase) return;
+    setSubmittingAsset(true);
+    try {
+      const emp = employees.find((e) => e.id === allotModalCase.employeeId || e.code === allotModalCase.employeeCode);
+      let payload: any;
+      if (allotMode === "inventory" && selectedAssetId) {
+        const picked = availableAssets.find((a) => a.id === selectedAssetId);
+        payload = {
+          assetId: selectedAssetId,
+          assetType: picked?.assetType || picked?.name || "Equipment",
+          assetCode: picked?.assetCode || picked?.tag || "AST-INV",
+        };
+      } else {
+        payload = {
+          assetType: assetForm.assetType,
+          assetCode: assetForm.assetCode,
+          serialNumber: assetForm.serialNumber || undefined,
+          condition: assetForm.condition,
+          location: assetForm.location,
+        };
+      }
+
+      const assigned = await api.onboarding.allotAsset(allotModalCase.id, payload);
+      toast.success(`Asset ${assigned.assetCode} allocated!`, {
+        description: `Confirmation email dispatched to ${emp?.email || "employee"}.`,
+      });
+      log(`Allotted asset ${assigned.assetCode} (${assigned.assetType}) to ${emp?.name || nameOf(allotModalCase.employeeId)}`, "Assets");
+
+      if (activeChecklistCaseId === allotModalCase.id) {
+        const fresh = await api.onboarding.getAssets(allotModalCase.id);
+        setCaseAssets(fresh);
+      }
+      setAllotModalCase(null);
+    } catch (err: any) {
+      toast.error("Failed to allocate asset", { description: err?.message });
+    } finally {
+      setSubmittingAsset(false);
+    }
+  };
+
+  const handleProvisionAccounts = async () => {
+    if (!provisionModalCase) return;
+    const selected = provisionServices.filter((s) => s.enabled);
+    if (selected.length === 0) {
+      toast.error("Please select at least one account to provision.");
+      return;
+    }
+    setSubmittingAccounts(true);
+    try {
+      const emp = employees.find((e) => e.id === provisionModalCase.employeeId || e.code === provisionModalCase.employeeCode);
+      const accountsPayload = selected.map((s) => ({
+        serviceName: s.serviceName,
+        username: s.username,
+        password: s.password,
+      }));
+
+      await api.onboarding.createServiceAccounts(provisionModalCase.id, accountsPayload);
+      toast.success(`${selected.length} work accounts provisioned!`, {
+        description: `Credentials & access setup email dispatched to ${emp?.email || "employee"}.`,
+      });
+      log(
+        `Provisioned ${selected.length} accounts (${selected.map((s) => s.serviceName).join(", ")}) for ${emp?.name || nameOf(provisionModalCase.employeeId)}`,
+        "Onboarding",
+      );
+
+      if (activeChecklistCaseId === provisionModalCase.id) {
+        const fresh = await api.onboarding.getServiceAccounts(provisionModalCase.id);
+        setCaseAccounts(fresh);
+      }
+      setProvisionModalCase(null);
+    } catch (err: any) {
+      toast.error("Failed to provision accounts", { description: err?.message });
+    } finally {
+      setSubmittingAccounts(false);
+    }
+  };
 
   const canManage = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
 
   const totalCases = onboarding.length;
-  const inProgressCases = onboarding.filter((c) => c.status === "In Progress" || c.status === "Account Created").length;
+  const inProgressCases = onboarding.filter((c) => c.status === "In Progress").length;
+  const invitationSentCases = onboarding.filter((c) => c.status === "Invitation Sent").length;
   const completedCases = onboarding.filter((c) => c.status === "Completed").length;
   const overdueCases = onboarding.filter((c) => c.status === "Overdue").length;
 
@@ -105,35 +377,38 @@ export function OnboardingPage() {
     setHireErrors(next);
     if (Object.keys(next).length) return;
 
+    setCreatingHire(true);
     try {
-      // 1. Create employee in DB (auto-provisions a user account)
+      // 1. Create employee in DB with autoProvision: true to send live credentials email!
       const created = await api.employees.create({
         name: hireForm.name.trim(),
         email: hireForm.email.trim(),
         department: hireForm.department,
         designation: hireForm.designation.trim(),
-        manager: hireForm.manager,
+        manager: hireForm.manager || undefined,
         employmentType: hireForm.employmentType,
         joinedOn: hireForm.joiningDate,
         ctc: Number(hireForm.ctc) || 1800000,
-        location: "Ahmedabad",
-        autoProvision: false,
+        location: "Headquarters",
+        autoProvision: true,
         role: "employee",
       });
 
       // 2. Create onboarding case in DB
-      await addOnboardingCase(created.id, "Sana Iqbal", hireForm.manager);
+      await addOnboardingCase(created.id, "HR Operations", hireForm.manager);
 
-      log(`Created employee account for ${created.name} & initiated onboarding`, "Onboarding");
-      toast.success("Employee account created & onboarding started", {
-        description: `Onboarding process initiated for ${created.email}`,
+      log(`Created employee account for ${created.name} & dispatched credentials email`, "Onboarding");
+      toast.success("Employee created & credentials dispatched", {
+        description: `Welcome email with password setup link sent to ${created.email}`,
       });
+
+      setHireOpen(false);
+      setHireForm(emptyHireForm);
     } catch (err: any) {
       toast.error("Failed to create employee", { description: err?.message });
+    } finally {
+      setCreatingHire(false);
     }
-
-    setHireOpen(false);
-    setHireForm(emptyHireForm);
   };
 
   const handleToggleTask = async (caseId: string, taskId: string) => {
@@ -152,76 +427,42 @@ export function OnboardingPage() {
       await updateOnboardingStatus(caseId, "Completed");
       patchEmployee(caseItem.employeeId, { status: "active" });
       toast.success(`${nameOf(caseItem.employeeId)} completed all onboarding tasks!`, {
-        description: "Status moved to Active across all modules.",
+        description: "Employee marked Active across system.",
       });
       log(`Completed onboarding for ${nameOf(caseItem.employeeId)}`, "Onboarding");
     }
   };
 
   const handleResendInvite = async (c: OnboardingCase) => {
-    await updateOnboardingStatus(c.id, "Invitation Sent");
-    log(`Resent onboarding invitation email to ${nameOf(c.employeeId)}`, "Onboarding");
-    toast.success("Invitation email re-dispatched", {
-      description: `Sent to ${employees.find((e) => e.id === c.employeeId)?.email}`,
-    });
-  };
-
-  const openSimulatedEmail = (c: OnboardingCase) => {
-    setInviteSimCase(c);
-    setSimStep("email");
-    setSimPassword("");
-    setSimPasswordError("");
-  };
-
-  const handleSimulateActivatePassword = () => {
-    if (simPassword.length < 6) {
-      setSimPasswordError("Password must be at least 6 characters.");
+    const emp = employees.find((e) => e.id === c.employeeId || e.code === c.employeeCode);
+    const targetEmail = emp?.email;
+    if (!targetEmail) {
+      toast.error("Employee email not found");
       return;
     }
-    if (!inviteSimCase) return;
 
-    // Update onboarding to Account Created / In Progress
-    update(
-      "onboarding",
-      onboarding.map((item) =>
-        item.id === inviteSimCase.id
-          ? {
-              ...item,
-              status: "Account Created",
-              accountCreatedDate: new Date().toISOString().slice(0, 10),
-            }
-          : item,
-      ),
-    );
-
-    // Update provisioning status to completed
-    update(
-      "provisioning",
-      provisioning.map((p) =>
-        p.employeeId === inviteSimCase.employeeId
-          ? {
-              ...p,
-              overallStatus: "Completed",
-              accountActivated: true,
-              steps: p.steps.map((st) => ({ ...st, status: "completed" as const })),
-            }
-          : p,
-      ),
-    );
-
-    log(`Employee ${nameOf(inviteSimCase.employeeId)} activated account & set password`, "Provisioning");
-    toast.success("Account successfully activated!", {
-      description: "You may now begin your Day-1 onboarding checklist.",
-    });
-
-    setSimStep("done");
+    setResendingId(c.id);
+    try {
+      await api.auth.provisionUser(
+        { employeeId: c.employeeId, email: targetEmail, role: "employee" },
+        role,
+      );
+      toast.success("Credentials email sent", {
+        description: `Welcome email with password change link dispatched to ${targetEmail}`,
+      });
+      log(`Dispatched credentials email to ${targetEmail}`, "Onboarding");
+    } catch (err: any) {
+      toast.error("Failed to send credentials email", { description: err?.message });
+    } finally {
+      setResendingId(null);
+    }
   };
 
   return (
     <>
       <PageHeader
         title="Employee Onboarding"
-        description="Lifecycle tracking from invitation dispatch to Day-1 checklist readiness, accompanied by automated IT provisioning."
+        description="Lifecycle tracking from invitation dispatch to Day-1 checklist readiness."
         actions={
           canManage && (
             <Button onClick={() => setHireOpen(true)}>
@@ -235,14 +476,21 @@ export function OnboardingPage() {
         <StatCard
           label="Total Onboarding Cases"
           value={totalCases}
-          hint="All time logged"
+          hint="All active processes"
           icon={<Users className="size-5" />}
+          tone="default"
+        />
+        <StatCard
+          label="Invitation Sent"
+          value={invitationSentCases}
+          hint="Awaiting first password change"
+          icon={<Mail className="size-5" />}
           tone="default"
         />
         <StatCard
           label="In Progress / Active"
           value={inProgressCases}
-          hint="Working through checklists"
+          hint="Password set & completing checklist"
           icon={<Clock className="size-5" />}
           tone="warning"
         />
@@ -253,58 +501,7 @@ export function OnboardingPage() {
           icon={<CheckCircle2 className="size-5" />}
           tone="success"
         />
-        <StatCard
-          label="Overdue Checklists"
-          value={overdueCases}
-          hint="Pending past target due date"
-          icon={<XCircle className="size-5" />}
-          tone="default"
-        />
       </div>
-
-      {/* Account Provisioning Live Simulation Banner */}
-      <Card className="border-primary/30 bg-primary/5">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="size-5 text-primary" />
-              <CardTitle className="text-base">Automatic Employee Account Provisioning</CardTitle>
-            </div>
-            <span className="text-xs text-muted-foreground">Connected to HRIS Onboarding</span>
-          </div>
-          <CardDescription>
-            When HR registers an employee, PeoplePay360 automatically provisions company Google Workspace email,
-            dispatches invite tokens, and assigns default zero-trust permissions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {provisioning.slice(0, 3).map((p) => (
-              <div
-                key={p.id}
-                className="rounded-lg border border-border bg-card p-3 text-xs space-y-1.5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-foreground">{p.employeeName}</span>
-                  <StatusBadge status={p.overallStatus} />
-                </div>
-                <p className="text-muted-foreground truncate">{p.companyEmail}</p>
-                <div className="flex items-center justify-between pt-1 text-[0.7rem] text-muted-foreground">
-                  <span>{p.steps.filter((s) => s.status === "completed").length}/6 steps completed</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-1.5 text-xs text-primary"
-                    onClick={() => setShowProvisioningDetails(p)}
-                  >
-                    View Pipeline
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Main Onboarding Cases Table */}
       <Card>
@@ -322,7 +519,7 @@ export function OnboardingPage() {
           ) : onboarding.length === 0 ? (
             <EmptyState
               title="No onboarding cases"
-              description="Click 'Create Employee Account' to start a new onboarding flow."
+              description="Click 'Create Employee Account' to register a new hire and dispatch credentials."
               icon={<UserPlus className="size-8" />}
             />
           ) : (
@@ -332,7 +529,7 @@ export function OnboardingPage() {
                   <TableRow>
                     <TableHead>Case ID</TableHead>
                     <TableHead>Employee</TableHead>
-                    <TableHead>Assigned HR Manager</TableHead>
+                    <TableHead>Assigned HR</TableHead>
                     <TableHead>Checklist Progress</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Status</TableHead>
@@ -341,9 +538,9 @@ export function OnboardingPage() {
                 </TableHeader>
                 <TableBody>
                   {onboarding.map((c) => {
-                    const emp = employees.find((e) => e.id === c.employeeId);
+                    const emp = employees.find((e) => e.id === c.employeeId || e.code === c.employeeCode);
                     const doneCount = c.tasks.filter((t) => t.done).length;
-                    const percent = Math.round((doneCount / c.tasks.length) * 100);
+                    const percent = c.tasks.length > 0 ? Math.round((doneCount / c.tasks.length) * 100) : 0;
 
                     return (
                       <TableRow key={c.id}>
@@ -354,7 +551,7 @@ export function OnboardingPage() {
                           <div className="font-medium">{emp ? emp.name : nameOf(c.employeeId)}</div>
                           <div className="text-xs text-muted-foreground">{emp?.email}</div>
                         </TableCell>
-                        <TableCell>{c.assignedHr || "Sana Iqbal"}</TableCell>
+                        <TableCell>{c.assignedHr || "HR Operations"}</TableCell>
                         <TableCell className="w-[180px]">
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs">
@@ -382,25 +579,41 @@ export function OnboardingPage() {
                               <Eye className="size-3.5 mr-1" /> Checklist
                             </Button>
 
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 px-2 text-primary"
-                              onClick={() => openSimulatedEmail(c)}
-                              title="Simulate Employee Invitation Email"
-                            >
-                              <Mail className="size-3.5 mr-1" /> Simulated Invite
-                            </Button>
+                            {/* Direct 1-click actions when checklist is 100% / Completed */}
+                            {canManage && (percent === 100 || c.status === "Completed") && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                                  onClick={() => openAllotModal(c)}
+                                  title="Allot hardware asset (Laptop, Monitor, etc.)"
+                                >
+                                  <Laptop className="size-3.5 mr-1" /> Allot Asset
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2 border-primary/30 text-primary hover:bg-primary/10"
+                                  onClick={() => openProvisionModal(c)}
+                                  title="Provision work accounts (GitHub, Slack, etc.)"
+                                >
+                                  <Layers className="size-3.5 mr-1" /> Accounts
+                                </Button>
+                              </>
+                            )}
 
-                            {canManage && c.status !== "Completed" && (
+                            {canManage && (
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                                className="h-8 px-2 text-primary"
+                                disabled={resendingId === c.id}
                                 onClick={() => handleResendInvite(c)}
-                                title="Resend invitation"
+                                title="Send or resend credentials email with password link"
                               >
-                                <Send className="size-3.5" />
+                                <Send className="size-3.5 mr-1" />
+                                {resendingId === c.id ? "Sending..." : "Send Email"}
                               </Button>
                             )}
                           </div>
@@ -415,13 +628,13 @@ export function OnboardingPage() {
         </CardContent>
       </Card>
 
-      {/* HR New Hire Creation Modal (Exact Section 9 Flow) */}
+      {/* HR New Hire Creation Modal */}
       <Dialog open={hireOpen} onOpenChange={setHireOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>HR Employee Account Creation</DialogTitle>
+            <DialogTitle>Create Employee &amp; Dispatch Credentials</DialogTitle>
             <DialogDescription>
-              Enter new hire details to register employee record and dispatch simulated email invitation.
+              Register employee record, auto-provision user account, and dispatch temporary credentials with a password reset redirect.
             </DialogDescription>
           </DialogHeader>
 
@@ -455,20 +668,18 @@ export function OnboardingPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Engineering">Engineering</SelectItem>
-                    <SelectItem value="People Ops">People Ops</SelectItem>
-                    <SelectItem value="Finance">Finance</SelectItem>
-                    <SelectItem value="IT">IT</SelectItem>
-                    <SelectItem value="Sales">Sales</SelectItem>
-                    <SelectItem value="Marketing">Marketing</SelectItem>
-                    <SelectItem value="Support">Support</SelectItem>
+                    {["Engineering", "Product", "HR", "Sales", "Marketing", "Finance", "Design", "Operations"].map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </Field>
 
               <Field label="Job Title" error={hireErrors["designation"]}>
                 <Input
-                  placeholder="e.g. Cloud Architect"
+                  placeholder="e.g. Senior Backend Engineer"
                   value={hireForm.designation}
                   onChange={(e) => setHireForm({ ...hireForm, designation: e.target.value })}
                 />
@@ -496,6 +707,7 @@ export function OnboardingPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Full-time">Full-time</SelectItem>
+                    <SelectItem value="Part-time">Part-time</SelectItem>
                     <SelectItem value="Contract">Contract</SelectItem>
                     <SelectItem value="Intern">Intern</SelectItem>
                   </SelectContent>
@@ -510,13 +722,14 @@ export function OnboardingPage() {
                   onValueChange={(v) => setHireForm({ ...hireForm, manager: v })}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select manager" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Sana Iqbal">Sana Iqbal (Head of HR)</SelectItem>
-                    <SelectItem value="Rohan Mehta">Rohan Mehta (Engineering Lead)</SelectItem>
-                    <SelectItem value="Arjun Nair">Arjun Nair (Finance Controller)</SelectItem>
-                    <SelectItem value="Neel Shah">Neel Shah (IT Manager)</SelectItem>
+                    {employees.map((e) => (
+                      <SelectItem key={e.id} value={e.name}>
+                        {e.name} ({e.designation})
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </Field>
@@ -533,15 +746,17 @@ export function OnboardingPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setHireOpen(false)}>
+            <Button variant="outline" onClick={() => setHireOpen(false)} disabled={creatingHire}>
               Cancel
             </Button>
-            <Button onClick={handleCreateNewHire}>Create Account & Dispatch Invitation</Button>
+            <Button onClick={handleCreateNewHire} disabled={creatingHire}>
+              {creatingHire ? "Provisioning..." : "Create Account & Dispatch Email"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Checklist Drawer Modal */}
+      {/* Dynamic Checklist Drawer Modal */}
       {activeChecklistCase && (
         <Dialog open={!!activeChecklistCase} onOpenChange={(o) => !o && setActiveChecklistCaseId(null)}>
           <DialogContent className="max-w-xl">
@@ -557,7 +772,7 @@ export function OnboardingPage() {
 
             <div className="space-y-3 py-2">
               <p className="text-xs text-muted-foreground">
-                Mandatory day-one checklist items for new employees. Toggle items as they are completed:
+                Mandatory onboarding checklist tasks. Changes sync immediately to PostgreSQL:
               </p>
 
               <div className="space-y-2 rounded-lg border border-border p-3">
@@ -568,14 +783,14 @@ export function OnboardingPage() {
                   >
                     <div className="flex items-center gap-3">
                       <Checkbox
-                        id={task.id}
+                        id={`task-${task.id}`}
                         checked={task.done}
                         onCheckedChange={() => handleToggleTask(activeChecklistCase.id, task.id)}
                       />
                       <label
-                        htmlFor={task.id}
+                        htmlFor={`task-${task.id}`}
                         className={`text-sm cursor-pointer ${
-                          task.done ? "line-through text-muted-foreground" : "font-medium"
+                          task.done ? "line-through text-muted-foreground" : "font-medium text-foreground"
                         }`}
                       >
                         {task.label}
@@ -587,6 +802,131 @@ export function OnboardingPage() {
                   </div>
                 ))}
               </div>
+
+              {/* 100% Checklist Completion: Allot Hardware & Provision Accounts Card */}
+              {(() => {
+                const doneCount = activeChecklistCase.tasks.filter((t) => t.done).length;
+                const is100 =
+                  (activeChecklistCase.tasks.length > 0 && doneCount === activeChecklistCase.tasks.length) ||
+                  activeChecklistCase.status === "Completed";
+
+                return (
+                  <div
+                    className={`mt-4 rounded-xl border p-4 space-y-3 transition-all ${
+                      is100
+                        ? "bg-gradient-to-br from-emerald-500/10 via-primary/5 to-transparent border-emerald-500/30"
+                        : "bg-muted/30 border-border"
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                              is100
+                                ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {is100 ? (
+                              <CheckCircle2 className="size-3 text-emerald-600" />
+                            ) : (
+                              <Clock className="size-3" />
+                            )}
+                            {is100
+                              ? "100% Checklist Complete"
+                              : `${doneCount}/${activeChecklistCase.tasks.length} Completed`}
+                          </span>
+                          {is100 && (
+                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                              <Sparkles className="size-3" /> Ready for Gear &amp; Account Setup
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {is100
+                            ? "HR can now allocate IT hardware and configure corporate developer/collaboration accounts with live email alerts."
+                            : "Complete remaining checklist items to unlock full IT equipment allocation and developer tool provisioning."}
+                        </p>
+                      </div>
+
+                      {is100 && canManage && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 border-primary/30 hover:bg-primary/10 text-primary font-medium"
+                            onClick={() => openAllotModal(activeChecklistCase)}
+                          >
+                            <Laptop className="size-3.5 mr-1" /> Allot Asset
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-8 bg-primary text-primary-foreground font-medium shadow-xs"
+                            onClick={() => openProvisionModal(activeChecklistCase)}
+                          >
+                            <Layers className="size-3.5 mr-1" /> Provision Accounts
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Display Currently Allotted Assets */}
+                    {caseAssets.length > 0 && (
+                      <div className="pt-2 border-t border-border/50">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                          <Laptop className="size-3 text-primary" /> Allotted Hardware Assets ({caseAssets.length})
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {caseAssets.map((asset) => (
+                            <div
+                              key={asset.id}
+                              className="text-xs bg-background/80 border rounded-lg p-2 flex items-center justify-between"
+                            >
+                              <div>
+                                <div className="font-semibold text-foreground">{asset.assetType}</div>
+                                <div className="font-mono text-[11px] text-muted-foreground">
+                                  {asset.assetCode} {asset.serialNumber ? `• S/N: ${asset.serialNumber}` : ""}
+                                </div>
+                              </div>
+                              <span className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded font-medium capitalize">
+                                {asset.condition || "Assigned"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Display Currently Provisioned Accounts */}
+                    {caseAccounts.length > 0 && (
+                      <div className="pt-2 border-t border-border/50">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                          <Layers className="size-3 text-primary" /> Provisioned Work Accounts ({caseAccounts.length})
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {caseAccounts.map((acc) => (
+                            <div
+                              key={acc.id}
+                              className="text-xs bg-background/80 border rounded-lg p-2.5 flex items-center justify-between"
+                            >
+                              <div className="min-w-0 pr-2">
+                                <span className="font-semibold text-foreground block truncate">{acc.serviceName}</span>
+                                {acc.username && (
+                                  <span className="text-[11px] text-muted-foreground truncate block">
+                                    Login: <code className="bg-muted px-1 py-0.5 rounded text-foreground font-mono">{acc.username}</code>
+                                  </span>
+                                )}
+                              </div>
+                              <span className="size-2 rounded-full bg-emerald-500 shrink-0" title="Active"></span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <DialogFooter>
@@ -596,155 +936,377 @@ export function OnboardingPage() {
         </Dialog>
       )}
 
-      {/* Simulated Email & Account Activation Experience (Section 9 & 19) */}
-      {inviteSimCase && (
-        <Dialog open={!!inviteSimCase} onOpenChange={(o) => !o && setInviteSimCase(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Mail className="size-5 text-primary" /> Simulated Employee Invitation
-              </DialogTitle>
-              <DialogDescription>
-                Simulates what the new hire receives in their personal email inbox.
-              </DialogDescription>
-            </DialogHeader>
+      {/* Allot Hardware Asset Modal */}
+      <Dialog open={!!allotModalCase} onOpenChange={(o) => !o && setAllotModalCase(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Laptop className="size-5 text-primary" /> Allot Company Asset
+            </DialogTitle>
+            <DialogDescription>
+              Assign hardware equipment to {allotModalCase ? nameOf(allotModalCase.employeeId) : "employee"}. Triggers an official assignment email alert.
+            </DialogDescription>
+          </DialogHeader>
 
-            {simStep === "email" && (
-              <div className="space-y-4 py-2 text-sm">
-                <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-1 text-xs">
-                  <p><span className="font-semibold">To:</span> {employees.find((e) => e.id === inviteSimCase.employeeId)?.email}</p>
-                  <p><span className="font-semibold">From:</span> hr-noreply@peoplepay360.io</p>
-                  <p><span className="font-semibold">Subject:</span> Welcome to PeoplePay360 — Set up your corporate account</p>
+          <div className="space-y-3 py-2">
+            <div className="flex rounded-lg bg-muted p-1 gap-1">
+              <button
+                type="button"
+                className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-all ${
+                  allotMode === "new"
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setAllotMode("new")}
+              >
+                Register &amp; Allot New Asset
+              </button>
+              <button
+                type="button"
+                className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-all ${
+                  allotMode === "inventory"
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setAllotMode("inventory")}
+              >
+                Pick Available Inventory ({availableAssets.length})
+              </button>
+            </div>
+
+            {allotMode === "inventory" ? (
+              availableAssets.length > 0 ? (
+                <Field label="Select Available Asset">
+                  <Select value={selectedAssetId} onValueChange={setSelectedAssetId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select asset from inventory" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableAssets.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name || a.assetType} — {a.tag || a.assetCode} ({a.condition || "Good"})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : (
+                <div className="text-center py-6 border border-dashed rounded-lg text-xs text-muted-foreground">
+                  No unassigned assets currently in inventory. Switch to "Register &amp; Allot New Asset" to catalog one.
                 </div>
+              )
+            ) : (
+              <>
+                <Field label="Asset Type / Model">
+                  <Select
+                    value={assetForm.assetType}
+                    onValueChange={(v) => setAssetForm({ ...assetForm, assetType: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select asset model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MacBook Pro 16&quot; M3 Max">MacBook Pro 16" M3 Max</SelectItem>
+                      <SelectItem value="MacBook Air 15&quot; M3">MacBook Air 15" M3</SelectItem>
+                      <SelectItem value="Dell XPS 15 (i9 / 32GB)">Dell XPS 15 (i9 / 32GB)</SelectItem>
+                      <SelectItem value="ThinkPad X1 Carbon Gen 11">ThinkPad X1 Carbon Gen 11</SelectItem>
+                      <SelectItem value="Dell UltraSharp 27&quot; 4K Monitor">Dell UltraSharp 27" 4K Monitor</SelectItem>
+                      <SelectItem value="Apple Studio Display 27&quot;">Apple Studio Display 27"</SelectItem>
+                      <SelectItem value="Apple Magic Keyboard &amp; Mouse">Apple Magic Keyboard &amp; Mouse</SelectItem>
+                      <SelectItem value="Logitech MX Master 3S">Logitech MX Master 3S</SelectItem>
+                      <SelectItem value="YubiKey 5C NFC Security Key">YubiKey 5C NFC Security Key</SelectItem>
+                      <SelectItem value="Herman Miller Aeron Chair">Herman Miller Aeron Chair</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-                <div className="rounded-lg border border-border p-4 space-y-3 bg-card">
-                  <p className="font-medium text-foreground">
-                    Dear {nameOf(inviteSimCase.employeeId)},
-                  </p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Welcome to the team! Your employee profile has been created. Click the link below to set your account password and begin your onboarding checklist:
-                  </p>
-
-                  <Button className="w-full mt-2" onClick={() => setSimStep("password")}>
-                    Set Password & Activate Account <ArrowRight className="size-4 ml-1.5" />
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {simStep === "password" && (
-              <div className="space-y-4 py-2">
-                <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <KeyRound className="size-5 text-primary" />
-                    <p className="font-medium text-sm">Set Your Workspace Password</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Create a secure password to unlock your PeoplePay360 self-service workspace:
-                  </p>
-
-                  <Field label="New Password" error={simPasswordError}>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Asset Code / Tag">
                     <Input
-                      type="password"
-                      placeholder="Minimum 6 characters"
-                      value={simPassword}
-                      onChange={(e) => {
-                        setSimPassword(e.target.value);
-                        setSimPasswordError("");
-                      }}
+                      value={assetForm.assetCode}
+                      onChange={(e) => setAssetForm({ ...assetForm, assetCode: e.target.value })}
+                      placeholder="e.g. AST-1049"
                     />
                   </Field>
 
-                  <Button className="w-full" onClick={handleSimulateActivatePassword}>
-                    Activate & Begin Onboarding
-                  </Button>
+                  <Field label="Serial Number">
+                    <Input
+                      value={assetForm.serialNumber}
+                      onChange={(e) => setAssetForm({ ...assetForm, serialNumber: e.target.value })}
+                      placeholder="e.g. C02XG184MD6R"
+                    />
+                  </Field>
                 </div>
-              </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Initial Condition">
+                    <Select
+                      value={assetForm.condition}
+                      onValueChange={(v) => setAssetForm({ ...assetForm, condition: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="good">Good (Standard)</SelectItem>
+                        <SelectItem value="new">Brand New</SelectItem>
+                        <SelectItem value="fair">Fair</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field label="Deployment Location">
+                    <Input
+                      value={assetForm.location}
+                      onChange={(e) => setAssetForm({ ...assetForm, location: e.target.value })}
+                      placeholder="HQ Operations / Remote"
+                    />
+                  </Field>
+                </div>
+              </>
             )}
 
-            {simStep === "done" && (
-              <div className="space-y-4 py-4 text-center">
-                <div className="rounded-full bg-success/15 p-3 text-success inline-flex">
-                  <CheckCircle2 className="size-8" />
-                </div>
-                <h3 className="font-bold text-lg">Account Activated!</h3>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  Account status updated to Activated. Default zero-trust permissions and day-one onboarding checklist have been provisioned.
-                </p>
+            <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-2.5 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+              <Mail className="size-4 shrink-0 mt-0.5 text-blue-600" />
+              <span>
+                Employee will receive an immediate assignment confirmation email specifying equipment specs, tag ID, and custody security guidelines.
+              </span>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAllotModalCase(null)} disabled={submittingAsset}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAllotAsset}
+              disabled={submittingAsset || (allotMode === "inventory" && !selectedAssetId)}
+              className="bg-primary text-primary-foreground font-medium"
+            >
+              {submittingAsset ? "Allotting & Sending Email..." : "Allot Asset & Send Alert"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Provision Work Accounts Modal */}
+      <Dialog open={!!provisionModalCase} onOpenChange={(o) => !o && setProvisionModalCase(null)}>
+        <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[92vh] flex flex-col p-6 sm:p-7">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Layers className="size-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold">
+                  Provision Work Accounts &amp; Access Credentials
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  Configure workspace tools, developer access, and secure initial passwords for{" "}
+                  <span className="font-semibold text-foreground">
+                    {provisionModalCase ? nameOf(provisionModalCase.employeeId) : "employee"}
+                  </span>{" "}
+                  ({employees.find((e) => e.id === provisionModalCase?.employeeId)?.email || "work email"}).
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-3.5 py-1">
+            {/* Quick Action Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-muted/50 border text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-foreground">
+                  {provisionServices.filter((s) => s.enabled).length} of {provisionServices.length} tools selected
+                </span>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-muted-foreground">
+                  Credentials are automatically emailed to the employee upon confirmation
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <Button
-                  className="w-full"
-                  onClick={() => {
-                    const c = inviteSimCase;
-                    setInviteSimCase(null);
-                    if (c) setActiveChecklistCaseId(c.id);
-                  }}
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs px-2.5"
+                  onClick={handleToggleSelectAll}
                 >
-                  Open Onboarding Checklist
+                  {provisionServices.every((s) => s.enabled) ? "Deselect All" : "Select All"}
                 </Button>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Provisioning Pipeline Details Modal (Section 19) */}
-      {showProvisioningDetails && (
-        <Dialog
-          open={!!showProvisioningDetails}
-          onOpenChange={(o) => !o && setShowProvisioningDetails(null)}
-        >
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle>Account Provisioning Pipeline</DialogTitle>
-                <StatusBadge status={showProvisioningDetails.overallStatus} />
-              </div>
-              <DialogDescription>
-                Automated account creation telemetry for {showProvisioningDetails.employeeName}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3 py-2">
-              <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs space-y-1">
-                <p><span className="text-muted-foreground">Corporate Email:</span> {showProvisioningDetails.companyEmail}</p>
-                <p><span className="text-muted-foreground">Account Status:</span> {showProvisioningDetails.accountActivated ? "Activated" : "Pending Password"}</p>
-                <p><span className="text-muted-foreground">Assigned Roles:</span> {showProvisioningDetails.defaultPermissions.join(", ")}</p>
-              </div>
-
-              <div className="space-y-2 border rounded-lg p-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Telemetry Checklist Steps
-                </p>
-                {showProvisioningDetails.steps.map((st) => (
-                  <div key={st.key} className="flex items-center justify-between text-xs py-1 border-b last:border-0">
-                    <span className="font-medium">
-                      {st.step}. {st.label}
-                    </span>
-                    <StatusBadge status={st.status} />
-                  </div>
-                ))}
-              </div>
-
-              {showProvisioningDetails.overallStatus === "Failed" && (
                 <Button
-                  className="w-full"
+                  type="button"
+                  size="sm"
                   variant="outline"
-                  onClick={() => {
-                    retryProvisioning(showProvisioningDetails.id);
-                    toast.success("Retried provisioning pipeline successfully");
-                  }}
+                  className="h-7 text-xs px-2.5 gap-1.5"
+                  onClick={handleRegenerateAllPasswords}
                 >
-                  <RefreshCw className="size-4 mr-2" /> Retry Failed Provisioning
+                  <RotateCcw className="size-3" /> Regenerate Passwords
                 </Button>
-              )}
+              </div>
             </div>
 
-            <DialogFooter>
-              <Button onClick={() => setShowProvisioningDetails(null)}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+            {/* List of Accounts */}
+            <div className="space-y-3 max-h-[48vh] overflow-y-auto pr-1">
+              {provisionServices.map((svc, idx) => (
+                <div
+                  key={svc.serviceName}
+                  className={`rounded-xl border p-4 transition-all ${
+                    svc.enabled
+                      ? "bg-card border-primary/30 shadow-xs ring-1 ring-primary/10"
+                      : "bg-muted/20 border-border/50 opacity-60 hover:opacity-80"
+                  }`}
+                >
+                  {/* Card Header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id={`svc-${idx}`}
+                        checked={svc.enabled}
+                        onCheckedChange={(checked) => {
+                          setProvisionServices((prev) =>
+                            prev.map((item, i) => (i === idx ? { ...item, enabled: Boolean(checked) } : item))
+                          );
+                        }}
+                      />
+                      <div>
+                        <label
+                          htmlFor={`svc-${idx}`}
+                          className="text-sm font-semibold cursor-pointer text-foreground flex items-center gap-2"
+                        >
+                          {svc.serviceName}
+                          <span className="text-[11px] font-normal text-muted-foreground">
+                            ({svc.category})
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${
+                        svc.enabled
+                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {svc.enabled ? "Provisioning Active" : "Disabled"}
+                    </span>
+                  </div>
+
+                  {/* 2-Column Inputs: Username / Email and Password */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                        Username / Work Email
+                      </label>
+                      <Input
+                        className="h-9 text-xs font-mono bg-background"
+                        value={svc.username}
+                        disabled={!svc.enabled}
+                        placeholder="e.g. username@company.com"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setProvisionServices((prev) =>
+                            prev.map((item, i) => (i === idx ? { ...item, username: val } : item))
+                          );
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block flex items-center justify-between">
+                        <span>Initial Temporary Password</span>
+                        <span className="text-[10px] text-muted-foreground">Prompted to change upon 1st login</span>
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <div className="relative flex-1">
+                          <Input
+                            className="h-9 text-xs font-mono pr-8 bg-background"
+                            type={svc.showPassword ? "text" : "password"}
+                            value={svc.password}
+                            disabled={!svc.enabled}
+                            placeholder="Temporary Password"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setProvisionServices((prev) =>
+                                prev.map((item, i) => (i === idx ? { ...item, password: val } : item))
+                              );
+                            }}
+                          />
+                          <button
+                            type="button"
+                            disabled={!svc.enabled}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                            onClick={() => {
+                              setProvisionServices((prev) =>
+                                prev.map((item, i) => (i === idx ? { ...item, showPassword: !item.showPassword } : item))
+                              );
+                            }}
+                            title={svc.showPassword ? "Hide password" : "Show password"}
+                          >
+                            {svc.showPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                          </button>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-9 px-2.5 shrink-0"
+                          disabled={!svc.enabled}
+                          onClick={() => handleRegeneratePassword(idx)}
+                          title="Regenerate password for this service"
+                        >
+                          <RotateCcw className="size-3.5" />
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-9 px-2.5 shrink-0"
+                          disabled={!svc.enabled}
+                          onClick={() => handleCopyPassword(`svc-${idx}`, svc.password)}
+                          title="Copy password to clipboard"
+                        >
+                          {copiedKey === `svc-${idx}` ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Email Dispatch Notice */}
+            <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2.5">
+              <Mail className="size-4 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+              <div className="space-y-0.5">
+                <div className="font-semibold">Automatic Dispatch to Employee Work Inbox</div>
+                <p className="text-[11px] leading-relaxed text-blue-600/90 dark:text-blue-300/90">
+                  When submitted, PeoplePay360 delivers an encrypted notification to the employee containing both their usernames, temporary access passwords, direct login URLs, and corporate security guidelines.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t mt-1">
+            <Button variant="outline" onClick={() => setProvisionModalCase(null)} disabled={submittingAccounts}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleProvisionAccounts}
+              disabled={submittingAccounts || provisionServices.filter((s) => s.enabled).length === 0}
+              className="bg-primary text-primary-foreground font-semibold px-5"
+            >
+              {submittingAccounts
+                ? "Provisioning Accounts & Alerting..."
+                : `Provision ${provisionServices.filter((s) => s.enabled).length} Accounts & Send Email Alert`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

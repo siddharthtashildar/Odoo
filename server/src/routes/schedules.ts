@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { resolveEmployee } from "../lib/resolve-employee";
+import { sendScheduleUpdateEmail } from "../lib/email";
 
 const router = Router();
 
@@ -406,6 +407,33 @@ router.patch("/:id", async (req, res) => {
       }
     }
 
+    // Notify all employees assigned to this schedule about the updated timings
+    try {
+      const assignedRows: any[] = await prisma.$queryRawUnsafe(
+        `SELECT e.id, e.full_name, e.email FROM employee_schedules es
+         JOIN employees e ON es.employee_id = e.id
+         WHERE es.schedule_id = $1::uuid AND e.email IS NOT NULL;`,
+        id,
+      );
+      for (const emp of assignedRows) {
+        if (emp.email) {
+          sendScheduleUpdateEmail({
+            to: emp.email,
+            employeeName: emp.full_name,
+            scheduleName: name.trim(),
+            shiftType,
+            startTime,
+            endTime,
+            workingDays: days,
+            dailyHours,
+            weeklyHours,
+          }).catch((e) => console.warn(`[schedules] Failed to send update email to ${emp.email}:`, e));
+        }
+      }
+    } catch (mailErr) {
+      console.warn("[schedules] Error dispatching schedule patch emails:", mailErr);
+    }
+
     res.json({
       success: true,
       message: "Schedule updated in database",
@@ -525,6 +553,34 @@ router.post("/:id/assign", async (req, res) => {
         where: { employee_id: empId, status: "active" },
         data: { working_hours_per_week: Number(schedule.weekly_hours || 40) },
       });
+    }
+
+    // Send email alert to assigned employees
+    if (resolvedIds.length > 0) {
+      try {
+        const assignedEmps = await prisma.employees.findMany({
+          where: { id: { in: resolvedIds } },
+          select: { id: true, full_name: true, email: true },
+        });
+
+        for (const emp of assignedEmps) {
+          if (emp.email) {
+            sendScheduleUpdateEmail({
+              to: emp.email,
+              employeeName: emp.full_name,
+              scheduleName: schedule.name,
+              shiftType: schedule.shift_type || "General",
+              startTime: schedule.start_time,
+              endTime: schedule.end_time,
+              workingDays: Array.isArray(schedule.working_days) ? schedule.working_days : [],
+              dailyHours: Number(schedule.daily_hours || 8),
+              weeklyHours: Number(schedule.weekly_hours || 40),
+            }).catch((e) => console.warn(`[schedules] Failed to send email to ${emp.email}:`, e));
+          }
+        }
+      } catch (emailErr) {
+        console.warn("[schedules] Error dispatching schedule assignment emails:", emailErr);
+      }
     }
 
     res.json({

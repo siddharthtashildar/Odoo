@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { resolveEmployee } from "../lib/resolve-employee";
+import { sendAssetAllotmentEmail } from "../lib/email";
 
 const router = Router();
 
@@ -154,6 +155,19 @@ router.post("/", async (req, res) => {
           status: "assigned",
         },
       });
+
+      const emp = await prisma.employees.findUnique({ where: { id: employeeId } });
+      if (emp?.email) {
+        sendAssetAllotmentEmail({
+          to: emp.email,
+          employeeName: emp.full_name,
+          assetCode: created.asset_code,
+          assetType: created.asset_type,
+          serialNumber: created.serial_number || undefined,
+          condition: created.condition,
+          location: created.location || undefined,
+        }).catch((e) => console.warn("Asset allotment mail error:", e));
+      }
     }
 
     res.status(201).json({ success: true, data: { id: created.id } });
@@ -222,6 +236,19 @@ router.patch("/:id", async (req, res) => {
           status: "assigned",
         },
       });
+
+      const emp = await prisma.employees.findUnique({ where: { id: employeeId } });
+      if (emp?.email) {
+        sendAssetAllotmentEmail({
+          to: emp.email,
+          employeeName: emp.full_name,
+          assetCode: updated.asset_code,
+          assetType: updated.asset_type,
+          serialNumber: updated.serial_number || undefined,
+          condition: updated.condition,
+          location: updated.location || undefined,
+        }).catch((e) => console.warn("Asset allotment update mail error:", e));
+      }
     } else if (employeeId === null || statusNorm === "available") {
       await prisma.asset_assignments.updateMany({
         where: { asset_id: updated.id, status: "assigned" },

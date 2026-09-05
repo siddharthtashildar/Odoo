@@ -1,5 +1,10 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
+import {
+  sendServiceAccountsEmail,
+  sendAssetAllotmentEmail,
+  sendOffboardingCompletionEmail,
+} from "../lib/email";
 
 const router = Router();
 
@@ -15,24 +20,31 @@ router.get("/onboarding", async (_req, res) => {
             full_name: true,
             email: true,
             joining_date: true,
+            reporting_manager_id: true,
           },
         },
         onboarding_tasks: {
           orderBy: { sequence: "asc" },
         },
       },
+      orderBy: { created_at: "desc" },
     });
+
+    // Fetch managers for reference if needed
+    const managerIds = processes
+      .map((p) => p.employees?.reporting_manager_id)
+      .filter((id): id is string => Boolean(id));
+
+    const managers = managerIds.length > 0
+      ? await prisma.employees.findMany({
+          where: { id: { in: managerIds } },
+          select: { id: true, full_name: true },
+        })
+      : [];
+    const managerMap = new Map(managers.map((m) => [m.id, m.full_name]));
 
     const mapped = processes.map((p) => {
       const rawStatus = p.status as string;
-      const statusMap: Record<string, "Invitation Sent" | "Account Created" | "In Progress" | "Completed" | "Overdue"> = {
-        in_progress: "In Progress",
-        invitation_sent: "Invitation Sent",
-        account_created: "Account Created",
-        completed: "Completed",
-        overdue: "Overdue",
-        pending: "Invitation Sent",
-      };
 
       const tasks = p.onboarding_tasks.map((t) => {
         const ownerMap: Record<string, "Employee" | "HR" | "IT" | "Payroll" | "Manager"> = {
@@ -58,19 +70,36 @@ router.get("/onboarding", async (_req, res) => {
         };
       });
 
+      const allDone = tasks.length > 0 && tasks.every((t) => t.done);
+      const anyDone = tasks.some((t) => t.done);
+      const hasChangedPassword = p.notes?.includes("password_changed") || false;
+
+      let computedStatus: "Invitation Sent" | "Account Created" | "In Progress" | "Completed" | "Overdue" = "Invitation Sent";
+      if (rawStatus === "completed" || allDone) {
+        computedStatus = "Completed";
+      } else if (hasChangedPassword || anyDone) {
+        computedStatus = "In Progress";
+      } else {
+        computedStatus = "Invitation Sent";
+      }
+
+      const managerName = p.employees?.reporting_manager_id
+        ? managerMap.get(p.employees.reporting_manager_id) ?? "Reporting Manager"
+        : "HR Manager";
+
       return {
         id: p.id,
         employeeId: p.employee_id,
-        employeeCode: p.employees.employee_code,
-        employeeName: p.employees.full_name,
+        employeeCode: p.employees?.employee_code ?? "PP-0000",
+        employeeName: p.employees?.full_name ?? "Employee",
         startDate: p.started_at instanceof Date ? p.started_at.toISOString().slice(0, 10) : String(p.started_at),
         dueDate: (() => {
           const d = p.started_at instanceof Date ? p.started_at : new Date(String(p.started_at));
           return new Date(d.getTime() + 30 * 86400000).toISOString().slice(0, 10);
         })(),
-        buddy: (p as any).buddy ?? "Rohan Mehta",
-        assignedHr: (p as any).assigned_hr ?? "Sana Iqbal",
-        status: statusMap[rawStatus] ?? "In Progress",
+        buddy: (p as any).buddy || managerName,
+        assignedHr: (p as any).assigned_hr || "HR Manager",
+        status: computedStatus,
         invitationSentDate: p.started_at instanceof Date ? p.started_at.toISOString().slice(0, 10) : String(p.started_at),
         accountCreatedDate: p.completed_at?.toISOString().slice(0, 10),
         tasks,
@@ -79,7 +108,7 @@ router.get("/onboarding", async (_req, res) => {
 
     res.json({ success: true, data: mapped });
   } catch (err) {
-    console.error(err);
+    console.error("Fetch onboarding error:", err);
     res.status(500).json({ success: false, error: "Failed to fetch onboarding cases" });
   }
 });
@@ -98,6 +127,25 @@ router.post("/onboarding", async (req, res) => {
       return res.status(400).json({ success: false, error: "employeeId is required" });
     }
 
+    // Check if onboarding process already exists for this employee
+    const existing = await prisma.onboarding_processes.findUnique({
+      where: { employee_id: employeeId },
+      include: {
+        employees: { select: { id: true, employee_code: true, full_name: true, email: true } },
+      },
+    });
+
+    if (existing) {
+      return res.json({
+        success: true,
+        data: {
+          id: existing.id,
+          employeeId: existing.employee_id,
+          employeeName: existing.employees.full_name,
+        },
+      });
+    }
+
     const defaultTasks = [
       { task_name: "Complete personal profile", responsible_department: "Employee", sequence: 1 },
       { task_name: "Add emergency contact", responsible_department: "Employee", sequence: 2 },
@@ -112,10 +160,10 @@ router.post("/onboarding", async (req, res) => {
     const process = await prisma.onboarding_processes.create({
       data: {
         employee_id: employeeId,
-        status: "invitation_sent",
-        assigned_hr: assignedHr ?? "Sana Iqbal",
-        buddy: buddy ?? "Rohan Mehta",
-        notes: notes ?? null,
+        status: "in_progress",
+        assigned_hr: assignedHr || "HR Operations",
+        buddy: buddy || "Assigned Mentor",
+        notes: notes || null,
         onboarding_tasks: {
           create: defaultTasks.map((t) => ({
             task_name: t.task_name,
@@ -124,7 +172,7 @@ router.post("/onboarding", async (req, res) => {
             status: "not_started",
           })),
         },
-      } as any,
+      },
       include: {
         employees: { select: { id: true, employee_code: true, full_name: true, email: true } },
         onboarding_tasks: { orderBy: { sequence: "asc" } },
@@ -140,7 +188,7 @@ router.post("/onboarding", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    console.error("Create onboarding error:", err);
     res.status(500).json({ success: false, error: "Failed to create onboarding case" });
   }
 });
@@ -151,27 +199,28 @@ router.patch("/onboarding/:id", async (req, res) => {
     const { id } = req.params;
     const { status } = req.body as { status?: string };
 
-    const statusMap: Record<string, string> = {
-      "Invitation Sent": "invitation_sent",
-      "Account Created": "account_created",
-      "In Progress": "in_progress",
-      "Completed": "completed",
-      "Overdue": "overdue",
-    };
+    const isCompleted = status === "Completed" || status === "completed";
+    const dbStatus = isCompleted ? "completed" : "in_progress";
 
-    const dbStatus = statusMap[status ?? ""] ?? status ?? undefined;
-
-    await prisma.onboarding_processes.update({
+    const updated = await prisma.onboarding_processes.update({
       where: { id },
       data: {
-        ...(dbStatus && { status: dbStatus }),
-        ...(dbStatus === "completed" && { completed_at: new Date() }),
-      } as any,
+        status: dbStatus,
+        completed_at: isCompleted ? new Date() : null,
+      },
+      include: { employees: true },
     });
+
+    if (isCompleted && updated.employee_id) {
+      await prisma.employees.update({
+        where: { id: updated.employee_id },
+        data: { status: "active" },
+      });
+    }
 
     res.json({ success: true, data: { id } });
   } catch (err) {
-    console.error(err);
+    console.error("Update onboarding error:", err);
     res.status(500).json({ success: false, error: "Failed to update onboarding case" });
   }
 });
@@ -179,7 +228,7 @@ router.patch("/onboarding/:id", async (req, res) => {
 // ── PATCH /api/onboarding/:id/tasks/:taskId ───────────────────────────────────
 router.patch("/onboarding/:id/tasks/:taskId", async (req, res) => {
   try {
-    const { taskId } = req.params;
+    const { id, taskId } = req.params;
     const { done } = req.body as { done: boolean };
 
     await prisma.onboarding_tasks.update({
@@ -190,10 +239,296 @@ router.patch("/onboarding/:id/tasks/:taskId", async (req, res) => {
       },
     });
 
-    res.json({ success: true, data: { id: taskId } });
+    // Check if all tasks are completed
+    const allTasks = await prisma.onboarding_tasks.findMany({
+      where: { onboarding_process_id: id },
+    });
+
+    const allDone = allTasks.length > 0 && allTasks.every((t) => t.status === "completed");
+
+    if (allDone) {
+      const proc = await prisma.onboarding_processes.update({
+        where: { id },
+        data: {
+          status: "completed",
+          completed_at: new Date(),
+        },
+      });
+
+      if (proc.employee_id) {
+        await prisma.employees.update({
+          where: { id: proc.employee_id },
+          data: { status: "active" },
+        });
+      }
+    } else {
+      await prisma.onboarding_processes.update({
+        where: { id },
+        data: {
+          status: "in_progress",
+          completed_at: null,
+        },
+      });
+    }
+
+    res.json({ success: true, data: { id: taskId, allDone } });
   } catch (err) {
-    console.error(err);
+    console.error("Update task error:", err);
     res.status(500).json({ success: false, error: "Failed to update task" });
+  }
+});
+
+// ── GET /api/onboarding/:id/service-accounts ──────────────────────────────────
+router.get("/onboarding/:id/service-accounts", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const proc = await prisma.onboarding_processes.findUnique({
+      where: { id },
+      include: { employees: true },
+    });
+    if (!proc) {
+      return res.status(404).json({ success: false, error: "Onboarding process not found" });
+    }
+
+    const accounts = await prisma.service_accounts.findMany({
+      where: {
+        OR: [
+          { onboarding_process_id: id },
+          { employee_id: proc.employee_id },
+        ],
+      },
+      orderBy: { requested_at: "desc" },
+    });
+
+    res.json({
+      success: true,
+      data: accounts.map((a) => ({
+        id: a.id,
+        serviceName: a.service_name,
+        username: a.username,
+        status: a.status,
+        requestedAt: a.requested_at.toISOString(),
+        createdDate: a.created_date?.toISOString(),
+      })),
+    });
+  } catch (err) {
+    console.error("Fetch service accounts error:", err);
+    res.status(500).json({ success: false, error: "Failed to fetch service accounts" });
+  }
+});
+
+// ── POST /api/onboarding/:id/service-accounts ─────────────────────────────────
+router.post("/onboarding/:id/service-accounts", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { accounts } = req.body as {
+      accounts: Array<{ serviceName: string; username?: string; password?: string }>;
+    };
+
+    if (!accounts || accounts.length === 0) {
+      return res.status(400).json({ success: false, error: "No accounts provided" });
+    }
+
+    const proc = await prisma.onboarding_processes.findUnique({
+      where: { id },
+      include: { employees: true },
+    });
+    if (!proc || !proc.employees) {
+      return res.status(404).json({ success: false, error: "Onboarding process or employee not found" });
+    }
+
+    const createdAccounts = [];
+    for (const acc of accounts) {
+      const existing = await prisma.service_accounts.findFirst({
+        where: {
+          employee_id: proc.employee_id,
+          service_name: acc.serviceName,
+        },
+      });
+
+      if (existing) {
+        const updated = await prisma.service_accounts.update({
+          where: { id: existing.id },
+          data: {
+            username: acc.username || existing.username,
+            status: "created",
+            onboarding_process_id: id,
+            created_date: new Date(),
+          },
+        });
+        createdAccounts.push(updated);
+      } else {
+        const created = await prisma.service_accounts.create({
+          data: {
+            employee_id: proc.employee_id,
+            service_name: acc.serviceName,
+            username: acc.username || "",
+            status: "created",
+            onboarding_process_id: id,
+            created_date: new Date(),
+          },
+        });
+        createdAccounts.push(created);
+      }
+    }
+
+    // Send email alert to the employee
+    if (proc.employees.email) {
+      try {
+        await sendServiceAccountsEmail({
+          to: proc.employees.email,
+          employeeName: proc.employees.full_name,
+          accounts: accounts.map((a) => ({
+            serviceName: a.serviceName,
+            username: a.username,
+            password: a.password,
+          })),
+        });
+      } catch (mailErr) {
+        console.warn("Failed to dispatch service accounts email alert:", mailErr);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: createdAccounts.map((a) => ({
+        id: a.id,
+        serviceName: a.service_name,
+        username: a.username,
+        status: a.status,
+        createdDate: a.created_date?.toISOString(),
+      })),
+    });
+  } catch (err) {
+    console.error("Create service accounts error:", err);
+    res.status(500).json({ success: false, error: "Failed to create service accounts" });
+  }
+});
+
+// ── GET /api/onboarding/:id/assets ────────────────────────────────────────────
+router.get("/onboarding/:id/assets", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const proc = await prisma.onboarding_processes.findUnique({
+      where: { id },
+    });
+    if (!proc) {
+      return res.status(404).json({ success: false, error: "Onboarding process not found" });
+    }
+
+    const assignedAssets = await prisma.assets.findMany({
+      where: { current_employee_id: proc.employee_id },
+      orderBy: { created_at: "desc" },
+    });
+
+    res.json({
+      success: true,
+      data: assignedAssets.map((a) => ({
+        id: a.id,
+        assetCode: a.asset_code,
+        assetType: a.asset_type,
+        serialNumber: a.serial_number,
+        condition: a.condition,
+        status: a.status,
+        location: a.location,
+      })),
+    });
+  } catch (err) {
+    console.error("Fetch onboarding assets error:", err);
+    res.status(500).json({ success: false, error: "Failed to fetch assets" });
+  }
+});
+
+// ── POST /api/onboarding/:id/allot-asset ───────────────────────────────────────
+router.post("/onboarding/:id/allot-asset", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assetId, assetCode, assetType, serialNumber, condition, location } = req.body as {
+      assetId?: string;
+      assetCode?: string;
+      assetType: string;
+      serialNumber?: string;
+      condition?: "good" | "damaged" | "under_repair" | "retired";
+      location?: string;
+    };
+
+    const proc = await prisma.onboarding_processes.findUnique({
+      where: { id },
+      include: { employees: true },
+    });
+    if (!proc || !proc.employees) {
+      return res.status(404).json({ success: false, error: "Onboarding process or employee not found" });
+    }
+
+    let assignedAsset;
+    if (assetId) {
+      // Allot existing available asset
+      assignedAsset = await prisma.assets.update({
+        where: { id: assetId },
+        data: {
+          status: "assigned",
+          current_employee_id: proc.employee_id,
+          location: location || "HQ Operations",
+        },
+      });
+    } else {
+      // Create new asset record and assign
+      const code = assetCode || `AST-${Date.now().toString().slice(-5)}`;
+      assignedAsset = await prisma.assets.create({
+        data: {
+          asset_code: code,
+          asset_type: assetType,
+          serial_number: serialNumber || null,
+          condition: (condition as any) || "good",
+          status: "assigned",
+          location: location || "HQ Operations",
+          current_employee_id: proc.employee_id,
+        },
+      });
+    }
+
+    // Record asset assignment
+    await prisma.asset_assignments.create({
+      data: {
+        asset_id: assignedAsset.id,
+        employee_id: proc.employee_id,
+        condition_at_assignment: assignedAsset.condition,
+        status: "assigned",
+      },
+    });
+
+    // Send Asset Allotment Email alert to employee
+    if (proc.employees.email) {
+      try {
+        await sendAssetAllotmentEmail({
+          to: proc.employees.email,
+          employeeName: proc.employees.full_name,
+          assetType: assignedAsset.asset_type,
+          assetCode: assignedAsset.asset_code,
+          serialNumber: assignedAsset.serial_number || undefined,
+          condition: assignedAsset.condition,
+          location: assignedAsset.location || "HQ Operations",
+        });
+      } catch (mailErr) {
+        console.warn("Failed to dispatch asset allotment email alert:", mailErr);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: assignedAsset.id,
+        assetCode: assignedAsset.asset_code,
+        assetType: assignedAsset.asset_type,
+        serialNumber: assignedAsset.serial_number,
+        condition: assignedAsset.condition,
+        status: assignedAsset.status,
+        location: assignedAsset.location,
+      },
+    });
+  } catch (err) {
+    console.error("Allot asset error:", err);
+    res.status(500).json({ success: false, error: "Failed to allot asset" });
   }
 });
 
@@ -208,24 +543,20 @@ router.get("/offboarding", async (_req, res) => {
             employee_code: true,
             full_name: true,
             email: true,
+            reporting_manager_id: true,
           },
         },
         offboarding_clearance_tasks: {
           orderBy: { department: "asc" },
         },
       },
+      orderBy: { created_at: "desc" },
     });
 
     const mapped = processes.map((p) => {
       const rawStatus = p.status as string;
-      const statusMap: Record<string, "Initiated" | "Clearance" | "Exit Interview" | "Settlement" | "Completed"> = {
-        initiated: "Initiated",
-        in_progress: "Clearance",
-        exit_interview_completed: "Exit Interview",
-        settled: "Settlement",
-        completed: "Completed",
-      };
 
+      const fnfRaw = p.final_settlement_status ?? "pending";
       const fnfStatusMap: Record<string, "Pending" | "Computed" | "Approved" | "Disbursed"> = {
         pending: "Pending",
         computed: "Computed",
@@ -257,34 +588,45 @@ router.get("/offboarding", async (_req, res) => {
         };
       });
 
-      const fnfRaw = p.final_settlement_status ?? "pending";
+      const allCleared = clearance.length > 0 && clearance.every((c) => c.cleared);
+
+      let statusLabel: "Initiated" | "Clearance" | "Exit Interview" | "Settlement" | "Completed" = "Clearance";
+      if (rawStatus === "completed" || fnfRaw === "settled" || fnfRaw === "disbursed") {
+        statusLabel = "Completed";
+      } else if (allCleared && p.exit_interview_completed) {
+        statusLabel = "Settlement";
+      } else if (p.exit_interview_completed) {
+        statusLabel = "Clearance";
+      } else {
+        statusLabel = "Initiated";
+      }
 
       return {
         id: p.id,
         employeeId: p.employee_id,
-        employeeCode: p.employees.employee_code,
-        employeeName: p.employees.full_name,
+        employeeCode: p.employees?.employee_code ?? "PP-0000",
+        employeeName: p.employees?.full_name ?? "Departing Employee",
         lastWorkingDay: p.last_working_date.toISOString().slice(0, 10),
         resignationDate: p.resignation_date?.toISOString().slice(0, 10) ?? p.created_at.toISOString().slice(0, 10),
         reason: p.reason ?? "Voluntary career transition",
-        status: statusMap[rawStatus] ?? "Clearance",
-        handoverTo: "Team Member",
+        status: statusLabel,
+        handoverTo: "Designated Team Peer",
         exitInterviewDone: p.exit_interview_completed,
         exitInterviewNotes: p.exit_interview_notes ?? undefined,
         exitInterviewStatus: p.exit_interview_completed ? "Completed" : "Pending",
-        assetsReturned: (p as any).assets_returned ?? false,
-        accessRevoked: (p as any).access_revoked ?? false,
+        assetsReturned: p.assets_returned ?? false,
+        accessRevoked: p.access_revoked ?? false,
         fnfStatus: fnfStatusMap[fnfRaw] ?? "Pending",
-        finalSettlement: fnfStatusMap[fnfRaw] === "Disbursed" ? "settled" : fnfRaw,
-        finalPayrollStatus: fnfStatusMap[fnfRaw] === "Disbursed" ? "Processed" : "Pending",
-        clearanceStatus: clearance.every((c) => c.cleared) ? "Cleared" : "Pending",
+        finalSettlement: fnfRaw === "settled" || fnfRaw === "disbursed" ? "settled" : fnfRaw,
+        finalPayrollStatus: fnfRaw === "settled" || fnfRaw === "disbursed" ? "Processed" : "Pending",
+        clearanceStatus: allCleared ? "Cleared" : "Pending",
         clearance,
       };
     });
 
     res.json({ success: true, data: mapped });
   } catch (err) {
-    console.error(err);
+    console.error("Fetch offboarding error:", err);
     res.status(500).json({ success: false, error: "Failed to fetch offboarding cases" });
   }
 });
@@ -319,7 +661,7 @@ router.post("/offboarding", async (req, res) => {
         last_working_date: new Date(lastWorkingDay),
         resignation_date: resignationDate ? new Date(resignationDate) : new Date(),
         reason: reason ?? "Voluntary resignation",
-        status: "initiated",
+        status: "in_progress",
         exit_interview_completed: false,
         final_settlement_status: "pending",
         offboarding_clearance_tasks: {
@@ -329,25 +671,29 @@ router.post("/offboarding", async (req, res) => {
             status: "not_started",
           })),
         },
-      } as any,
+      },
       include: {
         employees: { select: { id: true, employee_code: true, full_name: true, email: true } },
         offboarding_clearance_tasks: true,
       },
     });
 
-    // Mark employee as offboarding
+    // Update employee status to notice_period
     await prisma.employees.update({
       where: { id: employeeId },
-      data: { status: "exited", exit_date: new Date(lastWorkingDay) },
+      data: { status: "notice_period", exit_date: new Date(lastWorkingDay) },
     });
 
     res.json({
       success: true,
-      data: { id: process.id, employeeId: process.employee_id, employeeName: process.employees.full_name },
+      data: {
+        id: process.id,
+        employeeId: process.employee_id,
+        employeeName: process.employees.full_name,
+      },
     });
   } catch (err) {
-    console.error(err);
+    console.error("Create offboarding error:", err);
     res.status(500).json({ success: false, error: "Failed to create offboarding case" });
   }
 });
@@ -381,7 +727,6 @@ router.patch("/offboarding/:id", async (req, res) => {
     if (exitInterviewDone !== undefined) patch["exit_interview_completed"] = exitInterviewDone;
     if (exitInterviewNotes !== undefined) patch["exit_interview_notes"] = exitInterviewNotes;
 
-    // Map frontend FNF status to DB value
     if (finalSettlement !== undefined) {
       const fnfMap: Record<string, string> = {
         settled: "settled",
@@ -392,37 +737,54 @@ router.patch("/offboarding/:id", async (req, res) => {
       patch["final_settlement_status"] = fnfMap[finalSettlement] ?? finalSettlement;
     }
 
-    // Map frontend status to DB offboarding_status_enum
     if (status !== undefined) {
-      const sMap: Record<string, string> = {
-        "Initiated": "initiated",
-        "Clearance": "in_progress",
-        "Exit Interview": "exit_interview_completed",
-        "Settlement": "settled",
-        "Completed": "completed",
-      };
-      patch["status"] = sMap[status] ?? "in_progress";
+      patch["status"] = status === "Completed" ? "completed" : "in_progress";
     }
 
     if (completeOffboarding) {
       patch["status"] = "completed";
       patch["final_settlement_status"] = "settled";
       patch["employee_marked_exited"] = true;
-      // Also mark all clearance tasks as done
+      patch["access_revoked"] = true;
+      patch["assets_returned"] = true;
+
+      // Mark all clearance tasks as completed
       await prisma.offboarding_clearance_tasks.updateMany({
         where: { offboarding_process_id: id },
         data: { status: "completed", completed_at: new Date() },
       });
+
       // Mark employee as exited
       const proc = await prisma.offboarding_processes.findUnique({
         where: { id },
-        select: { employee_id: true },
+        select: { employee_id: true, last_working_date: true },
       });
       if (proc) {
-        await prisma.employees.update({
+        const emp = await prisma.employees.update({
           where: { id: proc.employee_id },
-          data: { status: "exited" },
+          data: { status: "exited", exit_date: proc.last_working_date || new Date() },
         });
+
+        // Release any assets assigned to this employee
+        await prisma.assets.updateMany({
+          where: { current_employee_id: proc.employee_id },
+          data: { status: "available", current_employee_id: null },
+        });
+
+        // Dispatch offboarding clearance and exit settlement confirmation email
+        if (emp.email) {
+          try {
+            await sendOffboardingCompletionEmail({
+              to: emp.email,
+              employeeName: emp.full_name,
+              lastWorkingDay: proc.last_working_date
+                ? proc.last_working_date.toISOString().slice(0, 10)
+                : new Date().toISOString().slice(0, 10),
+            });
+          } catch (mailErr) {
+            console.warn("Failed to dispatch offboarding completion email:", mailErr);
+          }
+        }
       }
     }
 
@@ -433,7 +795,7 @@ router.patch("/offboarding/:id", async (req, res) => {
 
     res.json({ success: true, data: { id } });
   } catch (err) {
-    console.error(err);
+    console.error("Update offboarding error:", err);
     res.status(500).json({ success: false, error: "Failed to update offboarding case" });
   }
 });
@@ -441,7 +803,7 @@ router.patch("/offboarding/:id", async (req, res) => {
 // ── PATCH /api/offboarding/:id/clearance/:taskId ──────────────────────────────
 router.patch("/offboarding/:id/clearance/:taskId", async (req, res) => {
   try {
-    const { taskId } = req.params;
+    const { id, taskId } = req.params;
     const { cleared } = req.body as { cleared: boolean };
 
     await prisma.offboarding_clearance_tasks.update({
@@ -449,12 +811,18 @@ router.patch("/offboarding/:id/clearance/:taskId", async (req, res) => {
       data: {
         status: cleared ? "completed" : "not_started",
         completed_at: cleared ? new Date() : null,
-      } as any,
+      },
     });
 
-    res.json({ success: true, data: { id: taskId } });
+    // Check if all tasks are cleared
+    const allTasks = await prisma.offboarding_clearance_tasks.findMany({
+      where: { offboarding_process_id: id },
+    });
+    const allDone = allTasks.length > 0 && allTasks.every((t) => t.status === "completed");
+
+    res.json({ success: true, data: { id: taskId, allCleared: allDone } });
   } catch (err) {
-    console.error(err);
+    console.error("Update clearance task error:", err);
     res.status(500).json({ success: false, error: "Failed to update clearance task" });
   }
 });
@@ -498,7 +866,7 @@ router.get("/provisioning", async (_req, res) => {
 
     res.json({ success: true, data: mapped });
   } catch (err) {
-    console.error(err);
+    console.error("Fetch provisioning error:", err);
     res.status(500).json({ success: false, error: "Failed to fetch provisioning records" });
   }
 });

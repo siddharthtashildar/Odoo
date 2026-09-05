@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { resolveEmployee } from "../lib/resolve-employee";
+import { sendHelpdeskUpdateEmail } from "../lib/email";
 
 const router = Router();
 
@@ -164,6 +165,20 @@ router.post("/", async (req, res) => {
       }
     }
 
+    // Dispatch email notification to requester
+    if (emp.email) {
+      sendHelpdeskUpdateEmail({
+        to: emp.email,
+        employeeName: emp.full_name,
+        ticketNumber: ticket.ticket_number,
+        subject: ticket.subject,
+        category: ticket.category,
+        priority: ticket.priority,
+        updateType: "created",
+        status: "Open",
+      }).catch((e) => console.warn("[helpdesk] Email dispatch error on ticket create:", e));
+    }
+
     res.status(201).json({ success: true, data: { id: ticket.id, ticketNumber: ticket.ticket_number } });
   } catch (err) {
     console.error(err);
@@ -243,6 +258,37 @@ router.patch("/:id", async (req, res) => {
       },
     });
 
+    // Dispatch update email to employee
+    try {
+      const statusMap = {
+        open: "Open",
+        assigned: "In Progress",
+        in_progress: "In Progress",
+        waiting_for_employee: "Waiting for User",
+        resolved: "Resolved",
+        closed: "Closed",
+      };
+      const ticketWithEmp = await prisma.it_tickets.findUnique({
+        where: { id: existing.id },
+        include: { employees: { select: { full_name: true, email: true } } },
+      });
+      if (ticketWithEmp?.employees?.email) {
+        const prettyStatus = statusMap[ticketWithEmp.status as keyof typeof statusMap] || ticketWithEmp.status;
+        sendHelpdeskUpdateEmail({
+          to: ticketWithEmp.employees.email,
+          employeeName: ticketWithEmp.employees.full_name,
+          ticketNumber: ticketWithEmp.ticket_number,
+          subject: ticketWithEmp.subject,
+          category: ticketWithEmp.category,
+          priority: ticketWithEmp.priority,
+          updateType: "status_updated",
+          status: prettyStatus,
+        }).catch((e) => console.warn("[helpdesk] Email error on status update:", e));
+      }
+    } catch (mailErr) {
+      console.warn("[helpdesk] Failed to dispatch ticket status update email:", mailErr);
+    }
+
     res.json({ success: true, data: { id: updated.id } });
   } catch (err) {
     console.error(err);
@@ -315,6 +361,31 @@ router.post("/:id/comments", async (req, res) => {
         users: { select: { email: true } },
       },
     });
+
+    // Dispatch email alert about new comment to the employee
+    try {
+      const ticketWithEmp = await prisma.it_tickets.findUnique({
+        where: { id: existing.id },
+        include: { employees: { select: { full_name: true, email: true } } },
+      });
+      if (ticketWithEmp?.employees?.email) {
+        const commentAuthor = created.users?.email ? created.users.email.split("@")[0] : "IT Support";
+        sendHelpdeskUpdateEmail({
+          to: ticketWithEmp.employees.email,
+          employeeName: ticketWithEmp.employees.full_name,
+          ticketNumber: ticketWithEmp.ticket_number,
+          subject: ticketWithEmp.subject,
+          category: ticketWithEmp.category,
+          priority: ticketWithEmp.priority,
+          updateType: "comment_added",
+          status: ticketWithEmp.status,
+          comment: created.comment,
+          author: commentAuthor,
+        }).catch((e) => console.warn("[helpdesk] Email error on new comment:", e));
+      }
+    } catch (mailErr) {
+      console.warn("[helpdesk] Failed to dispatch ticket comment email:", mailErr);
+    }
 
     res.status(201).json({
       success: true,

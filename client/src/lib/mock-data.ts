@@ -56,6 +56,8 @@ export interface OnboardingTask {
 export interface OnboardingCase {
   id: string;
   employeeId: string;
+  employeeCode?: string;
+  employeeName?: string;
   startDate: string;
   dueDate: string;
   buddy: string;
@@ -67,19 +69,37 @@ export interface OnboardingCase {
   tasks: OnboardingTask[];
 }
 
+export interface OffboardingClearanceItem {
+  id: string;
+  department: "IT" | "Finance" | "HR" | "Admin";
+  item: string;
+  cleared: boolean;
+  clearedBy?: string;
+  clearedAt?: string;
+  remarks?: string;
+}
+
 export interface OffboardingCase {
   id: string;
   employeeId: string;
+  employeeCode?: string;
+  employeeName?: string;
   lastWorkingDay: string;
+  resignationDate?: string;
   reason: string;
-  manager: string;
+  manager?: string;
+  exitInterviewDone?: boolean;
+  exitInterviewNotes?: string;
   exitInterviewStatus: "Scheduled" | "Completed" | "Pending";
   assetsReturned: boolean;
   accessRevoked: boolean;
+  fnfStatus?: "Pending" | "Computed" | "Approved" | "Disbursed";
   finalPayrollStatus: "Pending" | "Processing" | "Processed";
   clearanceStatus: "Pending" | "Partial" | "Cleared";
   finalSettlement: "pending" | "processing" | "settled";
-  notes: string;
+  notes?: string;
+  handoverTo?: string;
+  clearance: OffboardingClearanceItem[];
 }
 
 export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled";

@@ -1,5 +1,137 @@
 [
   {
+    "id": "<be0fb892-3bc8-e8ed-b90a-e6374f35d1b6@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Time-Off Request Approved — Casual Leave",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-05T23:27:14.734Z"
+  },
+  {
+    "id": "<111ca2cc-ea56-bac5-649d-1e5847e09de4@gmail.com>",
+    "to": "sarham985@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Arham",
+    "role": "employee",
+    "temporaryPassword": "PP360!HIP5195",
+    "sentAt": "2026-09-05T23:22:38.854Z"
+  },
+  {
+    "id": "<cc53b662-ccf5-3f41-c91b-29a3fe639c6c@gmail.com>",
+    "to": "sidtheminerofficial@gmail.com",
+    "subject": "Your Work Accounts are Ready (GitHub, Slack, etc.) — PeoplePay360",
+    "employeeName": "Charlie Kirk",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-05T23:18:48.011Z"
+  },
+  {
+    "id": "<ff2e02c7-9aba-1f8f-925f-f22c00c4a14c@gmail.com>",
+    "to": "spamok92@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Siddharth Tashildar",
+    "role": "admin",
+    "temporaryPassword": "PeoplePayLive2026#",
+    "sentAt": "2026-09-05T23:16:53.167Z"
+  },
+  {
+    "id": "<02daaaea-5af4-e544-f94b-b0e0e62fef54@peoplepay360.io>",
+    "to": "sidtheminerofficial@gmail.com",
+    "subject": "Your Work Accounts are Ready (GitHub, Slack, etc.) — PeoplePay360",
+    "employeeName": "Charlie Kirk",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-05T23:11:20.301Z",
+    "previewUrl": "https://ethereal.email/message/apyhlglT7djrJ-fPapyhmGNZ89.4y80FAAAAARS-iybLSAOxCR6P4LVp1wo"
+  },
+  {
+    "id": "<dfe22a9e-8312-bbb1-38cd-c6ae52974628@peoplepay360.io>",
+    "to": "test-employee@peoplepay360.io",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Siddharth Test",
+    "role": "employee",
+    "temporaryPassword": "TestPassword#2026",
+    "sentAt": "2026-09-05T23:05:01.875Z",
+    "previewUrl": "https://ethereal.email/message/apyf9glT7djrJ8CuapygHmNZ89.4y8znAAAABYWQcaQDF.jrFf0zo53nYXw"
+  },
+  {
+    "id": "<04e6daaf-4783-afc7-6cb6-e622d7c2e144@peoplepay360.io>",
+    "to": "test-employee@peoplepay360.io",
+    "subject": "[TKT-1042] Ticket Status Updated: TKT-1042: VPN Access Token Expired",
+    "employeeName": "Ananya Iyer",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-05T23:04:57.541Z",
+    "previewUrl": "https://ethereal.email/message/apyf9glT7djrJ8CuapygGfNVsWIVeYjjAAAABLGzFYOqE0wYcnlXTrcBKzE"
+  },
+  {
+    "id": "<186dab51-1e9a-dbbd-f499-ae274487cf70@peoplepay360.io>",
+    "to": "test-employee@peoplepay360.io",
+    "subject": "Work Schedule Updated — Morning Shift (India Tech) (08:30 - 17:30)",
+    "employeeName": "Rohan Verma",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-05T23:04:43.757Z",
+    "previewUrl": "https://ethereal.email/message/apyf9glT7djrJ8CuapygDGNZ89.4y8zhAAAAAzG5uULSIkUDmFK7iX-M1go"
+  },
+  {
+    "id": "<f3eeed7c-163a-c8b4-44ff-0f044c8fc2c8@peoplepay360.io>",
+    "to": "test-employee@peoplepay360.io",
+    "subject": "Expense Claim Approved — Client Dinner & Travel",
+    "employeeName": "Priya Patel",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-05T23:04:39.670Z",
+    "previewUrl": "https://ethereal.email/message/apyf9glT7djrJ8CuapygCPNVsWIVeYjhAAAAAt5Q39f.bjLxASsg7WOA5Gc"
+  },
+  {
+    "id": "<4e554d44-452d-8180-c5b8-f182c339bb10@peoplepay360.io>",
+    "to": "test-employee@peoplepay360.io",
+    "subject": "Time-Off Request Approved — Casual Leave",
+    "employeeName": "Aarav Sharma",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-05T23:04:24.916Z",
+    "previewUrl": "https://ethereal.email/message/apyf9glT7djrJ8Cuapyf-WNZ89.4y8zfAAAAAR8ozKoXBJhiiAP-erfXn68"
+  },
+  {
+    "id": "msg-1788648828360-x7iag",
+    "to": "sidtheminerofficial@gmail.com",
+    "subject": "Company Asset Allocated — MacBook Pro 16\" M3 Max (AST-6179)",
+    "employeeName": "Charlie Kirk",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-05T22:53:50.340Z"
+  },
+  {
+    "id": "msg-1788648755900-p3h17",
+    "to": "sidtheminerofficial@gmail.com",
+    "subject": "Your Work Accounts are Ready (GitHub, Slack, etc.) — PeoplePay360",
+    "employeeName": "Charlie Kirk",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-05T22:52:59.220Z"
+  },
+  {
+    "id": "<7813ab59-75b6-10d0-99ff-29495e44e0ef@gmail.com>",
+    "to": "sidtheminerofficial@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Charlie Kirk",
+    "role": "employee",
+    "temporaryPassword": "PP360!I0AO835",
+    "sentAt": "2026-09-05T22:23:11.653Z"
+  },
+  {
+    "id": "<56ec3aae-93e5-4750-76ca-c81cf818a007@gmail.com>",
+    "to": "siddharthtashildar17@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Test",
+    "role": "employee",
+    "temporaryPassword": "TestPassword123!",
+    "sentAt": "2026-09-05T22:12:45.821Z"
+  },
+  {
     "id": "<b9d209f5-86a1-fc4a-7648-32e9c9569bab@gmail.com>",
     "to": "karan.shah@peoplepay360.io",
     "subject": "Payslip Statement for 2026-09 — Karan Shah",

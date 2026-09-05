@@ -60,6 +60,15 @@ export const api = {
           previewUrl?: string;
         }>
       >("GET", "/api/auth/dispatched-emails", undefined, { "x-user-role": callerRole }),
+    changePassword: (data: { email: string; currentPassword?: string; newPassword: string }) =>
+      request<{
+        userId: string;
+        email: string;
+        role: string;
+        employeeId: string | null;
+        employeeCode: string | null;
+        employeeName: string;
+      }>("POST", "/api/auth/change-password", data),
   },
 
   // ── Employees ─────────────────────────────────────────────────────────────
@@ -143,6 +152,9 @@ export const api = {
   payroll: {
     list: () => request<unknown[]>("GET", "/api/payroll"),
     get: (id: string) => request<unknown>("GET", `/api/payroll/${id}`),
+    myPayslips: (employeeId: string) =>
+      request<any[]>("GET", `/api/payroll/my-payslips?employeeId=${encodeURIComponent(employeeId)}`),
+    getPayslip: (id: string) => request<any>("GET", `/api/payroll/payslips/${id}`),
     getDashboardAnalytics: () => request<any>("GET", "/api/payroll/dashboard-analytics"),
     create: (data: Record<string, unknown>) =>
       request<{ id: string; generatedCount?: number; warnings?: any[] }>("POST", "/api/payroll", data),
@@ -264,6 +276,55 @@ export const api = {
       request<{ id: string }>("PATCH", `/api/onboarding/${id}`, data),
     patchTask: (processId: string, taskId: string, data: { done: boolean }) =>
       request<{ id: string }>("PATCH", `/api/onboarding/${processId}/tasks/${taskId}`, data),
+    getServiceAccounts: (processId: string) =>
+      request<Array<{
+        id: string;
+        serviceName: string;
+        username: string | null;
+        status: string;
+        createdDate?: string;
+      }>>("GET", `/api/onboarding/${processId}/service-accounts`),
+    createServiceAccounts: (
+      processId: string,
+      accounts: Array<{ serviceName: string; username?: string; password?: string }>
+    ) =>
+      request<Array<{
+        id: string;
+        serviceName: string;
+        username: string | null;
+        status: string;
+        createdDate?: string;
+      }>>("POST", `/api/onboarding/${processId}/service-accounts`, { accounts }),
+    getAssets: (processId: string) =>
+      request<Array<{
+        id: string;
+        assetCode: string;
+        assetType: string;
+        serialNumber?: string | null;
+        condition: string;
+        status: string;
+        location?: string | null;
+      }>>("GET", `/api/onboarding/${processId}/assets`),
+    allotAsset: (
+      processId: string,
+      data: {
+        assetId?: string;
+        assetCode?: string;
+        assetType: string;
+        serialNumber?: string;
+        condition?: string;
+        location?: string;
+      }
+    ) =>
+      request<{
+        id: string;
+        assetCode: string;
+        assetType: string;
+        serialNumber?: string | null;
+        condition: string;
+        status: string;
+        location?: string | null;
+      }>("POST", `/api/onboarding/${processId}/allot-asset`, data),
   },
 
   // ── Offboarding ───────────────────────────────────────────────────────────

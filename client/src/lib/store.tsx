@@ -121,10 +121,12 @@ interface Store extends State {
     accessRevoked?: boolean;
     assetsReturned?: boolean;
     exitInterviewDone?: boolean;
+    exitInterviewNotes?: string;
     finalSettlement?: string;
     status?: string;
     completeOffboarding?: boolean;
   }) => Promise<void>;
+  updateOffboardingClearanceTask: (processId: string, taskId: string, cleared: boolean) => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -878,6 +880,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       accessRevoked?: boolean;
       assetsReturned?: boolean;
       exitInterviewDone?: boolean;
+      exitInterviewNotes?: string;
       finalSettlement?: string;
       status?: string;
       completeOffboarding?: boolean;
@@ -892,7 +895,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ...c,
               ...(patch.accessRevoked !== undefined && { accessRevoked: patch.accessRevoked }),
               ...(patch.assetsReturned !== undefined && { assetsReturned: patch.assetsReturned }),
-              ...(patch.exitInterviewDone !== undefined && { exitInterviewStatus: patch.exitInterviewDone ? ("Completed" as const) : ("Pending" as const) }),
+              ...(patch.exitInterviewDone !== undefined && { exitInterviewStatus: patch.exitInterviewDone ? ("Completed" as const) : ("Pending" as const), exitInterviewDone: patch.exitInterviewDone }),
+              ...(patch.exitInterviewNotes !== undefined && { exitInterviewNotes: patch.exitInterviewNotes }),
               ...(patch.finalSettlement !== undefined && { finalSettlement: patch.finalSettlement as "pending" | "processing" | "settled" }),
               ...(patch.completeOffboarding && { finalSettlement: "settled" as const, clearanceStatus: "Cleared" as const, finalPayrollStatus: "Processed" as const }),
             }
@@ -907,6 +911,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.warn("[store] patchOffboardingCase error:", err);
+    }
+  }, [refreshSlice]);
+
+  const updateOffboardingClearanceTask = useCallback(async (
+    processId: string,
+    taskId: string,
+    cleared: boolean,
+  ): Promise<void> => {
+    setState((s) => ({
+      ...s,
+      offboarding: s.offboarding.map((c) =>
+        c.id === processId
+          ? {
+              ...c,
+              clearance: c.clearance.map((task) =>
+                task.id === taskId
+                  ? {
+                      ...task,
+                      cleared,
+                      clearedAt: cleared ? new Date().toISOString().slice(0, 10) : undefined,
+                    }
+                  : task,
+              ),
+              clearanceStatus: c.clearance
+                .map((task) => (task.id === taskId ? { ...task, cleared } : task))
+                .every((t) => t.cleared)
+                ? ("Cleared" as const)
+                : ("Pending" as const),
+            }
+          : c,
+      ) as OffboardingCase[],
+    }));
+
+    try {
+      await api.offboarding.patchClearance(processId, taskId, { cleared });
+      await refreshSlice("offboarding");
+    } catch (err) {
+      console.warn("[store] updateOffboardingClearanceTask error:", err);
+      await refreshSlice("offboarding");
     }
   }, [refreshSlice]);
 
@@ -1004,6 +1047,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateOnboardingStatus,
       addOffboardingCase,
       patchOffboardingCase,
+      updateOffboardingClearanceTask,
     }),
     [
       state,
@@ -1038,6 +1082,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateOnboardingStatus,
       addOffboardingCase,
       patchOffboardingCase,
+      updateOffboardingClearanceTask,
     ],
   );
 
@@ -1108,7 +1153,7 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/payroll": ["payroll_user", "payroll_manager", "admin"],
   "/app/salary": ["payroll_user", "payroll_manager", "admin"],
   "/app/salary-structure": ["payroll_user", "payroll_manager", "admin"],
-  "/app/payslips": ["payroll_user", "payroll_manager", "admin"],
+  "/app/payslips": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/reimbursement": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
   "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],

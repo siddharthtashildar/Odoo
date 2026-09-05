@@ -269,12 +269,13 @@ router.post("/", async (req, res) => {
       });
 
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8081";
+      const changePasswordUrl = `${frontendUrl}/?action=change-password&email=${encodeURIComponent(employee.email)}`;
       const emailResult = await sendCredentialsEmail({
         to: employee.email,
         employeeName: employee.full_name,
         role,
         temporaryPassword,
-        loginUrl: frontendUrl,
+        loginUrl: changePasswordUrl,
       });
 
       provisionData = {
@@ -282,7 +283,7 @@ router.post("/", async (req, res) => {
         credentials: {
           email: employee.email,
           temporaryPassword,
-          loginUrl: frontendUrl,
+          loginUrl: changePasswordUrl,
         },
         emailDispatched: emailResult.success,
         previewUrl: emailResult.previewUrl,

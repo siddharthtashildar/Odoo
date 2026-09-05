@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle2, Loader2, Lock, Mail, Shield } from "lucide-react";
+import { ArrowRight, CheckCircle2, KeyRound, Loader2, Lock, Mail, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,18 +41,52 @@ const QUICK_ACCOUNTS: Array<{ label: string; email: string; role: Role }> = [
 function LoginPage() {
   const { signIn, log } = useApp();
   const navigate = useNavigate();
+
+  // Mode: "login" or "change_password"
+  const [mode, setMode] = useState<"login" | "change_password">("login");
+
   const [email, setEmail] = useState("sana.iqbal@peoplepay360.io");
   const [password, setPassword] = useState("demo1234");
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [tempPassword, setTempPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+    tempPassword?: string;
+    newPassword?: string;
+    confirmPassword?: string;
+  }>({});
   const [loading, setLoading] = useState(false);
 
+  // Check URL query parameters for password change redirect
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const emailParam = params.get("email");
+      const actionParam = params.get("action");
+      const changePasswordParam = params.get("changePassword");
+
+      if (emailParam) {
+        setEmail(emailParam);
+      }
+
+      if (actionParam === "change-password" || changePasswordParam === "true") {
+        setMode("change_password");
+        toast.info("Welcome! Please establish your permanent password to complete activation.");
+      }
+    }
+  }, []);
+
   const fillAccount = (acc: (typeof QUICK_ACCOUNTS)[0]) => {
+    setMode("login");
     setEmail(acc.email);
     setPassword("demo1234");
     setErrors({});
   };
 
-  const submit = async (e: React.FormEvent) => {
+  const submitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const next: typeof errors = {};
     if (!/^\S+@\S+\.\S+$/.test(email)) next.email = "Enter a valid company email address.";
@@ -82,6 +116,52 @@ function LoginPage() {
       navigate({ to: "/app/dashboard" });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Authentication failed";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const next: typeof errors = {};
+    if (!/^\S+@\S+\.\S+$/.test(email)) next.email = "Enter a valid company email address.";
+    if (!tempPassword) next.tempPassword = "Enter the temporary password from your email.";
+    if (newPassword.length < 6) next.newPassword = "New password must be at least 6 characters.";
+    if (newPassword !== confirmPassword) next.confirmPassword = "Passwords do not match.";
+
+    setErrors(next);
+    if (Object.keys(next).length) {
+      toast.error("Please correct the errors in the form");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const userRes = await api.auth.changePassword({
+        email: email.trim(),
+        currentPassword: tempPassword.trim(),
+        newPassword: newPassword.trim(),
+      });
+
+      const matchedRole = (userRes.role as Role) || "employee";
+      signIn(matchedRole, {
+        id: userRes.userId,
+        email: userRes.email,
+        name: userRes.employeeName || userRes.email,
+        role: matchedRole,
+        employeeId: userRes.employeeId,
+        employeeCode: userRes.employeeCode || null,
+      });
+
+      log(`Activated account and changed password for ${userRes.email}`, "Auth");
+      toast.success("Password successfully established!", {
+        description: `Welcome to PeoplePay360, ${userRes.employeeName || userRes.email}!`,
+      });
+
+      navigate({ to: "/app/dashboard" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update password";
       toast.error(message);
     } finally {
       setLoading(false);
@@ -122,7 +202,7 @@ function LoginPage() {
         </div>
       </section>
 
-      {/* Right Login Form Panel */}
+      {/* Right Login / Change Password Form Panel */}
       <section className="flex items-center justify-center px-4 py-12 sm:px-8">
         <div className="w-full max-w-md space-y-6">
           <div className="lg:hidden">
@@ -131,51 +211,141 @@ function LoginPage() {
 
           <Card className="border-border/70 shadow-md">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl font-bold tracking-tight">Sign In to Your Workspace</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-2xl font-bold tracking-tight">
+                  {mode === "login" ? "Sign In to Workspace" : "Set Permanent Password"}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-primary h-7 px-2"
+                  onClick={() => {
+                    setMode(mode === "login" ? "change_password" : "login");
+                    setErrors({});
+                  }}
+                >
+                  {mode === "login" ? "First-time setup?" : "Back to Sign In"}
+                </Button>
+              </div>
               <CardDescription>
-                Enter your company email and password to access the PeoplePay360 portal.
+                {mode === "login"
+                  ? "Enter your company email and password to access the PeoplePay360 portal."
+                  : "Activate your account by establishing a secure password for your work email."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <form onSubmit={submit} className="space-y-4" noValidate>
-                <div className="space-y-1.5">
-                  <Label htmlFor="email" className="flex items-center gap-1.5">
-                    <Mail className="size-3.5 text-muted-foreground" /> Work Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="name@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    aria-invalid={!!errors.email}
-                    autoComplete="email"
-                  />
-                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
-                </div>
+              {mode === "login" ? (
+                <form onSubmit={submitLogin} className="space-y-4" noValidate>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="flex items-center gap-1.5">
+                      <Mail className="size-3.5 text-muted-foreground" /> Work Email
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="name@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      aria-invalid={!!errors.email}
+                      autoComplete="email"
+                    />
+                    {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                  </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="password" className="flex items-center gap-1.5">
-                    <Lock className="size-3.5 text-muted-foreground" /> Password
-                  </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    aria-invalid={!!errors.password}
-                    autoComplete="current-password"
-                  />
-                  {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
-                </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="password" className="flex items-center gap-1.5">
+                      <Lock className="size-3.5 text-muted-foreground" /> Password
+                    </Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      aria-invalid={!!errors.password}
+                      autoComplete="current-password"
+                    />
+                    {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+                  </div>
 
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                  Sign In
-                  {!loading && <ArrowRight className="ml-2 size-4" />}
-                </Button>
-              </form>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    Sign In
+                    {!loading && <ArrowRight className="ml-2 size-4" />}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={submitChangePassword} className="space-y-3.5" noValidate>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="change-email" className="flex items-center gap-1.5">
+                      <Mail className="size-3.5 text-muted-foreground" /> Work Email
+                    </Label>
+                    <Input
+                      id="change-email"
+                      type="email"
+                      placeholder="name@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      aria-invalid={!!errors.email}
+                      autoComplete="email"
+                    />
+                    {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="temp-password" className="flex items-center gap-1.5">
+                      <KeyRound className="size-3.5 text-muted-foreground" /> Temporary Password (from email)
+                    </Label>
+                    <Input
+                      id="temp-password"
+                      type="password"
+                      placeholder="e.g. PP360!ABC123"
+                      value={tempPassword}
+                      onChange={(e) => setTempPassword(e.target.value)}
+                      aria-invalid={!!errors.tempPassword}
+                    />
+                    {errors.tempPassword && <p className="text-xs text-destructive">{errors.tempPassword}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-password" className="flex items-center gap-1.5">
+                      <Lock className="size-3.5 text-muted-foreground" /> New Permanent Password
+                    </Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      placeholder="Minimum 6 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      aria-invalid={!!errors.newPassword}
+                      autoComplete="new-password"
+                    />
+                    {errors.newPassword && <p className="text-xs text-destructive">{errors.newPassword}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-password" className="flex items-center gap-1.5">
+                      <Lock className="size-3.5 text-muted-foreground" /> Confirm New Password
+                    </Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      placeholder="Re-enter password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      aria-invalid={!!errors.confirmPassword}
+                      autoComplete="new-password"
+                    />
+                    {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword}</p>}
+                  </div>
+
+                  <Button type="submit" className="w-full mt-2" disabled={loading}>
+                    {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    Set Password &amp; Enter Workspace
+                    {!loading && <ArrowRight className="ml-2 size-4" />}
+                  </Button>
+                </form>
+              )}
 
               <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
                 <p className="font-semibold text-foreground flex items-center gap-1">
@@ -183,7 +353,7 @@ function LoginPage() {
                 </p>
                 <p>
                   Public registration is restricted. Only Human Resources or Administrators can provision accounts.
-                  New team members receive their login credentials via email.
+                  New team members receive temporary credentials via email to set their permanent password.
                 </p>
               </div>
 
@@ -196,7 +366,7 @@ function LoginPage() {
                       key={acc.email}
                       type="button"
                       onClick={() => fillAccount(acc)}
-                      className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${email === acc.email
+                      className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${email === acc.email && mode === "login"
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background hover:bg-muted text-muted-foreground hover:text-foreground border-border"
                         }`}

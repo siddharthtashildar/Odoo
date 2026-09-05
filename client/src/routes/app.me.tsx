@@ -765,7 +765,24 @@ function MyWorkspace() {
               <Button
                 className="w-full"
                 onClick={() => {
-                  toast.success(`Downloading PDF statement for ${selectedSlip.run.period}`);
+                  downloadPayslipPDF({
+                    employeeName: activeEmployee.name,
+                    employeeCode: activeEmployee.code,
+                    department: activeEmployee.department,
+                    designation: activeEmployee.designation,
+                    bankAccount: (activeEmployee as any).bankAccountNumber || activeEmployee.bankAccount || "HDFC0001234",
+                    period: selectedSlip.run.period,
+                    basic: selectedSlip.line.basicSalary,
+                    hra: selectedSlip.line.hra,
+                    specialAllowance: selectedSlip.line.specialAllowance,
+                    bonus: selectedSlip.line.bonus,
+                    gross: selectedSlip.line.gross,
+                    pf: selectedSlip.line.providentFund,
+                    pt: selectedSlip.line.professionalTax,
+                    tds: selectedSlip.line.incomeTax,
+                    deductions: selectedSlip.line.deductions,
+                    net: selectedSlip.line.net,
+                  });
                 }}
               >
                 <Download className="mr-2 size-4" /> Download Official PDF

@@ -12,6 +12,7 @@ import {
   Laptop,
   MessageSquare,
   Plus,
+  Save,
   ShieldAlert,
   UserCheck,
   UserMinus,
@@ -22,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -57,7 +59,18 @@ export const Route = createFileRoute("/app/offboarding")({
 });
 
 function OffboardingPage() {
-  const { offboarding, employees, assets, update, log, patchEmployee, role, addOffboardingCase, patchOffboardingCase } = useApp();
+  const {
+    offboarding,
+    employees,
+    assets,
+    update,
+    log,
+    patchEmployee,
+    role,
+    addOffboardingCase,
+    patchOffboardingCase,
+    updateOffboardingClearanceTask,
+  } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
 
@@ -67,8 +80,10 @@ function OffboardingPage() {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | undefined>();
 
-  const [activeCase, setActiveCase] = useState<OffboardingCase | null>(null);
-  const [showChecklist, setShowChecklist] = useState<OffboardingCase | null>(null);
+  const [checklistCaseId, setChecklistCaseId] = useState<string | null>(null);
+  const showChecklist = offboarding.find((c) => c.id === checklistCaseId) ?? null;
+  const [interviewNotesInput, setInterviewNotesInput] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
 
   // Destructive confirmation states
   const [revokeTarget, setRevokeTarget] = useState<OffboardingCase | null>(null);
@@ -82,6 +97,27 @@ function OffboardingPage() {
 
   const patchCase = async (id: string, patch: Parameters<typeof patchOffboardingCase>[1]) => {
     await patchOffboardingCase(id, patch);
+  };
+
+  const openChecklistModal = (c: OffboardingCase) => {
+    setChecklistCaseId(c.id);
+    setInterviewNotesInput(c.exitInterviewNotes || "");
+  };
+
+  const handleSaveInterviewNotes = async () => {
+    if (!showChecklist) return;
+    setSavingNotes(true);
+    try {
+      await patchCase(showChecklist.id, {
+        exitInterviewNotes: interviewNotesInput.trim(),
+        exitInterviewDone: true,
+      });
+      toast.success("Exit interview notes saved successfully");
+    } catch (err: any) {
+      toast.error("Failed to save exit interview notes", { description: err?.message });
+    } finally {
+      setSavingNotes(false);
+    }
   };
 
   const returnAssets = async (caseId: string, empId: string) => {
@@ -199,7 +235,7 @@ function OffboardingPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Offboarding Cases</CardTitle>
+          <CardTitle>Offboarding Cases ({offboarding.length})</CardTitle>
           <CardDescription>Departing employee exit checklist progress and department sign-offs</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -264,7 +300,7 @@ function OffboardingPage() {
                               size="sm"
                               variant="ghost"
                               className="h-8 px-2"
-                              onClick={() => setShowChecklist(c)}
+                              onClick={() => openChecklistModal(c)}
                               title="Generate clearance checklist"
                             >
                               <FileCheck className="size-3.5 mr-1" /> Checklist
@@ -368,73 +404,155 @@ function OffboardingPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Clearance Checklist Modal */}
+      {/* Dynamic Clearance Checklist Modal */}
       {showChecklist && (
-        <Dialog open={!!showChecklist} onOpenChange={(o) => !o && setShowChecklist(null)}>
-          <DialogContent className="max-w-md">
+        <Dialog open={!!showChecklist} onOpenChange={(o) => !o && setChecklistCaseId(null)}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <div className="flex items-center justify-between">
-                <DialogTitle>Clearance Checklist</DialogTitle>
+                <DialogTitle>Exit Clearance Checklist</DialogTitle>
                 <StatusBadge status={showChecklist.clearanceStatus || "Pending"} />
               </div>
               <DialogDescription>
-                Departmental sign-offs for {nameOf(showChecklist.employeeId)} ({showChecklist.id})
+                Departmental sign-offs and exit requirements for {nameOf(showChecklist.employeeId)} ({showChecklist.id})
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-2 text-sm">
-              <div className="rounded-lg border border-border p-3 space-y-2">
+            <div className="space-y-4 py-2 text-sm">
+              {/* Department Tasks List */}
+              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <h4 className="font-semibold text-foreground">Departmental Sign-offs</h4>
+                  <span className="text-xs text-muted-foreground">
+                    {showChecklist.clearance.filter((c) => c.cleared).length} of {showChecklist.clearance.length} cleared
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {showChecklist.clearance.map((task) => (
+                    <div
+                      key={task.id}
+                      className={`flex items-center justify-between p-2.5 rounded-md border text-xs transition-colors ${
+                        task.cleared ? "bg-muted/40 border-muted" : "bg-card border-border"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          id={`task-${task.id}`}
+                          checked={task.cleared}
+                          onCheckedChange={() =>
+                            updateOffboardingClearanceTask(showChecklist.id, task.id, !task.cleared)
+                          }
+                          disabled={!canManage}
+                        />
+                        <div>
+                          <label
+                            htmlFor={`task-${task.id}`}
+                            className={`font-medium cursor-pointer ${task.cleared ? "line-through text-muted-foreground" : "text-foreground"}`}
+                          >
+                            {task.item}
+                          </label>
+                          <div className="flex items-center gap-2 mt-0.5 text-[0.7rem] text-muted-foreground">
+                            <span className="rounded bg-muted px-1.5 py-0.5 font-semibold text-foreground">
+                              {task.department}
+                            </span>
+                            {task.cleared && task.clearedAt && (
+                              <span>Cleared on {task.clearedAt}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <StatusBadge status={task.cleared ? "Cleared" : "Pending"} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Exit Interview Feedback Section */}
+              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">1. HR Exit Interview</p>
-                    <p className="text-xs text-muted-foreground">Feedback and exit survey submission</p>
+                    <h4 className="font-semibold text-foreground">HR Exit Interview</h4>
+                    <p className="text-xs text-muted-foreground">Departing feedback, survey responses and manager debrief</p>
                   </div>
-                  {showChecklist.exitInterviewStatus === "Scheduled" || showChecklist.exitInterviewStatus === "Completed" ? (
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={showChecklist.exitInterviewStatus || "Pending"} />
+                    {showChecklist.exitInterviewStatus !== "Completed" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => handleScheduleExitInterview(showChecklist.id)}
+                      >
+                        Schedule Meeting
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <Textarea
+                  rows={3}
+                  placeholder="Record departing employee feedback, reason details, project handover status, and HR observations..."
+                  value={interviewNotesInput}
+                  onChange={(e) => setInterviewNotesInput(e.target.value)}
+                  disabled={!canManage}
+                />
+
+                {canManage && (
+                  <div className="flex justify-end">
                     <Button
                       size="sm"
-                      variant="outline"
+                      onClick={handleSaveInterviewNotes}
+                      disabled={savingNotes}
                       className="h-7 text-xs"
-                      onClick={async () => {
-                        await patchCase(showChecklist.id, { exitInterviewDone: true });
-                        toast.success("Exit interview marked as completed");
-                      }}
                     >
-                      Mark Completed
+                      <Save className="size-3 mr-1" />
+                      {savingNotes ? "Saving..." : "Save Interview Notes & Complete"}
                     </Button>
-                  ) : (
+                  </div>
+                )}
+              </div>
+
+              {/* Hardware & Systems Access Controls */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border bg-card p-3 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground">IT Hardware</span>
+                    <StatusBadge status={showChecklist.assetsReturned ? "Returned" : "Pending"} />
+                  </div>
+                  <p className="text-muted-foreground">Laptop, security keys, and accessories</p>
+                  {!showChecklist.assetsReturned && canManage && (
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 text-xs"
-                      onClick={() => handleScheduleExitInterview(showChecklist.id)}
+                      className="w-full h-7 text-xs"
+                      onClick={() => returnAssets(showChecklist.id, showChecklist.employeeId)}
                     >
-                      Schedule
+                      <Laptop className="size-3 mr-1" /> Confirm Assets Returned
                     </Button>
                   )}
                 </div>
 
-                <div className="flex items-center justify-between border-t border-border/50 pt-2">
-                  <div>
-                    <p className="font-medium">2. IT Hardware Recovery</p>
-                    <p className="text-xs text-muted-foreground">Laptops, monitors and ID cards return</p>
+                <div className="rounded-lg border border-border bg-card p-3 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground">Corporate Access</span>
+                    <StatusBadge status={showChecklist.accessRevoked ? "Revoked" : "Active"} />
                   </div>
-                  <StatusBadge status={showChecklist.assetsReturned ? "Returned" : "Pending"} />
-                </div>
-
-                <div className="flex items-center justify-between border-t border-border/50 pt-2">
-                  <div>
-                    <p className="font-medium">3. Systems Access Revocation</p>
-                    <p className="text-xs text-muted-foreground">SSO, Google Workspace and VPN shutdown</p>
-                  </div>
-                  <StatusBadge status={showChecklist.accessRevoked ? "Revoked" : "Active"} />
-                </div>
-
-                <div className="flex items-center justify-between border-t border-border/50 pt-2">
-                  <div>
-                    <p className="font-medium">4. Full & Final Settlement</p>
-                    <p className="text-xs text-muted-foreground">Leave encashment, gratuity & pending payroll</p>
-                  </div>
-                  <StatusBadge status={showChecklist.finalSettlement} />
+                  <p className="text-muted-foreground">SSO, email box, VPN and repositories</p>
+                  {!showChecklist.accessRevoked && canManage && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full h-7 text-xs text-warning-foreground"
+                      onClick={() => {
+                        setChecklistCaseId(null);
+                        setRevokeTarget(showChecklist);
+                      }}
+                    >
+                      <KeyRound className="size-3 mr-1" /> Revoke All Access
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -448,7 +566,7 @@ function OffboardingPage() {
               >
                 <Download className="size-4 mr-1.5" /> Download Clearance PDF
               </Button>
-              <Button onClick={() => setShowChecklist(null)}>Close</Button>
+              <Button onClick={() => setChecklistCaseId(null)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

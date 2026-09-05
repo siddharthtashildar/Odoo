@@ -134,14 +134,15 @@ router.post("/provision-user", async (req, res) => {
       });
     }
 
-    // Dispatch credentials email to the employee
+    // Dispatch credentials email to the employee with password change redirection
     const frontendUrl = (process.env.FRONTEND_URL as string | undefined) || "http://localhost:8081";
+    const changePasswordUrl = `${frontendUrl}/?action=change-password&email=${encodeURIComponent(employee.email)}`;
     const emailResult = await sendCredentialsEmail({
       to: employee.email,
       employeeName: employee.full_name,
       role,
       temporaryPassword,
-      loginUrl: frontendUrl,
+      loginUrl: changePasswordUrl,
     });
 
     res.json({
@@ -156,7 +157,7 @@ router.post("/provision-user", async (req, res) => {
         credentials: {
           email: employee.email,
           temporaryPassword,
-          loginUrl: frontendUrl,
+          loginUrl: changePasswordUrl,
         },
         emailDispatched: emailResult.success,
         messageId: emailResult.messageId,
@@ -293,6 +294,118 @@ router.get("/me", async (req, res) => {
   }
 
   res.json({ success: true, data: user });
+});
+
+// ── 5. POST /api/auth/change-password ──────────────────────────────────────────
+// Allows employee/user to change their temporary password to a permanent password
+router.post("/change-password", async (req, res) => {
+  try {
+    const { email, currentPassword, newPassword } = req.body as {
+      email?: string;
+      currentPassword?: string;
+      newPassword?: string;
+    };
+
+    if (!email || !newPassword) {
+      return res.status(400).json({ success: false, error: "Email and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, error: "New password must be at least 6 characters" });
+    }
+
+    // Check Better Auth user table
+    const betterUser = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        accounts: { where: { providerId: "credential" } },
+      },
+    });
+
+    if (!betterUser) {
+      return res.status(404).json({ success: false, error: "User account not found" });
+    }
+
+    // If current password is provided, verify it
+    if (currentPassword && betterUser.accounts.length > 0 && betterUser.accounts[0].password) {
+      const isValid = await verifyPassword({
+        password: currentPassword,
+        hash: betterUser.accounts[0].password,
+      });
+
+      if (!isValid) {
+        return res.status(401).json({ success: false, error: "Current temporary password is incorrect" });
+      }
+    }
+
+    // Hash the new password
+    const newHash = await hashPassword(newPassword);
+
+    if (betterUser.accounts.length > 0) {
+      await prisma.account.update({
+        where: { id: betterUser.accounts[0].id },
+        data: { password: newHash },
+      });
+    } else {
+      await prisma.account.create({
+        data: {
+          id: crypto.randomUUID(),
+          userId: betterUser.id,
+          accountId: betterUser.id,
+          providerId: "credential",
+          password: newHash,
+        },
+      });
+    }
+
+    // Resolve employee info if linked
+    let employeeName = betterUser.name;
+    let employeeId = betterUser.employeeId ?? null;
+    let employeeCode: string | null = null;
+    if (betterUser.employeeId) {
+      const emp = await prisma.employees.findUnique({ where: { id: betterUser.employeeId } });
+      if (emp) {
+        employeeName = emp.full_name;
+        employeeCode = emp.employee_code;
+      }
+    } else {
+      const emp = await prisma.employees.findFirst({ where: { email } });
+      if (emp) {
+        employeeId = emp.id;
+        employeeName = emp.full_name;
+        employeeCode = emp.employee_code;
+        await prisma.user.update({ where: { id: betterUser.id }, data: { employeeId: emp.id } }).catch(() => {});
+      }
+    }
+
+    // Move employee onboarding status to in_progress upon password change
+    if (employeeId) {
+      await prisma.onboarding_processes.updateMany({
+        where: { employee_id: employeeId },
+        data: {
+          notes: "password_changed",
+        },
+      }).catch((err) => {
+        console.warn("Failed to mark onboarding password_changed:", err);
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Password changed successfully! You may now sign in with your new permanent password.",
+      data: {
+        userId: betterUser.id,
+        email: betterUser.email,
+        role: betterUser.role || "employee",
+        employeeId,
+        employeeCode,
+        employeeName,
+      },
+    });
+  } catch (err) {
+    console.error("Change password error:", err);
+    res.status(500).json({ success: false, error: "Failed to change password" });
+  }
 });
 
 export default router;

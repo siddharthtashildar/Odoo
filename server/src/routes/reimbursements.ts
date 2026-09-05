@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { resolveEmployee } from "../lib/resolve-employee";
+import { sendReimbursementStatusEmail } from "../lib/email";
 
 const router = Router();
 
@@ -153,7 +154,7 @@ router.patch("/:id", async (req, res) => {
         updated_at: new Date(),
       },
       include: {
-        employees: { select: { full_name: true } },
+        employees: { select: { full_name: true, email: true } },
         reimbursement_categories: { select: { name: true } },
       },
     });
@@ -161,6 +162,23 @@ router.patch("/:id", async (req, res) => {
     const st = String(updated.status).toLowerCase();
     const isApproved = st === "approved" || st === "manager_approved" || st === "finance_approved" || st === "paid";
     const isRejected = st === "rejected";
+
+    if (updated.employees?.email && (isApproved || isRejected)) {
+      try {
+        const mailStatus: "approved" | "rejected" | "paid" = st === "paid" ? "paid" : isApproved ? "approved" : "rejected";
+        await sendReimbursementStatusEmail({
+          to: updated.employees.email,
+          employeeName: updated.employees.full_name,
+          category: updated.reimbursement_categories?.name ?? "General Expense",
+          amount: Number(updated.amount),
+          approvedAmount: updated.approved_amount ? Number(updated.approved_amount) : null,
+          status: mailStatus,
+          note: updated.manager_note || updated.finance_note || undefined,
+        });
+      } catch (mailErr) {
+        console.warn("Failed to dispatch reimbursement status email:", mailErr);
+      }
+    }
 
     res.json({
       success: true,
