@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeader, StatusBadge, TableSkeleton, EmptyState } from "@/components/bits";
+import { PageHeader, StatCard, StatusBadge, TableSkeleton, EmptyState } from "@/components/bits";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import {
@@ -69,6 +69,7 @@ function Dashboard() {
     reimbursements,
     helpdesk,
     assets,
+    contracts,
     role,
     persona,
     audit,
@@ -77,6 +78,71 @@ function Dashboard() {
   const nameOf = useEmployeeName();
   const ready = useDelayed();
   const navigate = useNavigate();
+
+  if (role === "employee") {
+    const me = employees.find((e) => e.id === persona.employeeId);
+    const myContract = contracts.find((c) => c.employeeId === persona.employeeId);
+    const lastSlip = payroll.find((r) => r.status === "paid" && r.lines.some((l) => l.employeeId === persona.employeeId));
+    const lastLine = lastSlip?.lines.find((l) => l.employeeId === persona.employeeId);
+
+    const myRecords = attendance.filter((a) => a.employeeId === persona.employeeId);
+    const countable = myRecords.filter((a) => a.status !== "Holiday" && a.status !== "On Leave");
+    const attended = countable.filter(
+      (a) => a.status === "Present" || a.status === "Late" || a.status === "Half Day",
+    ).length;
+    const myAttendancePercent = countable.length > 0 ? Math.round((attended / countable.length) * 100) : 0;
+
+    return (
+      <>
+        <PageHeader
+          title={`Good day, ${persona.name.split(" ")[0]}`}
+          description={`Your workspace overview · ${ROLE_LABELS[role]}`}
+        />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <StatCard
+            label="Attendance %"
+            value={`${myAttendancePercent}%`}
+            hint={
+              countable.length
+                ? `${attended} of ${countable.length} working days attended`
+                : "No attendance records yet"
+            }
+            icon={<UserCheck className="size-5" />}
+            tone="success"
+          />
+          <StatCard
+            label="Payroll"
+            value={lastLine ? inr(lastLine.net) : me ? inr(Math.round(me.ctc / 12)) : "—"}
+            hint={lastSlip ? `Last net · ${lastSlip.period}` : "Estimated monthly net"}
+            icon={<BadgeIndianRupee className="size-5" />}
+            tone="accent"
+          />
+          <StatCard
+            label="Remaining Leaves"
+            value={`${me?.leaveBalance ?? 0} Days`}
+            hint="Paid leave available"
+            icon={<CalendarDays className="size-5" />}
+          />
+          <StatCard
+            label="Current Contract"
+            value={myContract?.contractType ?? me?.employmentType ?? "—"}
+            hint={
+              myContract
+                ? `${myContract.status} · ${myContract.startDate} → ${myContract.endDate}`
+                : "No contract on file"
+            }
+            icon={<FilePlus className="size-5" />}
+          />
+          <StatCard
+            label="Department"
+            value={me?.department ?? "—"}
+            hint={me?.designation}
+            icon={<Building2 className="size-5" />}
+          />
+        </div>
+      </>
+    );
+  }
 
   const today = new Date().toISOString().slice(0, 10);
 

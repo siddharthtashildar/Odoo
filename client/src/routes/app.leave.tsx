@@ -212,20 +212,24 @@ function LeavePage() {
           icon={<AlertCircle className="size-5" />}
           tone="warning"
         />
-        <StatCard
-          label="Approved Requests"
-          value={approvedRequests.length}
-          hint="Sanctioned leave cycles"
-          icon={<CheckCircle2 className="size-5" />}
-          tone="success"
-        />
-        <StatCard
-          label="Rejected Requests"
-          value={rejectedRequests.length}
-          hint="Declined by management"
-          icon={<XCircle className="size-5" />}
-          tone="default"
-        />
+        {isEmployeeOnly ? null : (
+          <>
+            <StatCard
+              label="Approved Requests"
+              value={approvedRequests.length}
+              hint="Sanctioned leave cycles"
+              icon={<CheckCircle2 className="size-5" />}
+              tone="success"
+            />
+            <StatCard
+              label="Rejected Requests"
+              value={rejectedRequests.length}
+              hint="Declined by management"
+              icon={<XCircle className="size-5" />}
+              tone="default"
+            />
+          </>
+        )}
       </div>
 
       <Card>
@@ -272,8 +276,8 @@ function LeavePage() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
+                {!isEmployeeOnly && <SelectItem value="approved">Approved</SelectItem>}
+                {!isEmployeeOnly && <SelectItem value="rejected">Rejected</SelectItem>}
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>

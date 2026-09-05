@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Inbox, Plus } from "lucide-react";
+import { Inbox, Plus, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,28 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
-import type { AssetRequest } from "@/lib/mock-data";
+import type { Asset, AssetRequest, AssetCategory } from "@/lib/mock-data";
+
+function isAssetAvailable(asset: Asset) {
+  const status = asset.status.toLowerCase().replace(/_/g, " ");
+  return status === "available" || status === "in stock";
+}
+
+const assetCategories: AssetCategory[] = [
+  "Laptop",
+  "Desktop",
+  "Monitor",
+  "Keyboard",
+  "Mouse",
+  "Mobile phone",
+  "ID card",
+  "Access card",
+  "Software license",
+  "Phone",
+  "Accessory",
+  "License",
+  "Other",
+];
 
 export const Route = createFileRoute("/app/asset-requests")({
   head: () => ({
@@ -34,16 +56,30 @@ export const Route = createFileRoute("/app/asset-requests")({
 });
 
 function AssetRequestsPage() {
-  const { assetRequests, update, log, persona, role } = useApp();
+  const { assetRequests, assets, update, log, persona, role } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
   const isIt = role === "it_asset_manager" || role === "admin";
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ item: "", justification: "", priority: "Medium" });
+  const [form, setForm] = useState({
+    category: "",
+    assetId: "",
+    requiredFrom: "",
+    requiredUntil: "",
+    reason: "",
+  });
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
   const visible = isIt ? assetRequests : assetRequests.filter((r) => r.employeeId === persona.employeeId);
+
+  // Filter assets by selected category
+  const assetsInCategory = form.category
+    ? assets.filter((a) => a.category === form.category)
+    : [];
+
+  // Get selected asset for availability check
+  const selectedAsset = form.assetId ? assets.find((a) => a.id === form.assetId) : null;
 
   const move = (id: string, status: AssetRequest["status"]) => {
     update("assetRequests", assetRequests.map((r) => (r.id === id ? { ...r, status } : r)));
@@ -53,28 +89,45 @@ function AssetRequestsPage() {
 
   const raise = () => {
     const next: Record<string, string | undefined> = {};
-    if (form.item.trim().length < 3) next["item"] = "Describe the item you need.";
-    if (form.justification.trim().length < 10) next["justification"] = "Add a short business justification (10+ characters).";
+    if (!form.category) next["category"] = "Select a category.";
+    if (!form.assetId) next["assetId"] = "Select an asset.";
+    if (!form.requiredFrom) next["requiredFrom"] = "Enter required from date.";
+    if (!form.requiredUntil) next["requiredUntil"] = "Enter required until date.";
+    if (form.requiredFrom && form.requiredUntil && form.requiredFrom > form.requiredUntil)
+      next["requiredUntil"] = "Until date must be on or after from date.";
+    if (form.reason.trim().length < 5) next["reason"] = "Provide a reason (5+ characters).";
     setErrors(next);
     if (Object.values(next).some(Boolean)) {
       toast.error("Please complete the request");
       return;
     }
+
+    const assetName = selectedAsset?.name || "";
     update("assetRequests", [
       {
         id: `AR-${80 + assetRequests.length}`,
         employeeId: persona.employeeId,
-        item: form.item.trim(),
-        justification: form.justification.trim(),
+        item: assetName,
+        justification: form.reason.trim(),
         raisedOn: new Date().toISOString().slice(0, 10),
         status: "open",
-        priority: form.priority as AssetRequest["priority"],
+        priority: "Medium",
+        category: form.category as AssetCategory,
+        assetId: form.assetId,
+        requiredFrom: form.requiredFrom,
+        requiredUntil: form.requiredUntil,
       },
       ...assetRequests,
     ]);
-    log(`Raised asset request for ${form.item.trim()}`, "Assets");
-    toast.success("Request submitted", { description: "IT will pick this up from the queue." });
-    setForm({ item: "", justification: "", priority: "Medium" });
+    log(`Raised asset request for ${assetName}`, "Assets");
+    toast.success("Request submitted", { description: "IT will review and process your request." });
+    setForm({
+      category: "",
+      assetId: "",
+      requiredFrom: "",
+      requiredUntil: "",
+      reason: "",
+    });
     setOpen(false);
   };
 
@@ -90,11 +143,13 @@ function AssetRequestsPage() {
         }
       />
 
+      {isIt && (
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Open" value={visible.filter((r) => r.status === "open").length} tone="warning" icon={<Inbox className="size-5" />} />
         <StatCard label="In progress" value={visible.filter((r) => r.status === "in_progress").length} />
         <StatCard label="Resolved" value={visible.filter((r) => r.status === "resolved").length} tone="success" />
       </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -117,9 +172,10 @@ function AssetRequestsPage() {
                 <TableHeader>
                   <TableRow>
                     {isIt && <TableHead>Requester</TableHead>}
-                    <TableHead>Item</TableHead>
-                    <TableHead className="hidden md:table-cell">Justification</TableHead>
-                    <TableHead>Priority</TableHead>
+                    <TableHead>Asset Name</TableHead>
+                    <TableHead className="hidden sm:table-cell">Category</TableHead>
+                    <TableHead>Required Period</TableHead>
+                    <TableHead className="hidden md:table-cell">Reason</TableHead>
                     <TableHead>Status</TableHead>
                     {isIt && <TableHead className="text-right">Action</TableHead>}
                   </TableRow>
@@ -127,16 +183,24 @@ function AssetRequestsPage() {
                 <TableBody>
                   {visible.map((r) => (
                     <TableRow key={r.id}>
-                      {isIt && <TableCell className="font-medium">{nameOf(r.employeeId)}</TableCell>}
+                      {isIt && <TableCell className="font-medium text-sm">{nameOf(r.employeeId)}</TableCell>}
                       <TableCell>
                         <p className="font-medium">{r.item}</p>
-                        <p className="text-xs text-muted-foreground">{r.id} · {r.raisedOn}</p>
+                        <p className="text-xs text-muted-foreground">{r.id}</p>
                       </TableCell>
-                      <TableCell className="hidden max-w-xs truncate md:table-cell text-muted-foreground">
+                      <TableCell className="hidden sm:table-cell text-sm">{r.category || "—"}</TableCell>
+                      <TableCell className="text-sm">
+                        {r.requiredFrom && r.requiredUntil ? (
+                          <div>
+                            <div className="font-medium">{r.requiredFrom} → {r.requiredUntil}</div>
+                            <div className="text-xs text-muted-foreground">{r.raisedOn}</div>
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden max-w-xs truncate md:table-cell text-xs text-muted-foreground">
                         {r.justification}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={r.priority === "High" ? "destructive" : "secondary"}>{r.priority}</Badge>
                       </TableCell>
                       <TableCell><StatusBadge status={r.status} /></TableCell>
                       {isIt && (
@@ -163,27 +227,84 @@ function AssetRequestsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Raise an asset request</DialogTitle>
-            <DialogDescription>IT triages requests in priority order.</DialogDescription>
+            <DialogDescription>Select the asset category and item you need.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
-            <Field label="What do you need?" error={errors["item"]}>
-              <Input value={form.item} onChange={(e) => setForm({ ...form, item: e.target.value })} placeholder="e.g. Second monitor" />
-            </Field>
-            <Field label="Justification" error={errors["justification"]}>
-              <Textarea rows={3} value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} />
-            </Field>
-            <Field label="Priority">
-              <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+            <Field label="Category" error={errors["category"]}>
+              <Select value={form.category} onValueChange={(v) => {
+                setForm({ ...form, category: v, assetId: "" });
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category..." />
+                </SelectTrigger>
                 <SelectContent>
-                  {["Low", "Medium", "High"].map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  {assetCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>
+
+            {form.category && (
+              <Field label="Asset Name" error={errors["assetId"]}>
+                <Select value={form.assetId} onValueChange={(v) => setForm({ ...form, assetId: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select asset..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assetsInCategory.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name} {isAssetAvailable(a) ? "(Available)" : "(Not Available)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+
+            {selectedAsset && (
+              <Alert variant={isAssetAvailable(selectedAsset) ? "default" : "destructive"}>
+                <AlertCircle className="size-4" />
+                <AlertDescription>
+                  {isAssetAvailable(selectedAsset)
+                    ? "This asset is currently available."
+                    : "This asset is not currently available. Request will be queued."}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Field label="Required From" error={errors["requiredFrom"]}>
+              <Input
+                type="date"
+                value={form.requiredFrom}
+                onChange={(e) => setForm({ ...form, requiredFrom: e.target.value })}
+              />
+            </Field>
+
+            <Field label="Required Until" error={errors["requiredUntil"]}>
+              <Input
+                type="date"
+                value={form.requiredUntil}
+                onChange={(e) => setForm({ ...form, requiredUntil: e.target.value })}
+              />
+            </Field>
+
+            <Field label="Reason / Description" error={errors["reason"]}>
+              <Textarea
+                rows={3}
+                value={form.reason}
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                placeholder="Why do you need this asset? What will you use it for?"
+              />
+            </Field>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={raise}>Submit request</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={raise}>Raise Request</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

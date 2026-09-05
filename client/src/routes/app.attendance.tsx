@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { addMonths, endOfMonth, format, startOfMonth, subMonths } from "date-fns";
+import Holidays from "date-holidays";
 import { toast } from "sonner";
 import {
   Bar,
@@ -13,6 +15,8 @@ import {
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Edit2,
   LogIn,
@@ -39,6 +43,37 @@ import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } f
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import type { AttendanceRecord, AttendanceStatus } from "@/lib/mock-data";
 
+const indiaGujaratHolidays = new Holidays("IN", "GJ");
+
+function toLocalDate(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function holidaysForMonth(year: number, monthIndex: number) {
+  return indiaGujaratHolidays.getHolidays(year).flatMap((h) => {
+    const date = String(h.date).slice(0, 10);
+    const [y, m] = date.split("-").map(Number);
+    if (y !== year || m !== monthIndex + 1) return [];
+    if (h.type !== "public" && h.type !== "bank") return [];
+    return [{ date, name: h.name }];
+  });
+}
+
+function attendancePercentForMonth(records: AttendanceRecord[], year: number, monthIndex: number) {
+  const prefix = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+  const inMonth = records.filter((r) => r.date.startsWith(prefix));
+  const countable = inMonth.filter((r) => r.status !== "Holiday");
+  const attended = countable.filter(
+    (r) => r.status === "Present" || r.status === "Late" || r.status === "Half Day",
+  ).length;
+  return {
+    pct: countable.length ? Math.round((attended / countable.length) * 100) : null,
+    attended,
+    countable: countable.length,
+  };
+}
+
 export const Route = createFileRoute("/app/attendance")({
   head: () => ({
     meta: [
@@ -51,6 +86,212 @@ export const Route = createFileRoute("/app/attendance")({
 });
 
 function AttendancePage() {
+  const { role } = useApp();
+  if (role === "employee") return <EmployeeAttendance />;
+  return <StaffAttendance />;
+}
+
+function EmployeeAttendance() {
+  const { attendance, persona } = useApp();
+  const [month, setMonth] = useState(() => startOfMonth(new Date()));
+
+  const myRecords = useMemo(
+    () => attendance.filter((a) => a.employeeId === persona.employeeId),
+    [attendance, persona.employeeId],
+  );
+
+  const year = month.getFullYear();
+  const monthHolidays = useMemo(
+    () => holidaysForMonth(year, month.getMonth()),
+    [year, month],
+  );
+
+  const holidayDates = useMemo(() => {
+    const fromLib = monthHolidays.map((h) => toLocalDate(h.date));
+    const fromRecords = myRecords.filter((r) => r.status === "Holiday").map((r) => toLocalDate(r.date));
+    return [...fromLib, ...fromRecords];
+  }, [monthHolidays, myRecords]);
+
+  const holidayKeys = useMemo(() => new Set(holidayDates.map((d) => format(d, "yyyy-MM-dd"))), [holidayDates]);
+  const holidayNameByDate = useMemo(
+    () => new Map(monthHolidays.map((h) => [h.date, h.name])),
+    [monthHolidays],
+  );
+
+  const presentKeys = useMemo(
+    () =>
+      new Set(
+        myRecords
+          .filter(
+            (r) =>
+              (r.status === "Present" || r.status === "Late" || r.status === "Half Day") &&
+              !holidayKeys.has(r.date),
+          )
+          .map((r) => r.date),
+      ),
+    [myRecords, holidayKeys],
+  );
+
+  const leaveKeys = useMemo(
+    () =>
+      new Set(
+        myRecords.filter((r) => r.status === "On Leave" && !holidayKeys.has(r.date)).map((r) => r.date),
+      ),
+    [myRecords, holidayKeys],
+  );
+
+  const monthStats = attendancePercentForMonth(myRecords, year, month.getMonth());
+
+  const previousMonths = Array.from({ length: 5 }, (_, i) => {
+    const d = startOfMonth(subMonths(startOfMonth(new Date()), i + 1));
+    const stats = attendancePercentForMonth(myRecords, d.getFullYear(), d.getMonth());
+    return { label: format(d, "MMM yyyy"), pct: stats.pct };
+  });
+
+  const leadingBlanks = month.getDay();
+  const daysInMonth = endOfMonth(month).getDate();
+  const trailingBlanks = (7 - ((leadingBlanks + daysInMonth) % 7)) % 7;
+
+  const dayStatus = (iso: string) => {
+    if (holidayKeys.has(iso)) return "holiday" as const;
+    if (leaveKeys.has(iso)) return "leave" as const;
+    if (presentKeys.has(iso)) return "present" as const;
+    return "working" as const;
+  };
+
+  return (
+    <>
+      <Card className="shadow-none">
+        <CardHeader className="space-y-4 pb-3">
+          <CardTitle className="text-xl font-semibold">Attendance</CardTitle>
+          <div className="flex items-center gap-2">
+            <div className="flex flex-1 items-center justify-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => setMonth(startOfMonth(addMonths(month, -1)))}
+                aria-label="Previous month"
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <p className="min-w-[10rem] text-center text-sm font-semibold">{format(month, "MMMM yyyy")}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => setMonth(startOfMonth(addMonths(month, 1)))}
+                aria-label="Next month"
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>
+              Today
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-7 gap-1.5">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className="text-center text-xs font-medium text-muted-foreground">
+                {d}
+              </div>
+            ))}
+            {Array.from({ length: leadingBlanks }, (_, i) => (
+              <div key={`lead-${i}`} className="min-h-[4.25rem] rounded-md border border-border bg-muted/30 sm:min-h-[5rem]" />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const iso = format(new Date(year, month.getMonth(), day), "yyyy-MM-dd");
+              const status = dayStatus(iso);
+              const holidayName = holidayNameByDate.get(iso);
+              return (
+                <div
+                  key={iso}
+                  className={
+                    status === "present"
+                      ? "relative min-h-[4.25rem] rounded-md border border-border bg-success/20 sm:min-h-[5rem]"
+                      : status === "leave"
+                        ? "relative min-h-[4.25rem] rounded-md border border-border bg-destructive/15 sm:min-h-[5rem]"
+                        : status === "holiday"
+                          ? "relative min-h-[4.25rem] rounded-md border border-border bg-warning/45 sm:min-h-[5rem]"
+                          : "relative min-h-[4.25rem] rounded-md border border-border bg-card sm:min-h-[5rem]"
+                  }
+                >
+                  <span className="absolute left-1.5 top-1 text-[11px] font-medium tabular-nums">{day}</span>
+                  {status === "holiday" && holidayName ? (
+                    <span className="absolute inset-x-1 top-1/2 -translate-y-1/2 px-0.5 text-center text-[10px] leading-tight break-words text-foreground">
+                      {holidayName}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+            {Array.from({ length: trailingBlanks }, (_, i) => (
+              <div key={`trail-${i}`} className="min-h-[4.25rem] rounded-md border border-border bg-muted/30 sm:min-h-[5rem]" />
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-sm bg-success/70" /> Present
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-sm bg-destructive/70" /> Leave
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-sm bg-warning" /> Holiday
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-sm border border-border bg-card" /> Working day
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Attendance This Month</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="font-display text-3xl font-semibold tabular-nums text-success">
+              {monthStats.pct == null ? "—" : `${monthStats.pct}%`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {monthStats.countable
+                ? `${monthStats.attended} / ${monthStats.countable} working days`
+                : "No attendance records this month"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Last 5 Months</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-40 overflow-y-auto divide-y divide-border">
+              {previousMonths.map((row) => (
+                <div key={row.label} className="flex items-center justify-between py-2 text-sm">
+                  <span className="text-muted-foreground">{row.label}</span>
+                  <span className="tabular-nums font-medium text-success">
+                    {row.pct == null ? "—" : `${row.pct}%`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}
+
+function StaffAttendance() {
   const { attendance, employees, punchAttendance, correctAttendance, log, role, persona } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();

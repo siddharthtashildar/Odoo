@@ -232,6 +232,10 @@ export interface AssetRequest {
   raisedOn: string;
   status: RequestStatus;
   priority: "Low" | "Medium" | "High";
+  category?: AssetCategory;
+  assetId?: string;
+  requiredFrom?: string;
+  requiredUntil?: string;
 }
 
 export type TicketCategory =

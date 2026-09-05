@@ -54,7 +54,6 @@ function MyWorkspace() {
     leave,
     payroll,
     reimbursements,
-    allowances,
     assets,
     helpdesk,
     onboarding,
@@ -249,7 +248,6 @@ function MyWorkspace() {
           <TabsTrigger value="leave">My Time Off</TabsTrigger>
           <TabsTrigger value="payslips">My Payslips</TabsTrigger>
           <TabsTrigger value="reimbursements">My Expenses</TabsTrigger>
-          <TabsTrigger value="allowances">My Allowances</TabsTrigger>
           <TabsTrigger value="assets">My Assets ({myAssets.length})</TabsTrigger>
           <TabsTrigger value="tickets">My IT Tickets ({myTickets.length})</TabsTrigger>
           {onCase && <TabsTrigger value="onboarding">Onboarding Checklist</TabsTrigger>}
@@ -555,42 +553,6 @@ function MyWorkspace() {
                         <TableCell className="text-xs text-muted-foreground">{r.submittedDate}</TableCell>
                         <TableCell><StatusBadge status={r.approvalStatus} /></TableCell>
                         <TableCell><StatusBadge status={r.paymentStatus} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* 7. Allowances Tab */}
-        <TabsContent value="allowances" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>My Active Allowances</CardTitle>
-              <CardDescription>Monthly recurring perks and benefits</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {myAllowances.length === 0 ? (
-                <EmptyState title="No allowances configured" description="No monthly recurring allowances assigned." />
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Allowance</TableHead>
-                      <TableHead className="text-right">Monthly Amount</TableHead>
-                      <TableHead>Effective Term</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {myAllowances.map((a) => (
-                      <TableRow key={a.id}>
-                        <TableCell className="font-medium">{a.type}</TableCell>
-                        <TableCell className="text-right font-medium tabular-nums">{inr(a.amount)}/mo</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{a.effectiveDate} → {a.expiryDate}</TableCell>
-                        <TableCell><StatusBadge status={a.status} /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
