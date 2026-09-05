@@ -57,6 +57,7 @@ function MyWorkspace() {
     assets,
     helpdesk,
     onboarding,
+    allowances,
     patchEmployee,
     punchAttendance,
     log,

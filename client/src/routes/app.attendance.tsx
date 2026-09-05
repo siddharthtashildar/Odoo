@@ -46,17 +46,33 @@ import type { AttendanceRecord, AttendanceStatus } from "@/lib/mock-data";
 const indiaGujaratHolidays = new Holidays("IN", "GJ");
 
 function toLocalDate(iso: string) {
-  const [y, m, d] = iso.split("-").map(Number);
+  const parts = iso.split("-").map(Number);
+  const y = parts[0] ?? 1970;
+  const m = parts[1] ?? 1;
+  const d = parts[2] ?? 1;
   return new Date(y, m - 1, d);
 }
 
 function holidaysForMonth(year: number, monthIndex: number) {
-  return indiaGujaratHolidays.getHolidays(year).flatMap((h) => {
+  const hList = (indiaGujaratHolidays.getHolidays(year) || []) as Array<{
+    date: string | Date;
+    type?: string;
+    name?: string | Record<string, string>;
+  }>;
+  return hList.flatMap((h) => {
     const date = String(h.date).slice(0, 10);
-    const [y, m] = date.split("-").map(Number);
+    const parts = date.split("-").map(Number);
+    const y = parts[0] ?? 0;
+    const m = parts[1] ?? 0;
     if (y !== year || m !== monthIndex + 1) return [];
     if (h.type !== "public" && h.type !== "bank") return [];
-    return [{ date, name: h.name }];
+    const nameStr =
+      typeof h.name === "string"
+        ? h.name
+        : typeof h.name === "object" && h.name
+          ? (Object.values(h.name)[0] ?? "")
+          : "";
+    return [{ date, name: String(nameStr || "Holiday") }];
   });
 }
 
@@ -96,8 +112,13 @@ function EmployeeAttendance() {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
 
   const myRecords = useMemo(
-    () => attendance.filter((a) => a.employeeId === persona.employeeId),
-    [attendance, persona.employeeId],
+    () =>
+      attendance.filter(
+        (a) =>
+          a.employeeId === persona.employeeId ||
+          (persona.employeeCode && a.employeeId === persona.employeeCode),
+      ),
+    [attendance, persona.employeeId, persona.employeeCode],
   );
 
   const year = month.getFullYear();

@@ -52,6 +52,126 @@ router.get("/", async (_req, res) => {
   }
 });
 
+// POST /api/assets
+router.post("/", async (req, res) => {
+  try {
+    const {
+      name,
+      assetType,
+      tag,
+      assetCode,
+      category,
+      serial,
+      serialNumber,
+      condition,
+      status,
+      location,
+      assignedTo,
+      currentEmployeeId,
+      value,
+      purchaseCost,
+      purchaseDate,
+      purchasedOn,
+    } = req.body as any;
+
+    let employeeId = assignedTo || currentEmployeeId;
+    if (employeeId) {
+      const emp = await resolveEmployee(employeeId);
+      if (emp) employeeId = emp.id;
+    }
+
+    const code = tag || assetCode || `AST-${Date.now().toString().slice(-4)}`;
+    const condNorm =
+      condition?.toLowerCase() === "new"
+        ? "new"
+        : condition?.toLowerCase() === "fair"
+          ? "fair"
+          : condition?.toLowerCase()?.includes("damage") || condition?.toLowerCase()?.includes("service")
+            ? "damaged"
+            : "good";
+
+    const statusNorm =
+      status?.toLowerCase() === "assigned" || employeeId
+        ? "assigned"
+        : status?.toLowerCase() === "retired"
+          ? "retired"
+          : status?.toLowerCase()?.includes("repair") || status?.toLowerCase()?.includes("maint")
+            ? "under_repair"
+            : "available";
+
+    const created = await prisma.assets.create({
+      data: {
+        asset_code: code,
+        asset_type: name || assetType || category || "Equipment",
+        serial_number: serial || serialNumber || null,
+        condition: condNorm as any,
+        status: statusNorm as any,
+        location: location || "Ahmedabad IT Vault",
+        current_employee_id: employeeId || null,
+        purchase_cost: value || purchaseCost ? Number(value || purchaseCost) : null,
+        purchase_date: purchaseDate || purchasedOn ? new Date(purchaseDate || purchasedOn) : null,
+      },
+      include: { employees: { select: { full_name: true } } },
+    });
+
+    res.status(201).json({ success: true, data: { id: created.id } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "Failed to create asset" });
+  }
+});
+
+// PATCH /api/assets/:id
+router.patch("/:id", async (req, res) => {
+  try {
+    const { condition, status, location, assignedTo, currentEmployeeId, serial, serialNumber } = req.body as any;
+
+    let employeeId = assignedTo !== undefined ? assignedTo : currentEmployeeId;
+    if (employeeId) {
+      const emp = await resolveEmployee(employeeId);
+      if (emp) employeeId = emp.id;
+    }
+
+    const condNorm = condition
+      ? condition.toLowerCase() === "new"
+        ? "new"
+        : condition.toLowerCase() === "fair"
+          ? "fair"
+          : condition.toLowerCase().includes("damage") || condition.toLowerCase().includes("service")
+            ? "damaged"
+            : "good"
+      : undefined;
+
+    const statusNorm = status
+      ? status.toLowerCase() === "assigned"
+        ? "assigned"
+        : status.toLowerCase() === "retired"
+          ? "retired"
+          : status.toLowerCase().includes("repair") || status.toLowerCase().includes("maint")
+            ? "under_repair"
+            : "available"
+      : undefined;
+
+    const updated = await prisma.assets.update({
+      where: { id: req.params.id },
+      data: {
+        ...(condNorm && { condition: condNorm as any }),
+        ...(statusNorm && { status: statusNorm as any }),
+        ...(location !== undefined && { location }),
+        ...(employeeId !== undefined && { current_employee_id: employeeId || null }),
+        ...(serial !== undefined && { serial_number: serial }),
+        ...(serialNumber !== undefined && { serial_number: serialNumber }),
+        updated_at: new Date(),
+      },
+    });
+
+    res.json({ success: true, data: { id: updated.id } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "Failed to update asset" });
+  }
+});
+
 // GET /api/assets/requests
 router.get("/requests", async (req, res) => {
   try {
@@ -75,8 +195,13 @@ router.get("/requests", async (req, res) => {
       employeeId: r.employee_id,
       employeeName: r.employees.full_name,
       assetTypeRequested: r.asset_type_requested,
+      item: r.asset_type_requested,
       reason: r.reason ?? "",
+      justification: r.reason ?? "",
       status: r.status,
+      priority: "Medium",
+      category: (r.asset_type_requested || "Laptop") as any,
+      raisedOn: r.requested_at.toISOString().slice(0, 10),
       requestedAt: r.requested_at.toISOString(),
     }));
 
@@ -90,11 +215,7 @@ router.get("/requests", async (req, res) => {
 // POST /api/assets/requests
 router.post("/requests", async (req, res) => {
   try {
-    const { employeeId, assetTypeRequested, reason } = req.body as {
-      employeeId: string;
-      assetTypeRequested: string;
-      reason?: string;
-    };
+    const { employeeId, assetTypeRequested, reason, item, justification, category } = req.body as any;
 
     const emp = await resolveEmployee(employeeId);
     if (!emp) return res.status(404).json({ success: false, error: "Employee not found" });
@@ -102,8 +223,8 @@ router.post("/requests", async (req, res) => {
     const request = await prisma.asset_requests.create({
       data: {
         employee_id: emp.id,
-        asset_type_requested: assetTypeRequested,
-        reason: reason ?? null,
+        asset_type_requested: assetTypeRequested || item || category || "Equipment",
+        reason: reason || justification || null,
         status: "pending",
       },
     });
@@ -119,9 +240,20 @@ router.post("/requests", async (req, res) => {
 router.patch("/requests/:id", async (req, res) => {
   try {
     const { status } = req.body as { status: string };
+    const normStatus =
+      status === "approved" || status === "fulfilled"
+        ? "approved"
+        : status === "rejected"
+          ? "rejected"
+          : status === "in_review"
+            ? "pending"
+            : status === "cancelled"
+              ? "cancelled"
+              : "pending";
+
     const updated = await prisma.asset_requests.update({
       where: { id: req.params.id },
-      data: { status: status as any, resolved_at: new Date() },
+      data: { status: normStatus as any, resolved_at: normStatus !== "pending" ? new Date() : null },
     });
     res.json({ success: true, data: { id: updated.id } });
   } catch (err) {

@@ -77,6 +77,28 @@ router.get("/", async (req, res) => {
   }
 });
 
+function parseTimeString(baseDate: Date, timeStr: string): Date | null {
+  const trimmed = timeStr.trim();
+  if (!trimmed || trimmed === "—") return null;
+  const isoTry = new Date(trimmed);
+  if (!isNaN(isoTry.getTime()) && trimmed.includes("-")) {
+    return isoTry;
+  }
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (match) {
+    const res = new Date(baseDate);
+    let h = parseInt(match[1]!, 10);
+    const m = parseInt(match[2]!, 10);
+    const s = match[3] ? parseInt(match[3]!, 10) : 0;
+    const mer = match[4]?.toUpperCase();
+    if (mer === "PM" && h < 12) h += 12;
+    if (mer === "AM" && h === 12) h = 0;
+    res.setHours(h, m, s, 0);
+    return res;
+  }
+  return null;
+}
+
 // POST /api/attendance — punch in/out
 router.post("/", async (req, res) => {
   try {
@@ -98,11 +120,17 @@ router.post("/", async (req, res) => {
     });
 
     if (existing) {
+      // Calculate working_hours
+      const checkInTime = existing.check_in ? existing.check_in.getTime() : now.getTime();
+      const diffHours = Math.max(0, (now.getTime() - checkInTime) / (1000 * 60 * 60));
+      const hoursRounded = Math.round(diffHours * 10) / 10;
+
       // Punch out
       const updated = await prisma.attendance.update({
         where: { id: existing.id },
         data: {
           check_out: now,
+          working_hours: hoursRounded,
           status: normStatus as any,
           updated_at: now,
         },
@@ -167,12 +195,25 @@ router.patch("/:id", async (req, res) => {
       status?: string;
     };
 
+    const existing = await prisma.attendance.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ success: false, error: "Record not found" });
+
+    const newCheckIn = checkIn !== undefined ? parseTimeString(existing.attendance_date, checkIn) : existing.check_in;
+    const newCheckOut = checkOut !== undefined ? parseTimeString(existing.attendance_date, checkOut) : existing.check_out;
+
+    let workingHours = existing.working_hours ? Number(existing.working_hours) : 0;
+    if (newCheckIn && newCheckOut) {
+      const diff = Math.max(0, (newCheckOut.getTime() - newCheckIn.getTime()) / (1000 * 60 * 60));
+      workingHours = Math.round(diff * 10) / 10;
+    }
+
     const updated = await prisma.attendance.update({
       where: { id: req.params.id },
       data: {
-        ...(checkIn && { check_in: new Date(checkIn) }),
-        ...(checkOut && { check_out: new Date(checkOut) }),
+        ...(checkIn !== undefined && { check_in: newCheckIn }),
+        ...(checkOut !== undefined && { check_out: newCheckOut }),
         ...(status && { status: normAttendanceStatus(status) as any }),
+        working_hours: workingHours,
         is_manually_corrected: true,
         updated_at: new Date(),
       },

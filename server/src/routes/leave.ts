@@ -82,13 +82,17 @@ router.post("/", async (req, res) => {
     }
     if (!leaveType) return res.status(400).json({ success: false, error: "No valid leave type configured" });
 
+    const sDate = startDate || (req.body as any).from || new Date().toISOString().slice(0, 10);
+    const eDate = endDate || (req.body as any).to || sDate;
+    const leaveDays = Number(days || (req.body as any).days) || 1;
+
     const request = await prisma.leave_requests.create({
       data: {
         employee_id: emp.id,
         leave_type_id: leaveType.id,
-        start_date: new Date(startDate),
-        end_date: new Date(endDate),
-        days: Number(days) || 1,
+        start_date: new Date(sDate),
+        end_date: new Date(eDate),
+        days: leaveDays,
         reason: reason ?? null,
         status: "pending",
       },
