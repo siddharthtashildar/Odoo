@@ -667,6 +667,136 @@ async function main() {
   }
   console.log(`  ✓ ${attCount} attendance records`);
 
+  // ── 21. Work Schedules ──────────────────────────────────────────────────────
+  console.log("Creating work schedules...");
+  const seedSchedules = [
+    {
+      code: "SCH-001",
+      name: "Standard General Shift (9 AM - 6 PM)",
+      description: "Core company business hours. Monday to Friday with 1 hour lunch break.",
+      shift_type: "General",
+      working_days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      start_time: "09:00",
+      end_time: "18:00",
+      break_duration_minutes: 60,
+      break_start_time: "13:00",
+      break_end_time: "14:00",
+      daily_hours: 8.0,
+      weekly_hours: 40.0,
+      color: "#3b82f6",
+      is_default: true,
+      status: "active",
+    },
+    {
+      code: "SCH-002",
+      name: "Engineering Morning Shift (8 AM - 4:30 PM)",
+      description: "Early engineering & architecture sprint schedule with 30m break.",
+      shift_type: "Morning",
+      working_days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      start_time: "08:00",
+      end_time: "16:30",
+      break_duration_minutes: 30,
+      break_start_time: "12:30",
+      break_end_time: "13:00",
+      daily_hours: 8.0,
+      weekly_hours: 40.0,
+      color: "#10b981",
+      is_default: false,
+      status: "active",
+    },
+    {
+      code: "SCH-003",
+      name: "Customer Operations Evening Shift (2 PM - 11 PM)",
+      description: "Global enterprise customer coverage shift with 1 hour dinner break.",
+      shift_type: "Evening",
+      working_days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      start_time: "14:00",
+      end_time: "23:00",
+      break_duration_minutes: 60,
+      break_start_time: "18:00",
+      break_end_time: "19:00",
+      daily_hours: 8.0,
+      weekly_hours: 40.0,
+      color: "#f59e0b",
+      is_default: false,
+      status: "active",
+    },
+    {
+      code: "SCH-004",
+      name: "Flexible 4-Day Leadership Shift",
+      description: "Condensed 4-day executive & technical lead schedule (Mon - Thu).",
+      shift_type: "Flexible",
+      working_days: ["Monday", "Tuesday", "Wednesday", "Thursday"],
+      start_time: "08:30",
+      end_time: "19:00",
+      break_duration_minutes: 30,
+      break_start_time: "13:00",
+      break_end_time: "13:30",
+      daily_hours: 10.0,
+      weekly_hours: 40.0,
+      color: "#8b5cf6",
+      is_default: false,
+      status: "active",
+    },
+  ];
+
+  for (const s of seedSchedules) {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO work_schedules (
+        code, name, description, shift_type, working_days, start_time, end_time,
+        break_duration_minutes, break_start_time, break_end_time, daily_hours, weekly_hours,
+        color, is_default, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5::text[], $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
+      ON CONFLICT (code) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        shift_type = EXCLUDED.shift_type,
+        working_days = EXCLUDED.working_days,
+        start_time = EXCLUDED.start_time,
+        end_time = EXCLUDED.end_time,
+        break_duration_minutes = EXCLUDED.break_duration_minutes,
+        break_start_time = EXCLUDED.break_start_time,
+        break_end_time = EXCLUDED.break_end_time,
+        daily_hours = EXCLUDED.daily_hours,
+        weekly_hours = EXCLUDED.weekly_hours,
+        color = EXCLUDED.color,
+        is_default = EXCLUDED.is_default,
+        updated_at = NOW();`,
+      s.code,
+      s.name,
+      s.description,
+      s.shift_type,
+      s.working_days,
+      s.start_time,
+      s.end_time,
+      s.break_duration_minutes,
+      s.break_start_time,
+      s.break_end_time,
+      s.daily_hours,
+      s.weekly_hours,
+      s.color,
+      s.is_default,
+      s.status
+    );
+  }
+
+  const defaultSchRes: any[] = await prisma.$queryRawUnsafe(
+    `SELECT id FROM work_schedules WHERE is_default = true LIMIT 1;`
+  );
+  if (defaultSchRes[0]?.id) {
+    const allEmps = await prisma.employees.findMany({ select: { id: true } });
+    for (const emp of allEmps) {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO employee_schedules (schedule_id, employee_id, assigned_at)
+         VALUES ($1::uuid, $2::uuid, NOW())
+         ON CONFLICT (employee_id) DO NOTHING;`,
+        defaultSchRes[0].id,
+        emp.id
+      );
+    }
+  }
+  console.log(`  ✓ ${seedSchedules.length} work schedules in database`);
+
   console.log("\n✅ Database seeded successfully!");
   console.log("\nDemo login emails:");
   userData.forEach((u) => console.log(`  ${u.email.padEnd(40)} → ${u.role}`));

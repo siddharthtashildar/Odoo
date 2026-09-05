@@ -300,6 +300,7 @@ model employees {
   reimbursements                                       reimbursements[]
   service_accounts                                     service_accounts[]
   users                                                users?
+  employee_schedules                                   employee_schedules?
 
   @@index([department_id], map: "idx_employees_department")
   @@index([reporting_manager_id], map: "idx_employees_manager")
@@ -1175,3 +1176,38 @@ model Verification {
   @@index([identifier])
   @@map("verification")
 }
+
+model work_schedules {
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                   String?              @unique @db.VarChar(50)
+  name                   String               @db.VarChar(120)
+  description            String?              @db.Text
+  shift_type             String               @default("General") @db.VarChar(50)
+  working_days           String[]
+  start_time             String               @db.VarChar(10)
+  end_time               String               @db.VarChar(10)
+  break_duration_minutes Int                  @default(60)
+  break_start_time       String?              @db.VarChar(10)
+  break_end_time         String?              @db.VarChar(10)
+  daily_hours            Decimal              @db.Decimal(5, 2)
+  weekly_hours           Decimal              @db.Decimal(5, 2)
+  color                  String?              @default("#3b82f6") @db.VarChar(30)
+  is_default             Boolean              @default(false)
+  status                 String               @default("active") @db.VarChar(20)
+  created_at             DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime             @default(now()) @updatedAt @db.Timestamptz(6)
+  employee_schedules     employee_schedules[]
+}
+
+model employee_schedules {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schedule_id    String         @db.Uuid
+  employee_id    String         @unique @db.Uuid
+  assigned_at    DateTime       @default(now()) @db.Timestamptz(6)
+  work_schedules work_schedules @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+  employees      employees      @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+
+  @@index([employee_id])
+  @@index([schedule_id])
+}
+

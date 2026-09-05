@@ -211,6 +211,10 @@ The `persona` object in `useApp()` is computed dynamically:
 | `/api/reimbursements/:id` | `PATCH` | Updates claim status & approved amounts |
 | `/api/allowances` | `GET` / `POST` | Lists / configures recurring employee allowances |
 | `/api/contracts` | `GET` / `POST` | Fetches / drafts employment contracts |
+| `/api/schedules` | `GET` / `POST` | Lists all shift schedules (or filters by `?employeeId=`); creates schedule |
+| `/api/schedules/my-schedule` | `GET` | Fetches active shift schedule for authenticated user's employee |
+| `/api/schedules/:id` | `PATCH` / `DELETE` | Updates shift timings/break/working days; deletes non-default schedule |
+| `/api/schedules/:id/assign` | `POST` | Assigns schedule to employees and syncs contract working hours |
 | `/api/helpdesk` | `GET` / `POST` | Fetches / submits IT support tickets |
 | `/api/helpdesk/:id/comments`| `POST` | Adds comments to support tickets |
 

@@ -199,6 +199,22 @@ export const api = {
       request<{ id: string }>("POST", `/api/helpdesk/${id}/comments`, data),
   },
 
+  // ── Schedules ─────────────────────────────────────────────────────────────
+  schedules: {
+    list: (employeeId?: string) =>
+      request<any[]>("GET", employeeId ? `/api/schedules?employeeId=${employeeId}` : "/api/schedules"),
+    mySchedule: (employeeId: string) =>
+      request<any>("GET", `/api/schedules/my-schedule?employeeId=${employeeId}`),
+    create: (data: Record<string, unknown>) =>
+      request<{ id: string; name: string; dailyHours: number; weeklyHours: number }>("POST", "/api/schedules", data),
+    patch: (id: string, data: Record<string, unknown>) =>
+      request<{ id: string; dailyHours: number; weeklyHours: number }>("PATCH", `/api/schedules/${id}`, data),
+    delete: (id: string) =>
+      request<{ success: boolean; message: string }>("DELETE", `/api/schedules/${id}`),
+    assign: (id: string, data: { employeeIds: string[]; contractIds?: string[] }) =>
+      request<{ assignedCount: number }>("POST", `/api/schedules/${id}/assign`, data),
+  },
+
   // ── Health check ──────────────────────────────────────────────────────────
   health: () => request<{ message: string; version: string }>("GET", "/"),
 };

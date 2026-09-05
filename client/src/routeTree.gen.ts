@@ -28,6 +28,7 @@ import { Route as AppReimbursementRouteImport } from './routes/app.reimbursement
 import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppSalaryRouteImport } from './routes/app.salary'
 import { Route as AppSalaryStructureRouteImport } from './routes/app.salary-structure'
+import { Route as AppScheduleRouteImport } from './routes/app.schedule'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppEmployeesIndexRouteImport } from './routes/app.employees.index'
 import { Route as AppEmployeesIdRouteImport } from './routes/app.employees.$id'
@@ -129,6 +130,11 @@ const AppSalaryStructureRoute = AppSalaryStructureRouteImport.update({
   path: '/salary-structure',
   getParentRoute: () => AppRoute,
 } as any)
+const AppScheduleRoute = AppScheduleRouteImport.update({
+  id: '/schedule',
+  path: '/schedule',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -175,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/app/reports': typeof AppReportsRoute
   '/app/salary': typeof AppSalaryRoute
   '/app/salary-structure': typeof AppSalaryStructureRoute
+  '/app/schedule': typeof AppScheduleRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/employees/$id': typeof AppEmployeesIdRoute
   '/app/payroll/$runId': typeof AppPayrollRunIdRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/app/reports': typeof AppReportsRoute
   '/app/salary': typeof AppSalaryRoute
   '/app/salary-structure': typeof AppSalaryStructureRoute
+  '/app/schedule': typeof AppScheduleRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/employees/$id': typeof AppEmployeesIdRoute
   '/app/payroll/$runId': typeof AppPayrollRunIdRoute
@@ -228,6 +236,7 @@ export interface FileRoutesById {
   '/app/reports': typeof AppReportsRoute
   '/app/salary': typeof AppSalaryRoute
   '/app/salary-structure': typeof AppSalaryStructureRoute
+  '/app/schedule': typeof AppScheduleRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/employees/$id': typeof AppEmployeesIdRoute
   '/app/payroll/$runId': typeof AppPayrollRunIdRoute
@@ -256,6 +265,7 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/salary'
     | '/app/salary-structure'
+    | '/app/schedule'
     | '/app/settings'
     | '/app/employees/$id'
     | '/app/payroll/$runId'
@@ -282,6 +292,7 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/salary'
     | '/app/salary-structure'
+    | '/app/schedule'
     | '/app/settings'
     | '/app/employees/$id'
     | '/app/payroll/$runId'
@@ -308,6 +319,7 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/salary'
     | '/app/salary-structure'
+    | '/app/schedule'
     | '/app/settings'
     | '/app/employees/$id'
     | '/app/payroll/$runId'
@@ -455,6 +467,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSalaryStructureRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/schedule': {
+      id: '/app/schedule'
+      path: '/schedule'
+      fullPath: '/app/schedule'
+      preLoaderRoute: typeof AppScheduleRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/settings': {
       id: '/app/settings'
       path: '/settings'
@@ -511,6 +530,7 @@ interface AppRouteChildren {
   AppReportsRoute: typeof AppReportsRoute
   AppSalaryRoute: typeof AppSalaryRoute
   AppSalaryStructureRoute: typeof AppSalaryStructureRoute
+  AppScheduleRoute: typeof AppScheduleRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppEmployeesIdRoute: typeof AppEmployeesIdRoute
   AppPayrollRunIdRoute: typeof AppPayrollRunIdRoute
@@ -536,6 +556,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppReportsRoute: AppReportsRoute,
   AppSalaryRoute: AppSalaryRoute,
   AppSalaryStructureRoute: AppSalaryStructureRoute,
+  AppScheduleRoute: AppScheduleRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppEmployeesIdRoute: AppEmployeesIdRoute,
   AppPayrollRunIdRoute: AppPayrollRunIdRoute,

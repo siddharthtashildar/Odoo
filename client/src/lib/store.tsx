@@ -20,6 +20,7 @@ import type {
   Role,
   SalaryRecord,
   SalaryStructure,
+  WorkSchedule,
 } from "./mock-data";
 
 export interface CurrentUser {
@@ -52,6 +53,7 @@ interface State {
   audit: AuditEntry[];
   salaryRecords: SalaryRecord[];
   salaryStructures: SalaryStructure[];
+  schedules: WorkSchedule[];
 }
 
 const initial: State = {
@@ -75,6 +77,7 @@ const initial: State = {
   audit: seed.auditLog,
   salaryRecords: seed.salaryRecords,
   salaryStructures: seed.salaryStructures,
+  schedules: seed.defaultSchedules,
 };
 
 interface Store extends State {
@@ -102,6 +105,10 @@ interface Store extends State {
   updateTicket: (id: string, patch: Partial<HelpdeskTicket>) => void;
   addTicketComment: (ticketId: string, author: string, text: string) => void;
   retryProvisioning: (id: string) => void;
+  addSchedule: (s: WorkSchedule) => Promise<void>;
+  updateSchedule: (id: string, patch: Partial<WorkSchedule>) => Promise<void>;
+  deleteSchedule: (id: string) => Promise<void>;
+  assignSchedule: (scheduleId: string, employeeIds: string[]) => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -117,7 +124,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     async function fetchAll() {
       try {
-        const [empRes, conRes, attRes, leaveRes, payrollRes, structRes, recordsRes, reimRes, allowRes, assetRes, helpdeskRes] =
+        const [empRes, conRes, attRes, leaveRes, payrollRes, structRes, recordsRes, reimRes, allowRes, assetRes, helpdeskRes, schedRes] =
           await Promise.allSettled([
             fetch(`${API}/api/employees`).then((r) => r.json()),
             fetch(`${API}/api/contracts`).then((r) => r.json()),
@@ -130,6 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             fetch(`${API}/api/allowances`).then((r) => r.json()),
             fetch(`${API}/api/assets`).then((r) => r.json()),
             fetch(`${API}/api/helpdesk`).then((r) => r.json()),
+            fetch(`${API}/api/schedules`).then((r) => r.json()),
           ]);
 
         const ok = <T,>(res: PromiseSettledResult<{ success: boolean; data: T }>, fallback: T): T =>
@@ -148,6 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           allowances: ok(allowRes, seed.allowances) as State["allowances"],
           assets: ok(assetRes, seed.assets) as State["assets"],
           helpdesk: ok(helpdeskRes, seed.helpdeskTickets) as State["helpdesk"],
+          schedules: ok(schedRes, seed.defaultSchedules) as State["schedules"],
         }));
       } catch (err) {
         console.warn("[store] API unreachable — using seed data", err);
@@ -492,6 +501,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const addSchedule = useCallback(async (s: WorkSchedule) => {
+    try {
+      await api.schedules.create({
+        name: s.name,
+        description: s.description,
+        shiftType: s.shiftType,
+        workingDays: s.workingDays,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        breakDurationMinutes: s.breakDurationMinutes,
+        breakStartTime: s.breakStartTime,
+        breakEndTime: s.breakEndTime,
+        color: s.color,
+        isDefault: s.isDefault,
+        assignedEmployeeIds: s.assignedEmployeeIds,
+      });
+      const res = await api.schedules.list();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, schedules: res as WorkSchedule[] }));
+      }
+    } catch (err) {
+      console.warn("[store] addSchedule sync error:", err);
+    }
+  }, []);
+
+  const updateSchedule = useCallback(async (id: string, patch: Partial<WorkSchedule>) => {
+    try {
+      await api.schedules.patch(id, patch as Record<string, unknown>);
+      const res = await api.schedules.list();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, schedules: res as WorkSchedule[] }));
+      }
+    } catch (err) {
+      console.warn("[store] updateSchedule sync error:", err);
+    }
+  }, []);
+
+  const deleteSchedule = useCallback(async (id: string) => {
+    try {
+      await api.schedules.delete(id);
+      const res = await api.schedules.list();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, schedules: res as WorkSchedule[] }));
+      }
+    } catch (err) {
+      console.warn("[store] deleteSchedule sync error:", err);
+    }
+  }, []);
+
+  const assignSchedule = useCallback(async (scheduleId: string, employeeIds: string[]) => {
+    try {
+      await api.schedules.assign(scheduleId, { employeeIds });
+      const res = await api.schedules.list();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, schedules: res as WorkSchedule[] }));
+      }
+    } catch (err) {
+      console.warn("[store] assignSchedule sync error:", err);
+    }
+  }, []);
+
   const persona = useMemo(() => {
     if (state.currentUser) {
       const match = state.employees.find(
@@ -573,6 +643,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateTicket,
       addTicketComment,
       retryProvisioning,
+      addSchedule,
+      updateSchedule,
+      deleteSchedule,
+      assignSchedule,
     }),
     [
       state,
@@ -594,6 +668,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateTicket,
       addTicketComment,
       retryProvisioning,
+      addSchedule,
+      updateSchedule,
+      deleteSchedule,
+      assignSchedule,
     ],
   );
 
@@ -629,6 +707,7 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/offboarding": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/contracts": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/attendance": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/schedule": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
   "/app/leave": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/payroll": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/salary": ["payroll_user", "payroll_manager", "admin"],

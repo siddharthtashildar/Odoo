@@ -4,6 +4,7 @@ import {
   BadgeIndianRupee,
   Building2,
   CalendarDays,
+  CalendarRange,
   ChevronDown,
   Clock,
   Coins,
@@ -59,6 +60,7 @@ const NAV: { to: string; label: string; icon: typeof Users; roles: Role[]; group
   // Time & Attendance
   { to: "/app/attendance", label: "Attendance", icon: Clock, group: "Time & Leave", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
   { to: "/app/leave", label: "Time Off", icon: CalendarDays, group: "Time & Leave", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/schedule", label: "Work Schedule", icon: CalendarRange, group: "Time & Leave", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
 
   // Compensation & Finance
   { to: "/app/payroll", label: "Payroll", icon: Coins, group: "Compensation", roles: ["payroll_user", "payroll_manager", "admin"] },

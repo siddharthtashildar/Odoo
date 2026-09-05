@@ -1885,3 +1885,30 @@ export const ROLE_PERSONA: Record<Role, { employeeId: string; name: string }> = 
 
 export const inr = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
+
+export type ShiftType = "General" | "Morning" | "Evening" | "Night" | "Flexible" | "Rotational";
+
+export interface WorkSchedule {
+  id: string;
+  name: string;
+  description: string;
+  shiftType: ShiftType;
+  workingDays: string[];
+  startTime: string;
+  endTime: string;
+  breakDurationMinutes: number;
+  breakStartTime?: string | undefined;
+  breakEndTime?: string | undefined;
+  dailyHours: number;
+  weeklyHours: number;
+  color: string;
+  isDefault: boolean;
+  status: "active" | "inactive";
+  assignedEmployeeIds: string[];
+  assignedEmployees?: { id: string; code: string; name: string }[] | undefined;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const defaultSchedules: WorkSchedule[] = [];
+

@@ -16,6 +16,7 @@ import reimbursementsRouter from "./routes/reimbursements";
 import allowancesRouter from "./routes/allowances";
 import assetsRouter from "./routes/assets";
 import helpdeskRouter from "./routes/helpdesk";
+import schedulesRouter from "./routes/schedules";
 import authRouter from "./routes/auth";
 
 const app = express();
@@ -59,6 +60,7 @@ app.use("/api/reimbursements", reimbursementsRouter);
 app.use("/api/allowances", allowancesRouter);
 app.use("/api/assets", assetsRouter);
 app.use("/api/helpdesk", helpdeskRouter);
+app.use("/api/schedules", schedulesRouter);
 
 // 404 handler
 app.use((_req, res) => {
