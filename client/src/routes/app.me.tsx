@@ -32,6 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmptyState, Field, PageHeader, StatCard, StatusBadge } from "@/components/bits";
 import { useApp } from "@/lib/store";
 import { inr, ROLE_LABELS } from "@/lib/mock-data";
+import { downloadContractPDF } from "@/lib/contract-exporter";
+import { downloadPayslipPDF } from "@/lib/payslip-exporter";
 
 export const Route = createFileRoute("/app/me")({
   head: () => ({
@@ -329,7 +331,20 @@ function MyWorkspace() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => toast.success(`Downloading Contract PDF: ${myContract.id}.pdf`)}
+                    onClick={() =>
+                      downloadContractPDF({
+                        id: myContract.id,
+                        employeeName: activeEmployee.name,
+                        employeeCode: activeEmployee.code,
+                        department: myContract.department,
+                        contractType: myContract.contractType,
+                        startDate: myContract.startDate,
+                        endDate: myContract.endDate,
+                        salary: myContract.salary,
+                        noticePeriodDays: myContract.noticePeriodDays,
+                        terms: myContract.terms,
+                      })
+                    }
                   >
                     <Download className="mr-1.5 size-3.5" /> Download Contract PDF
                   </Button>
@@ -481,10 +496,31 @@ function MyWorkspace() {
                                 size="sm"
                                 variant="outline"
                                 className="h-8 text-xs gap-1"
-                                onClick={() => toast.success(`Downloading PDF Payslip for ${r.period}`)}
+                                onClick={() =>
+                                  downloadPayslipPDF({
+                                    employeeName: activeEmployee.name,
+                                    employeeCode: activeEmployee.code,
+                                    department: activeEmployee.department,
+                                    designation: activeEmployee.designation,
+                                    bankAccount: (activeEmployee as any).bankAccountNumber || activeEmployee.bankAccount || "HDFC0001234",
+
+                                    period: r.period,
+                                    basic: line.basicSalary,
+                                    hra: line.hra,
+                                    specialAllowance: line.specialAllowance,
+                                    bonus: line.bonus,
+                                    gross: line.gross,
+                                    pf: line.providentFund,
+                                    pt: line.professionalTax,
+                                    tds: line.incomeTax,
+                                    deductions: line.deductions,
+                                    net: line.net,
+                                  })
+                                }
                               >
                                 <Download className="size-3.5" /> PDF
                               </Button>
+
                             </div>
                           </TableCell>
                         </TableRow>

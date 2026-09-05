@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock,
   Eye,
+  Pencil,
   Plus,
   Search,
   X,
@@ -397,7 +398,6 @@ function LeavePage() {
                       </TableCell>
                       <TableCell>
                         <div className="font-medium">{nameOf(l.employeeId)}</div>
-                        <div className="text-xs text-muted-foreground">{l.employeeId}</div>
                       </TableCell>
                       <TableCell>{l.type} Leave</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{l.from}</TableCell>
@@ -421,10 +421,11 @@ function LeavePage() {
                             variant="ghost"
                             className="h-8 px-2"
                             onClick={() => setViewReq(l)}
-                            title="View details"
+                            title="Edit details"
                           >
-                            <Eye className="size-3.5" />
+                            <Pencil className="size-3.5" />
                           </Button>
+
 
                           {isApprover && l.status === "pending" && (
                             <>

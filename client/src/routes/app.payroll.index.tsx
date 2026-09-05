@@ -2,18 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
   AlertCircle,
   AlertTriangle,
   BadgeIndianRupee,
@@ -521,84 +509,6 @@ function PayrollList() {
           </CardContent>
         </Card>
       )}
-
-      {/* Analytics Charts */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Department Salary Cost Breakdown</CardTitle>
-            <CardDescription>Monthly net salary allocation per department</CardDescription>
-          </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={analytics?.departmentCostChart || [
-                  { department: "Engineering", headcount: 8, totalMonthlyCost: 480000 },
-                  { department: "HR", headcount: 3, totalMonthlyCost: 150000 },
-                  { department: "Design", headcount: 2, totalMonthlyCost: 120000 },
-                  { department: "Sales", headcount: 4, totalMonthlyCost: 240000 },
-                ]}
-                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="department" stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} />
-                <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${v / 1000}k`} />
-                <Tooltip
-                  formatter={(v: number) => inr(v)}
-                  contentStyle={{
-                    background: "var(--popover)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    color: "var(--popover-foreground)",
-                  }}
-                />
-                <Bar dataKey="totalMonthlyCost" name="Monthly Cost" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Net Salary Trajectory</CardTitle>
-            <CardDescription>Historical payout trend across recent cycles</CardDescription>
-          </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={analytics?.monthlyTrend || [
-                  { period: "2026-06", totalNet: 785000 },
-                  { period: "2026-07", totalNet: 840000 },
-                  { period: "2026-08", totalNet: 890000 },
-                  { period: "2026-09", totalNet: netSalaryDisbursal || 920000 },
-                ]}
-                margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="period" stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} />
-                <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${v / 1000}k`} />
-                <Tooltip
-                  formatter={(v: number) => inr(v)}
-                  contentStyle={{
-                    background: "var(--popover)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    color: "var(--popover-foreground)",
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="totalNet"
-                  name="Net Disbursal"
-                  stroke="var(--chart-3)"
-                  strokeWidth={2.5}
-                  dot={{ r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Main Employee Compensation Records Table */}
       <Card>

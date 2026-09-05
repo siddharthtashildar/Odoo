@@ -32,6 +32,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import { inr, type Contract, type ContractStatus, type ContractType } from "@/lib/mock-data";
+import { downloadContractPDF } from "@/lib/contract-exporter";
 
 export const Route = createFileRoute("/app/contracts")({
   head: () => ({
@@ -185,10 +186,19 @@ function ContractsPage() {
   };
 
   const handleDownload = (c: Contract) => {
-    toast.success(`Downloading ${c.id}.pdf`, {
-      description: `Official ${c.contractType} for ${nameOf(c.employeeId)}`,
+    downloadContractPDF({
+      id: c.id,
+      employeeName: nameOf(c.employeeId),
+      department: c.department,
+      contractType: c.contractType,
+      startDate: c.startDate,
+      endDate: c.endDate,
+      salary: c.salary,
+      noticePeriodDays: c.noticePeriodDays,
+      terms: c.terms,
     });
   };
+
 
   return (
     <>
@@ -311,23 +321,32 @@ function ContractsPage() {
               icon={<FileSignature className="size-8" />}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Contract ID</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Contract Type</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead className="text-right">Annual Salary</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((c) => {
+            <>
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Contract ID</TableHead>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Contract Type</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead className="text-right">Annual Salary</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRows.map((c) => {
+
                     const isExpiring = c.status === "Expiring Soon";
                     return (
                       <TableRow key={c.id}>
@@ -428,7 +447,9 @@ function ContractsPage() {
                 </TableBody>
               </Table>
             </div>
+          </>
           )}
+
         </CardContent>
       </Card>
 
