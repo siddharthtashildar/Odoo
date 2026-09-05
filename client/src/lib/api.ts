@@ -28,7 +28,7 @@ async function request<T>(
 export const api = {
   auth: {
     login: (email: string, password?: string) =>
-      request<{ userId: string; email: string; role: string; employeeId: string | null; employeeName: string }>(
+      request<{ userId: string; email: string; role: string; employeeId: string | null; employeeCode: string | null; employeeName: string }>(
         "POST",
         "/api/auth/login",
         { email, password },

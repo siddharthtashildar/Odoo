@@ -67,7 +67,7 @@ function AttendancePage() {
   const [editStatus, setEditStatus] = useState<AttendanceStatus>("Present");
   const [editRemarks, setEditRemarks] = useState("");
 
-  const canManage = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const canManage = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
   const me = employees.find(
     (e) =>
       e.id === persona.employeeId ||

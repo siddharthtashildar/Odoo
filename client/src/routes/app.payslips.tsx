@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Download, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,22 +31,37 @@ function Payslips() {
     (e) =>
       e.id === persona.employeeId ||
       e.code === persona.employeeCode ||
-      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()) ||
+      (persona.name && e.name.toLowerCase() === persona.name.toLowerCase()),
   );
   const myId = me?.id || persona.employeeId;
   const myCode = me?.code || persona.employeeCode;
 
   const [who, setWho] = useState(myId);
   const [openSlip, setOpenSlip] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (myId) {
+      setWho(myId);
+    } else if (employees.length > 0 && !who && employees[0]) {
+      setWho(employees[0].id);
+    }
+  }, [myId, employees]);
+
   const canSwitch = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin";
-  const target = canSwitch ? who : persona.employeeId;
-  const employee = employees.find((e) => e.id === target);
+  const target = canSwitch ? (who || myId) : myId;
+  const employee = employees.find((e) => e.id === target || e.code === target);
 
   const slips = payroll
-    .filter((r) => r.status === "paid")
+    .filter((r) => r.status === "paid" || r.status === "approved")
     .map((r) => ({
       run: r,
-      line: r.lines.find((l) => l.employeeId === target || (employee && (l.employeeId === employee.code || l.employeeId === employee.id))),
+      line: r.lines.find(
+        (l) =>
+          l.employeeId === target ||
+          (employee && (l.employeeId === employee.code || l.employeeId === employee.id)),
+      ),
     }))
     .filter((s) => s.line);
 
@@ -59,8 +74,9 @@ function Payslips() {
     try {
       await generatePayslips(target);
       toast.success("Payslip generated successfully from compensation structure");
-    } catch (err) {
-      toast.error("Failed to generate payslip");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to generate payslip";
+      toast.error(msg);
     } finally {
       setIsGenerating(false);
     }

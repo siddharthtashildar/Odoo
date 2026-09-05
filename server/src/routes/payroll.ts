@@ -86,7 +86,7 @@ export async function generatePayslipsForRun(runId: string, employeeIdFilter?: s
 // GET /api/payroll
 router.get("/", async (_req, res) => {
   try {
-    const runs = await prisma.payroll_runs.findMany({
+    let runs = await prisma.payroll_runs.findMany({
       orderBy: [{ period_year: "desc" }, { period_month: "desc" }],
       include: {
         payslips: {
@@ -112,8 +112,26 @@ router.get("/", async (_req, res) => {
       const activeCount = await prisma.employees.count({ where: { status: "active" } });
       if (paidRun.payslips.length < activeCount) {
         await generatePayslipsForRun(paidRun.id);
-        // Re-fetch runs after generation
-        return res.redirect(307, "/api/payroll");
+        // Re-fetch runs after generation in-process
+        runs = await prisma.payroll_runs.findMany({
+          orderBy: [{ period_year: "desc" }, { period_month: "desc" }],
+          include: {
+            payslips: {
+              select: {
+                id: true,
+                employee_id: true,
+                gross_salary: true,
+                net_salary: true,
+                basic_salary: true,
+                allowances_total: true,
+                deductions_total: true,
+                tax_amount: true,
+                status: true,
+                payment_status: true,
+              },
+            },
+          },
+        });
       }
     }
 

@@ -493,30 +493,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persona = useMemo(() => {
-    const staticP = seed.ROLE_PERSONA[state.role];
-    if (staticP) {
+    if (state.currentUser) {
       const match = state.employees.find(
         (e) =>
-          e.id === staticP.employeeId ||
-          e.code === staticP.employeeId ||
-          (Boolean(staticP.name) && e.name.toLowerCase().includes((staticP.name ?? "").split(" ")[0]?.toLowerCase() ?? "")) ||
-          (state.role === "payroll_manager" && (e.code === "PP-1005" || e.code === "PP-1004" || e.email.includes("arjun"))) ||
-          (state.role === "payroll_user" && (e.code === "PP-1004" || e.code === "PP-1005" || e.email.includes("devika"))),
+          (state.currentUser?.employeeId && e.id === state.currentUser.employeeId) ||
+          (state.currentUser?.employeeCode && e.code === state.currentUser.employeeCode) ||
+          (state.currentUser?.email && e.email.toLowerCase() === state.currentUser.email.toLowerCase()) ||
+          (state.currentUser?.name && e.name.toLowerCase() === state.currentUser.name.toLowerCase()),
       );
-      if (match) {
-        return { employeeId: match.id, name: match.name };
-      }
+      return {
+        employeeId: match?.id || state.currentUser.employeeId || state.currentUser.id,
+        employeeCode: match?.code || state.currentUser.employeeCode || "",
+        name: match?.name || state.currentUser.name || state.currentUser.email,
+        email: match?.email || state.currentUser.email,
+      };
     }
-    return staticP ?? { employeeId: "E1001", name: "Charmi Patel" };
-  }, [state.role, state.employees]);
+    const staticP = seed.ROLE_PERSONA[state.role];
+    const match = state.employees.find(
+      (e) =>
+        e.id === staticP?.employeeId ||
+        e.code === staticP?.employeeId ||
+        (Boolean(staticP?.name) && e.name.toLowerCase().includes((staticP?.name ?? "").split(" ")[0]?.toLowerCase() ?? "")) ||
+        (state.role === "payroll_manager" && (e.code === "PP-1005" || e.code === "PP-1004" || e.email.includes("arjun"))) ||
+        (state.role === "payroll_user" && (e.code === "PP-1004" || e.code === "PP-1005" || e.email.includes("devika"))),
+    );
+    return {
+      employeeId: match?.id || staticP?.employeeId || "E1001",
+      employeeCode: match?.code || staticP?.employeeId || "PP-1001",
+      name: match?.name || staticP?.name || "User",
+      email: match?.email || "",
+    };
+  }, [state.currentUser, state.role, state.employees]);
 
   const value = useMemo<Store>(
     () => ({
       ...state,
       hydrated,
-      persona: seed.ROLE_PERSONA[state.role] ?? { employeeId: "E1001", name: "Charmi Patel" },
-      signIn: (role) => setState((s) => ({ ...s, signedIn: true, role })),
-      signOut: () => setState((s) => ({ ...s, signedIn: false })),
+      persona,
+      signIn: (role, user) => {
+        const newUser: CurrentUser = {
+          id: user?.id || user?.email || "USR",
+          email: user?.email || "",
+          name: user?.name || user?.email || "User",
+          role,
+          employeeId: user?.employeeId ?? null,
+          employeeCode: user?.employeeCode ?? null,
+        };
+        setState((s) => ({ ...s, signedIn: true, role, currentUser: newUser }));
+      },
+      signOut: () => {
+        setState((s) => ({ ...s, signedIn: false, currentUser: null }));
+        try {
+          localStorage.removeItem(KEY);
+        } catch {}
+      },
       setRole: (role) => setState((s) => ({ ...s, role })),
       log,
       update: (key, val) => setState((s) => ({ ...s, [key]: val })),
@@ -592,22 +622,24 @@ export function useDelayed(ms = 350) {
 }
 
 export const ROLE_ACCESS: Record<string, Role[]> = {
-  "/app/dashboard": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/me": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/employees": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/onboarding": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/offboarding": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/contracts": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/attendance": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/leave": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/payroll": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/payslips": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/reimbursement": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/allowance": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "hr_user", "payroll_user", "payroll_manager"],
-  "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "hr_user", "payroll_user", "payroll_manager"],
-  "/app/helpdesk": ["employee", "it_asset_manager", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/reports": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
+  "/app/dashboard": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/me": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/employees": ["hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/onboarding": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/offboarding": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/contracts": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/attendance": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/leave": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/payroll": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/salary": ["payroll_user", "payroll_manager", "admin"],
+  "/app/salary-structure": ["payroll_user", "payroll_manager", "admin"],
+  "/app/payslips": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/reimbursement": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/allowance": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
+  "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
+  "/app/helpdesk": ["employee", "it_asset_manager", "hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/reports": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/admin": ["admin"],
   "/app/settings": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
 };

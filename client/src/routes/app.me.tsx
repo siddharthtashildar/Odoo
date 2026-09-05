@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   BadgeIndianRupee,
@@ -63,7 +63,10 @@ function MyWorkspace() {
   const staticP = ROLE_PERSONA[role];
   const me =
     employees.find((e) => e.id === persona.employeeId) ??
+    (persona.employeeCode ? employees.find((e) => e.code === persona.employeeCode) : undefined) ??
     employees.find((e) => e.code === persona.employeeId) ??
+    (persona.email ? employees.find((e) => e.email.toLowerCase() === persona.email.toLowerCase()) : undefined) ??
+    (persona.name ? employees.find((e) => e.name.toLowerCase() === persona.name.toLowerCase()) : undefined) ??
     employees.find(
       (e) =>
         staticP &&
@@ -76,6 +79,12 @@ function MyWorkspace() {
 
   const [phone, setPhone] = useState(me?.phone ?? "");
   const [error, setError] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (me?.phone) {
+      setPhone(me.phone);
+    }
+  }, [me?.phone]);
 
   if (!me) {
     return (
@@ -90,17 +99,19 @@ function MyWorkspace() {
   const myCode = me.code;
 
   // Personal private filtered slices
-  const myContract = contracts.find((c) => c.employeeId === me.id);
-  const myAttendance = attendance.filter((a) => a.employeeId === me.id);
-  const myLeave = leave.filter((l) => l.employeeId === me.id);
-  const myPaidSlips = payroll.filter((r) => r.status === "paid" && r.lines.some((l) => l.employeeId === me.id));
+  const myContract = contracts.find((c) => c.employeeId === me.id || (myCode && c.employeeId === myCode));
+  const myAttendance = attendance.filter((a) => a.employeeId === me.id || (myCode && a.employeeId === myCode));
+  const myLeave = leave.filter((l) => l.employeeId === me.id || (myCode && l.employeeId === myCode));
+  const myPaidSlips = payroll.filter(
+    (r) => (r.status === "paid" || r.status === "approved") && r.lines.some((l) => l.employeeId === me.id || (myCode && l.employeeId === myCode)),
+  );
   const lastSlip = myPaidSlips[0];
-  const lastLine = lastSlip?.lines.find((l) => l.employeeId === me.id);
-  const myReimbursements = reimbursements.filter((r) => r.employeeId === me.id);
-  const myAllowances = allowances.filter((a) => a.employeeId === me.id);
-  const myAssets = assets.filter((a) => a.assignedTo === me.id);
-  const myTickets = helpdesk.filter((t) => t.requesterId === me.id);
-  const onCase = onboarding.find((o) => o.employeeId === me.id);
+  const lastLine = lastSlip?.lines.find((l) => l.employeeId === me.id || (myCode && l.employeeId === myCode));
+  const myReimbursements = reimbursements.filter((r) => r.employeeId === me.id || (myCode && r.employeeId === myCode));
+  const myAllowances = allowances.filter((a) => a.employeeId === me.id || (myCode && a.employeeId === myCode));
+  const myAssets = assets.filter((a) => a.assignedTo === me.id || (myCode && a.assignedTo === myCode));
+  const myTickets = helpdesk.filter((t) => t.requesterId === me.id || (myCode && t.requesterId === myCode));
+  const onCase = onboarding.find((o) => o.employeeId === me.id || (myCode && o.employeeId === myCode));
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const myTodayRecord = myAttendance.find((a) => a.date === todayStr);
