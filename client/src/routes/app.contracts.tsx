@@ -391,120 +391,43 @@ function ContractsPage() {
                             </Button>
 
                             {canEdit && (
-            <>
-              {/* Pagination ON TOP of Employees' Staff Contracts */}
-              <TablePagination
-                currentPage={page}
-                totalPages={totalPages}
-                totalItems={rows.length}
-                pageSize={5}
-                onPageChange={setPage}
-              />
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Contract ID</TableHead>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Contract Type</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead className="text-right">Annual Salary</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedRows.map((c) => {
-                      const isExpiring = c.status === "Expiring Soon";
-                      return (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-mono text-xs font-semibold text-primary">
-                            {c.id}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{nameOf(c.employeeId)}</div>
-                            <div className="text-xs text-muted-foreground">{c.employeeId}</div>
-                          </TableCell>
-                          <TableCell>{c.contractType}</TableCell>
-                          <TableCell>{c.department}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{c.startDate}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5 text-xs">
-                              {c.endDate}
-                              {isExpiring && (
-                                <AlertTriangle className="size-3.5 text-warning" />
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-medium tabular-nums">
-                            {inr(c.salary)}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={c.status} />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 px-2"
-                                onClick={() => setViewContract(c)}
-                                title="View details"
+                                className="h-8 px-2 text-primary"
+                                onClick={() => {
+                                  setRenewContract(c);
+                                  setNewEndDate(
+                                    new Date(new Date(c.endDate).setFullYear(new Date(c.endDate).getFullYear() + 1))
+                                      .toISOString()
+                                      .slice(0, 10),
+                                  );
+                                }}
+                                title="Renew contract"
                               >
-                                <Eye className="size-3.5" />
+                                <RefreshCw className="size-3.5" />
                               </Button>
                             )}
 
                             {canEdit && (
-
-                              {canEdit && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 px-2 text-primary"
-                                  onClick={() => {
-                                    setRenewContract(c);
-                                    setNewEndDate(
-                                      new Date(new Date(c.endDate).setFullYear(new Date(c.endDate).getFullYear() + 1))
-                                        .toISOString()
-                                        .slice(0, 10),
-                                    );
-                                  }}
-                                  title="Renew contract"
-                                >
-                                  <RefreshCw className="size-3.5" />
-                                </Button>
-                              )}
-
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 className="h-8 px-2"
-                                onClick={() =>
-                                  toast.success(`Downloading contract PDF for ${nameOf(c.employeeId)}`)
-                                }
+                                onClick={() => handleDownload(c)}
                                 title="Download contract"
                               >
                                 <Download className="size-3.5" />
                               </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-              <TablePagination
-                currentPage={page}
-                totalPages={totalPages}
-                totalItems={rows.length}
-                pageSize={5}
-                onPageChange={setPage}
-              />
-            </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
