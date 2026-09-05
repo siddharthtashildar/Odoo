@@ -43,3 +43,4 @@ coverage/
 # Local databases
 *.sqlite
 *.sqlite3
+/generated/prisma

@@ -1,0 +1,1107 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model allowance_types {
+  id                  String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String                   @db.VarChar(60)
+  code                String                   @unique @db.VarChar(20)
+  default_amount      Decimal?                 @db.Decimal(12, 2)
+  default_frequency   allowance_frequency_enum @default(monthly)
+  is_active           Boolean                  @default(true)
+  created_at          DateTime                 @default(now()) @db.Timestamptz(6)
+  employee_allowances employee_allowances[]
+}
+
+model asset_assignments {
+  id                                                 String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  asset_id                                           String                       @db.Uuid
+  employee_id                                        String                       @db.Uuid
+  assigned_on                                        DateTime                     @default(dbgenerated("CURRENT_DATE")) @db.Date
+  assigned_by                                        String?                      @db.Uuid
+  accepted_by_employee                               Boolean                      @default(false)
+  accepted_at                                        DateTime?                    @db.Timestamptz(6)
+  condition_at_assignment                            asset_condition_enum?
+  returned_on                                        DateTime?                    @db.Date
+  condition_at_return                                asset_condition_enum?
+  return_processed_by                                String?                      @db.Uuid
+  status                                             asset_assignment_status_enum @default(assigned)
+  created_at                                         DateTime                     @default(now()) @db.Timestamptz(6)
+  assets                                             assets                       @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_asset_assignments_assigned_byTousers         users?                       @relation("asset_assignments_assigned_byTousers", fields: [assigned_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees                                          employees                    @relation(fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_asset_assignments_return_processed_byTousers users?                       @relation("asset_assignments_return_processed_byTousers", fields: [return_processed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([asset_id], map: "idx_asset_assignments_asset")
+  @@index([employee_id], map: "idx_asset_assignments_employee")
+}
+
+model asset_requests {
+  id                    String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id           String                    @db.Uuid
+  asset_type_requested  String                    @db.VarChar(50)
+  reason                String?
+  onboarding_process_id String?                   @db.Uuid
+  status                asset_request_status_enum @default(pending)
+  fulfilled_asset_id    String?                   @db.Uuid
+  requested_at          DateTime                  @default(now()) @db.Timestamptz(6)
+  resolved_at           DateTime?                 @db.Timestamptz(6)
+  employees             employees                 @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  assets                assets?                   @relation(fields: [fulfilled_asset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  onboarding_processes  onboarding_processes?     @relation(fields: [onboarding_process_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status], map: "idx_asset_requests_status")
+}
+
+model assets {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  asset_code          String               @unique @db.VarChar(30)
+  asset_type          String               @db.VarChar(50)
+  serial_number       String?              @db.VarChar(100)
+  purchase_date       DateTime?            @db.Date
+  purchase_cost       Decimal?             @db.Decimal(12, 2)
+  warranty_expiry     DateTime?            @db.Date
+  condition           asset_condition_enum @default(good)
+  status              asset_status_enum    @default(available)
+  location            String?              @db.VarChar(100)
+  current_employee_id String?              @db.Uuid
+  created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime             @default(now()) @db.Timestamptz(6)
+  asset_assignments   asset_assignments[]
+  asset_requests      asset_requests[]
+  employees           employees?           @relation(fields: [current_employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  it_tickets          it_tickets[]
+
+  @@index([current_employee_id], map: "idx_assets_current_employee")
+  @@index([status], map: "idx_assets_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model attendance {
+  id                             String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id                    String                           @db.Uuid
+  attendance_date                DateTime                         @db.Date
+  check_in                       DateTime?                        @db.Timestamptz(6)
+  check_out                      DateTime?                        @db.Timestamptz(6)
+  working_hours                  Decimal?                         @default(dbgenerated("\nCASE\n    WHEN ((check_in IS NOT NULL) AND (check_out IS NOT NULL)) THEN round((EXTRACT(epoch FROM (check_out - check_in)) / (3600)::numeric), 2)\n    ELSE (0)::numeric\nEND")) @db.Decimal(6, 2)
+  overtime_hours                 Decimal                          @default(0) @db.Decimal(6, 2)
+  status                         attendance_status_enum           @default(present)
+  is_manually_corrected          Boolean                          @default(false)
+  created_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  employees                      employees                        @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  attendance_correction_requests attendance_correction_requests[]
+
+  @@unique([employee_id, attendance_date])
+  @@index([employee_id, attendance_date(sort: Desc)], map: "idx_attendance_employee_date")
+  @@index([status], map: "idx_attendance_status")
+}
+
+model attendance_correction_requests {
+  id                  String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attendance_id       String                 @db.Uuid
+  employee_id         String                 @db.Uuid
+  requested_check_in  DateTime?              @db.Timestamptz(6)
+  requested_check_out DateTime?              @db.Timestamptz(6)
+  reason              String
+  status              correction_status_enum @default(pending)
+  reviewed_by         String?                @db.Uuid
+  reviewed_at         DateTime?              @db.Timestamptz(6)
+  review_note         String?
+  created_at          DateTime               @default(now()) @db.Timestamptz(6)
+  attendance          attendance             @relation(fields: [attendance_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees           employees              @relation(fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users               users?                 @relation(fields: [reviewed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status], map: "idx_correction_requests_status")
+}
+
+model audit_log {
+  id         BigInt            @id @default(autoincrement())
+  table_name String
+  record_id  String            @db.Uuid
+  action     audit_action_enum
+  changed_by String?           @db.Uuid
+  old_data   Json?
+  new_data   Json?
+  changed_at DateTime          @default(now()) @db.Timestamptz(6)
+  users      users?            @relation(fields: [changed_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_audit_log_user")
+
+  @@index([table_name, record_id, changed_at(sort: Desc)], map: "idx_audit_log_record")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This table contains exclusion constraints and requires additional setup for migrations. Visit https://pris.ly/d/exclusion-constraints for more info.
+model contracts {
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contract_number        String                  @unique @db.VarChar(50)
+  employee_id            String                  @db.Uuid
+  contract_type          contract_type_enum      @default(permanent)
+  department_id          String?                 @db.Uuid
+  designation_id         String?                 @db.Uuid
+  salary                 Decimal                 @db.Decimal(12, 2)
+  working_hours_per_week Decimal?                @db.Decimal(5, 2)
+  start_date             DateTime                @db.Date
+  end_date               DateTime?               @db.Date
+  status                 contract_status_enum    @default(draft)
+  document_url           String?
+  employee_accepted      Boolean                 @default(false)
+  accepted_at            DateTime?               @db.Timestamptz(6)
+  created_by             String?                 @db.Uuid
+  created_at             DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                @default(now()) @db.Timestamptz(6)
+  users                  users?                  @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  departments            departments?            @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  designations           designations?           @relation(fields: [designation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees              employees               @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payroll_run_employees  payroll_run_employees[]
+  payslips               payslips[]
+
+  @@index([employee_id], map: "idx_contracts_employee")
+  @@index([status], map: "idx_contracts_status")
+}
+
+model departments {
+  id                                                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                              String                 @db.VarChar(100)
+  code                                              String?                @unique @db.VarChar(20)
+  parent_department_id                              String?                @db.Uuid
+  head_employee_id                                  String?                @db.Uuid
+  created_at                                        DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at                                        DateTime               @default(now()) @db.Timestamptz(6)
+  contracts                                         contracts[]
+  departments                                       departments?           @relation("departmentsTodepartments", fields: [parent_department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_departments                                 departments[]          @relation("departmentsTodepartments")
+  employees_departments_head_employee_idToemployees employees?             @relation("departments_head_employee_idToemployees", fields: [head_employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_departments_head")
+  designations                                      designations[]
+  employees_employees_department_idTodepartments    employees[]            @relation("employees_department_idTodepartments")
+  onboarding_templates                              onboarding_templates[]
+  payroll_runs                                      payroll_runs[]
+  salary_structures                                 salary_structures[]
+}
+
+model designations {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                String                 @db.VarChar(100)
+  department_id        String?                @db.Uuid
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  contracts            contracts[]
+  departments          departments?           @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees            employees[]
+  onboarding_templates onboarding_templates[]
+  salary_structures    salary_structures[]
+}
+
+model employee_allowances {
+  id                String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id       String                   @db.Uuid
+  allowance_type_id String                   @db.Uuid
+  amount            Decimal                  @db.Decimal(12, 2)
+  frequency         allowance_frequency_enum @default(monthly)
+  status            allowance_status_enum    @default(active)
+  effective_from    DateTime                 @default(dbgenerated("CURRENT_DATE")) @db.Date
+  effective_to      DateTime?                @db.Date
+  configured_by     String?                  @db.Uuid
+  created_at        DateTime                 @default(now()) @db.Timestamptz(6)
+  allowance_types   allowance_types          @relation(fields: [allowance_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users             users?                   @relation(fields: [configured_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees         employees                @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id, status], map: "idx_employee_allowances_employee")
+}
+
+model employee_documents {
+  id                                          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id                                 String    @db.Uuid
+  document_type                               String    @db.VarChar(60)
+  file_url                                    String
+  uploaded_by                                 String?   @db.Uuid
+  is_verified                                 Boolean   @default(false)
+  verified_by                                 String?   @db.Uuid
+  verified_at                                 DateTime? @db.Timestamptz(6)
+  uploaded_at                                 DateTime  @default(now()) @db.Timestamptz(6)
+  employees                                   employees @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_employee_documents_uploaded_byTousers users?    @relation("employee_documents_uploaded_byTousers", fields: [uploaded_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_employee_documents_verified_byTousers users?    @relation("employee_documents_verified_byTousers", fields: [verified_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([employee_id], map: "idx_employee_documents_employee")
+}
+
+model employee_salary_structures {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id       String            @db.Uuid
+  structure_id      String            @db.Uuid
+  effective_from    DateTime          @db.Date
+  effective_to      DateTime?         @db.Date
+  is_current        Boolean           @default(true)
+  assigned_by       String?           @db.Uuid
+  created_at        DateTime          @default(now()) @db.Timestamptz(6)
+  users             users?            @relation(fields: [assigned_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees         employees         @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  salary_structures salary_structures @relation(fields: [structure_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model employees {
+  id                                                   String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_code                                        String                           @unique @db.VarChar(20)
+  full_name                                            String                           @db.VarChar(150)
+  email                                                String                           @unique
+  phone                                                String?                          @db.VarChar(20)
+  date_of_birth                                        DateTime?                        @db.Date
+  gender                                               gender_enum?
+  profile_photo_url                                    String?
+  joining_date                                         DateTime                         @db.Date
+  department_id                                        String?                          @db.Uuid
+  designation_id                                       String?                          @db.Uuid
+  reporting_manager_id                                 String?                          @db.Uuid
+  employment_type                                      employment_type_enum             @default(full_time)
+  status                                               employee_status_enum             @default(onboarding)
+  bank_name                                            String?                          @db.VarChar(100)
+  bank_account_number                                  String?                          @db.VarChar(50)
+  bank_ifsc_code                                       String?                          @db.VarChar(20)
+  emergency_contact_name                               String?                          @db.VarChar(100)
+  emergency_contact_phone                              String?                          @db.VarChar(20)
+  address                                              String?
+  alternate_phone                                      String?                          @db.VarChar(20)
+  exit_date                                            DateTime?                        @db.Date
+  created_at                                           DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                                           DateTime                         @default(now()) @db.Timestamptz(6)
+  asset_assignments                                    asset_assignments[]
+  asset_requests                                       asset_requests[]
+  assets                                               assets[]
+  attendance                                           attendance[]
+  attendance_correction_requests                       attendance_correction_requests[]
+  contracts                                            contracts[]
+  departments_departments_head_employee_idToemployees  departments[]                    @relation("departments_head_employee_idToemployees")
+  employee_allowances                                  employee_allowances[]
+  employee_documents                                   employee_documents[]
+  employee_salary_structures                           employee_salary_structures[]
+  departments_employees_department_idTodepartments     departments?                     @relation("employees_department_idTodepartments", fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  designations                                         designations?                    @relation(fields: [designation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees                                            employees?                       @relation("employeesToemployees", fields: [reporting_manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_employees                                      employees[]                      @relation("employeesToemployees")
+  it_tickets                                           it_tickets[]
+  leave_allocations                                    leave_allocations[]
+  leave_requests_leave_requests_employee_idToemployees leave_requests[]                 @relation("leave_requests_employee_idToemployees")
+  leave_requests_leave_requests_manager_idToemployees  leave_requests[]                 @relation("leave_requests_manager_idToemployees")
+  offboarding_processes                                offboarding_processes[]
+  onboarding_processes                                 onboarding_processes?
+  payroll_exceptions                                   payroll_exceptions[]
+  payroll_run_employees                                payroll_run_employees[]
+  payslips                                             payslips[]
+  reimbursements                                       reimbursements[]
+  service_accounts                                     service_accounts[]
+  users                                                users?
+
+  @@index([department_id], map: "idx_employees_department")
+  @@index([reporting_manager_id], map: "idx_employees_manager")
+  @@index([status], map: "idx_employees_status")
+}
+
+model it_ticket_activity {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_id  String     @db.Uuid
+  changed_by String?    @db.Uuid
+  field_name String     @db.VarChar(30)
+  old_value  String?
+  new_value  String?
+  changed_at DateTime   @default(now()) @db.Timestamptz(6)
+  users      users?     @relation(fields: [changed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  it_tickets it_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model it_ticket_attachments {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_id   String     @db.Uuid
+  file_url    String
+  uploaded_by String?    @db.Uuid
+  uploaded_at DateTime   @default(now()) @db.Timestamptz(6)
+  it_tickets  it_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users?     @relation(fields: [uploaded_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model it_ticket_comments {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_id  String     @db.Uuid
+  user_id    String     @db.Uuid
+  comment    String
+  created_at DateTime   @default(now()) @db.Timestamptz(6)
+  it_tickets it_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([ticket_id, created_at], map: "idx_ticket_comments_ticket")
+}
+
+model it_tickets {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_number         String                  @unique @db.VarChar(30)
+  employee_id           String                  @db.Uuid
+  category              ticket_category_enum
+  priority              ticket_priority_enum    @default(medium)
+  subject               String                  @db.VarChar(150)
+  description           String?
+  linked_asset_id       String?                 @db.Uuid
+  status                ticket_status_enum      @default(open)
+  assigned_to           String?                 @db.Uuid
+  resolved_at           DateTime?               @db.Timestamptz(6)
+  closed_at             DateTime?               @db.Timestamptz(6)
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  it_ticket_activity    it_ticket_activity[]
+  it_ticket_attachments it_ticket_attachments[]
+  it_ticket_comments    it_ticket_comments[]
+  users                 users?                  @relation(fields: [assigned_to], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees             employees               @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  assets                assets?                 @relation(fields: [linked_asset_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([assigned_to], map: "idx_it_tickets_assigned")
+  @@index([employee_id], map: "idx_it_tickets_employee")
+  @@index([status], map: "idx_it_tickets_status")
+}
+
+model leave_allocations {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id    String           @db.Uuid
+  leave_type_id  String           @db.Uuid
+  year           Int
+  allocated_days Decimal          @default(0) @db.Decimal(5, 2)
+  used_days      Decimal          @default(0) @db.Decimal(5, 2)
+  remaining_days Decimal?         @default(dbgenerated("(allocated_days - used_days)")) @db.Decimal(5, 2)
+  adjusted_by    String?          @db.Uuid
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+  users          users?           @relation(fields: [adjusted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees      employees        @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  leave_types    leave_types      @relation(fields: [leave_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  leave_requests leave_requests[]
+
+  @@unique([employee_id, leave_type_id, year])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model leave_requests {
+  id                                              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id                                     String                    @db.Uuid
+  leave_type_id                                   String                    @db.Uuid
+  allocation_id                                   String?                   @db.Uuid
+  start_date                                      DateTime                  @db.Date
+  end_date                                        DateTime                  @db.Date
+  days                                            Decimal                   @db.Decimal(5, 2)
+  reason                                          String?
+  status                                          leave_request_status_enum @default(pending)
+  manager_id                                      String?                   @db.Uuid
+  manager_decision                                correction_status_enum?
+  manager_decided_at                              DateTime?                 @db.Timestamptz(6)
+  hr_decided_by                                   String?                   @db.Uuid
+  hr_decision                                     correction_status_enum?
+  hr_decided_at                                   DateTime?                 @db.Timestamptz(6)
+  cancelled_at                                    DateTime?                 @db.Timestamptz(6)
+  created_at                                      DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at                                      DateTime                  @default(now()) @db.Timestamptz(6)
+  leave_allocations                               leave_allocations?        @relation(fields: [allocation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees_leave_requests_employee_idToemployees employees                 @relation("leave_requests_employee_idToemployees", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                                           users?                    @relation(fields: [hr_decided_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  leave_types                                     leave_types               @relation(fields: [leave_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees_leave_requests_manager_idToemployees  employees?                @relation("leave_requests_manager_idToemployees", fields: [manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([start_date, end_date], map: "idx_leave_requests_dates")
+  @@index([employee_id, status], map: "idx_leave_requests_employee")
+}
+
+model leave_types {
+  id                        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String              @db.VarChar(60)
+  code                      String              @unique @db.VarChar(20)
+  is_paid                   Boolean             @default(true)
+  requires_allocation       Boolean             @default(true)
+  default_annual_allocation Decimal?            @default(0) @db.Decimal(5, 2)
+  is_active                 Boolean             @default(true)
+  created_at                DateTime            @default(now()) @db.Timestamptz(6)
+  leave_allocations         leave_allocations[]
+  leave_requests            leave_requests[]
+}
+
+model login_history {
+  id             BigInt   @id @default(autoincrement())
+  user_id        String?  @db.Uuid
+  email_used     String
+  success        Boolean
+  failure_reason String?
+  ip_address     String?  @db.Inet
+  user_agent     String?
+  logged_at      DateTime @default(now()) @db.Timestamptz(6)
+  users          users?   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id, logged_at(sort: Desc)], map: "idx_login_history_user")
+}
+
+model notifications {
+  id            String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String                 @db.Uuid
+  type          notification_type_enum
+  title         String                 @db.VarChar(150)
+  message       String?
+  related_table String?
+  related_id    String?                @db.Uuid
+  is_read       Boolean                @default(false)
+  read_at       DateTime?              @db.Timestamptz(6)
+  created_at    DateTime               @default(now()) @db.Timestamptz(6)
+  users         users                  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, is_read, created_at(sort: Desc)], map: "idx_notifications_user")
+}
+
+model offboarding_clearance_tasks {
+  id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  offboarding_process_id String                @db.Uuid
+  department             String                @db.VarChar(50)
+  task_name              String                @db.VarChar(150)
+  is_mandatory           Boolean               @default(true)
+  status                 clearance_status_enum @default(not_started)
+  completed_by           String?               @db.Uuid
+  completed_at           DateTime?             @db.Timestamptz(6)
+  users                  users?                @relation(fields: [completed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  offboarding_processes  offboarding_processes @relation(fields: [offboarding_process_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([offboarding_process_id], map: "idx_clearance_tasks_process")
+}
+
+model offboarding_processes {
+  id                                                     String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id                                            String                        @db.Uuid
+  resignation_date                                       DateTime?                     @db.Date
+  last_working_date                                      DateTime                      @db.Date
+  reason                                                 String?
+  notice_period_days                                     Int?
+  exit_type                                              offboarding_exit_type_enum    @default(resignation)
+  manager_approved                                       Boolean                       @default(false)
+  manager_approved_by                                    String?                       @db.Uuid
+  manager_approved_at                                    DateTime?                     @db.Timestamptz(6)
+  exit_interview_completed                               Boolean                       @default(false)
+  exit_interview_notes                                   String?
+  exit_interview_by                                      String?                       @db.Uuid
+  final_settlement_amount                                Decimal?                      @db.Decimal(12, 2)
+  final_settlement_status                                String?                       @default("pending") @db.VarChar(30)
+  status                                                 offboarding_status_enum       @default(in_progress)
+  employee_marked_exited                                 Boolean                       @default(false)
+  created_by                                             String?                       @db.Uuid
+  created_at                                             DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                                             DateTime                      @default(now()) @db.Timestamptz(6)
+  offboarding_clearance_tasks                            offboarding_clearance_tasks[]
+  users_offboarding_processes_created_byTousers          users?                        @relation("offboarding_processes_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees                                              employees                     @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_offboarding_processes_exit_interview_byTousers   users?                        @relation("offboarding_processes_exit_interview_byTousers", fields: [exit_interview_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_offboarding_processes_manager_approved_byTousers users?                        @relation("offboarding_processes_manager_approved_byTousers", fields: [manager_approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model onboarding_processes {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id          String                 @unique @db.Uuid
+  template_id          String?                @db.Uuid
+  started_at           DateTime               @default(dbgenerated("CURRENT_DATE")) @db.Date
+  status               onboarding_status_enum @default(in_progress)
+  completed_at         DateTime?              @db.Timestamptz(6)
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  asset_requests       asset_requests[]
+  employees            employees              @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  onboarding_templates onboarding_templates?  @relation(fields: [template_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  onboarding_tasks     onboarding_tasks[]
+  service_accounts     service_accounts[]
+}
+
+model onboarding_tasks {
+  id                     String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  onboarding_process_id  String                      @db.Uuid
+  task_name              String                      @db.VarChar(150)
+  responsible_department String?                     @db.VarChar(50)
+  responsible_person_id  String?                     @db.Uuid
+  due_date               DateTime?                   @db.Date
+  status                 onboarding_task_status_enum @default(not_started)
+  completed_at           DateTime?                   @db.Timestamptz(6)
+  sequence               Int                         @default(10)
+  created_at             DateTime                    @default(now()) @db.Timestamptz(6)
+  onboarding_processes   onboarding_processes        @relation(fields: [onboarding_process_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                  users?                      @relation(fields: [responsible_person_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([onboarding_process_id], map: "idx_onboarding_tasks_process")
+}
+
+model onboarding_template_tasks {
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_id            String               @db.Uuid
+  task_name              String               @db.VarChar(150)
+  responsible_department String?              @db.VarChar(50)
+  default_due_days       Int                  @default(3)
+  sequence               Int                  @default(10)
+  onboarding_templates   onboarding_templates @relation(fields: [template_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model onboarding_templates {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String                      @db.VarChar(100)
+  department_id             String?                     @db.Uuid
+  designation_id            String?                     @db.Uuid
+  is_active                 Boolean                     @default(true)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  onboarding_processes      onboarding_processes[]
+  onboarding_template_tasks onboarding_template_tasks[]
+  departments               departments?                @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  designations              designations?               @relation(fields: [designation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model payroll_exceptions {
+  id             String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payroll_run_id String                      @db.Uuid
+  employee_id    String                      @db.Uuid
+  exception_type payroll_exception_type_enum
+  message        String
+  is_resolved    Boolean                     @default(false)
+  resolved_by    String?                     @db.Uuid
+  resolved_at    DateTime?                   @db.Timestamptz(6)
+  created_at     DateTime                    @default(now()) @db.Timestamptz(6)
+  employees      employees                   @relation(fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payroll_runs   payroll_runs                @relation(fields: [payroll_run_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users?                      @relation(fields: [resolved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model payroll_run_employees {
+  id             String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payroll_run_id String                       @db.Uuid
+  employee_id    String                       @db.Uuid
+  contract_id    String?                      @db.Uuid
+  status         payroll_employee_status_enum @default(ready)
+  exclude_reason String?
+  contracts      contracts?                   @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees      employees                    @relation(fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payroll_runs   payroll_runs                 @relation(fields: [payroll_run_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([payroll_run_id, employee_id])
+  @@index([payroll_run_id], map: "idx_payroll_run_employees_run")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model payroll_runs {
+  id                                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  period_month                          Int
+  period_year                           Int
+  pay_date                              DateTime?               @db.Date
+  department_id                         String?                 @db.Uuid
+  status                                payroll_run_status_enum @default(draft)
+  created_by                            String?                 @db.Uuid
+  submitted_at                          DateTime?               @db.Timestamptz(6)
+  approved_by                           String?                 @db.Uuid
+  approved_at                           DateTime?               @db.Timestamptz(6)
+  rejected_reason                       String?
+  processed_at                          DateTime?               @db.Timestamptz(6)
+  paid_at                               DateTime?               @db.Timestamptz(6)
+  created_at                            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                            DateTime                @default(now()) @db.Timestamptz(6)
+  payroll_exceptions                    payroll_exceptions[]
+  payroll_run_employees                 payroll_run_employees[]
+  users_payroll_runs_approved_byTousers users?                  @relation("payroll_runs_approved_byTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_payroll_runs_created_byTousers  users?                  @relation("payroll_runs_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  departments                           departments?            @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payslips                              payslips[]
+  reimbursements                        reimbursements[]
+
+  @@unique([period_month, period_year, department_id])
+  @@index([period_year, period_month], map: "idx_payroll_runs_period")
+  @@index([status], map: "idx_payroll_runs_status")
+}
+
+model payslip_explanations {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payslip_id   String   @db.Uuid
+  explanation  String
+  generated_at DateTime @default(now()) @db.Timestamptz(6)
+  payslips     payslips @relation(fields: [payslip_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model payslip_lines {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payslip_id   String                 @db.Uuid
+  rule_id      String?                @db.Uuid
+  line_source  String                 @default("rule") @db.VarChar(20)
+  code         String                 @db.VarChar(30)
+  name         String                 @db.VarChar(100)
+  rule_type    salary_rule_type_enum?
+  sequence     Int                    @default(10)
+  amount       Decimal                @db.Decimal(12, 2)
+  created_at   DateTime               @default(now()) @db.Timestamptz(6)
+  payslips     payslips               @relation(fields: [payslip_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  salary_rules salary_rules?          @relation(fields: [rule_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([payslip_id, sequence], map: "idx_payslip_lines_payslip")
+}
+
+model payslips {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payroll_run_id        String                  @db.Uuid
+  employee_id           String                  @db.Uuid
+  contract_id           String                  @db.Uuid
+  structure_id          String?                 @db.Uuid
+  period_month          Int
+  period_year           Int
+  working_days          Decimal                 @default(0) @db.Decimal(5, 2)
+  present_days          Decimal                 @default(0) @db.Decimal(5, 2)
+  absent_days           Decimal                 @default(0) @db.Decimal(5, 2)
+  leave_days            Decimal                 @default(0) @db.Decimal(5, 2)
+  overtime_hours        Decimal                 @default(0) @db.Decimal(6, 2)
+  basic_salary          Decimal                 @default(0) @db.Decimal(12, 2)
+  allowances_total      Decimal                 @default(0) @db.Decimal(12, 2)
+  overtime_amount       Decimal                 @default(0) @db.Decimal(12, 2)
+  reimbursements_total  Decimal                 @default(0) @db.Decimal(12, 2)
+  gross_salary          Decimal                 @default(0) @db.Decimal(12, 2)
+  deductions_total      Decimal                 @default(0) @db.Decimal(12, 2)
+  tax_amount            Decimal                 @default(0) @db.Decimal(12, 2)
+  net_salary            Decimal                 @default(0) @db.Decimal(12, 2)
+  status                payroll_run_status_enum @default(draft)
+  payment_status        String                  @default("unpaid") @db.VarChar(20)
+  bank_account_snapshot String?                 @db.VarChar(50)
+  pdf_url               String?
+  email_status          email_status_enum       @default(pending)
+  email_sent_at         DateTime?               @db.Timestamptz(6)
+  email_retry_count     Int                     @default(0)
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  payslip_explanations  payslip_explanations[]
+  payslip_lines         payslip_lines[]
+  contracts             contracts               @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees             employees               @relation(fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payroll_runs          payroll_runs            @relation(fields: [payroll_run_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  salary_structures     salary_structures?      @relation(fields: [structure_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([payroll_run_id, employee_id])
+  @@index([employee_id, period_year, period_month], map: "idx_payslips_employee")
+  @@index([status], map: "idx_payslips_status")
+}
+
+model permissions {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String             @unique @db.VarChar(60)
+  module           String             @db.VarChar(40)
+  action           String             @db.VarChar(30)
+  description      String?
+  role_permissions role_permissions[]
+}
+
+model reimbursement_categories {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String           @unique @db.VarChar(60)
+  is_active      Boolean          @default(true)
+  reimbursements reimbursements[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model reimbursements {
+  id                                              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id                                     String                    @db.Uuid
+  category_id                                     String                    @db.Uuid
+  expense_date                                    DateTime                  @db.Date
+  amount                                          Decimal                   @db.Decimal(12, 2)
+  description                                     String?
+  receipt_url                                     String?
+  status                                          reimbursement_status_enum @default(draft)
+  manager_reviewed_by                             String?                   @db.Uuid
+  manager_reviewed_at                             DateTime?                 @db.Timestamptz(6)
+  manager_note                                    String?
+  finance_reviewed_by                             String?                   @db.Uuid
+  finance_reviewed_at                             DateTime?                 @db.Timestamptz(6)
+  finance_note                                    String?
+  approved_amount                                 Decimal?                  @db.Decimal(12, 2)
+  paid_amount                                     Decimal?                  @db.Decimal(12, 2)
+  payroll_run_id                                  String?                   @db.Uuid
+  paid_at                                         DateTime?                 @db.Timestamptz(6)
+  created_at                                      DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at                                      DateTime                  @default(now()) @db.Timestamptz(6)
+  payroll_runs                                    payroll_runs?             @relation(fields: [payroll_run_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reimbursements_payroll_run")
+  reimbursement_categories                        reimbursement_categories  @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees                                       employees                 @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_reimbursements_finance_reviewed_byTousers users?                    @relation("reimbursements_finance_reviewed_byTousers", fields: [finance_reviewed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_reimbursements_manager_reviewed_byTousers users?                    @relation("reimbursements_manager_reviewed_byTousers", fields: [manager_reviewed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([employee_id, status], map: "idx_reimbursements_employee")
+  @@index([status], map: "idx_reimbursements_status")
+}
+
+model role_permissions {
+  role_id       String      @db.Uuid
+  permission_id String      @db.Uuid
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles         roles       @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([role_id, permission_id])
+}
+
+model roles {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String             @unique @db.VarChar(50)
+  description      String?
+  is_system_role   Boolean            @default(false)
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  role_permissions role_permissions[]
+  users            users[]
+}
+
+model salary_rules {
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                    String                   @db.VarChar(100)
+  code                    String                   @unique @db.VarChar(30)
+  rule_type               salary_rule_type_enum
+  calculation_type        calculation_type_enum    @default(fixed)
+  fixed_amount            Decimal?                 @db.Decimal(12, 2)
+  percentage              Decimal?                 @db.Decimal(6, 3)
+  percentage_base_rule_id String?                  @db.Uuid
+  formula                 String?
+  condition_expression    String?
+  priority                Int                      @default(10)
+  is_active               Boolean                  @default(true)
+  created_at              DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                 @default(now()) @db.Timestamptz(6)
+  payslip_lines           payslip_lines[]
+  salary_rules            salary_rules?            @relation("salary_rulesTosalary_rules", fields: [percentage_base_rule_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_salary_rules      salary_rules[]           @relation("salary_rulesTosalary_rules")
+  salary_structure_rules  salary_structure_rules[]
+}
+
+model salary_structure_rules {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  structure_id      String            @db.Uuid
+  rule_id           String            @db.Uuid
+  sequence          Int               @default(10)
+  salary_rules      salary_rules      @relation(fields: [rule_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  salary_structures salary_structures @relation(fields: [structure_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([structure_id, rule_id])
+  @@index([structure_id, sequence], map: "idx_structure_rules_structure")
+}
+
+model salary_structures {
+  id                         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                       String                       @db.VarChar(100)
+  department_id              String?                      @db.Uuid
+  designation_id             String?                      @db.Uuid
+  effective_date             DateTime                     @db.Date
+  status                     structure_status_enum        @default(draft)
+  description                String?
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  employee_salary_structures employee_salary_structures[]
+  payslips                   payslips[]
+  salary_structure_rules     salary_structure_rules[]
+  departments                departments?                 @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  designations               designations?                @relation(fields: [designation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model service_accounts {
+  id                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id           String                @db.Uuid
+  service_name          String                @db.VarChar(60)
+  username              String?               @db.VarChar(100)
+  status                account_status_enum   @default(requested)
+  onboarding_process_id String?               @db.Uuid
+  requested_at          DateTime              @default(now()) @db.Timestamptz(6)
+  provisioned_by        String?               @db.Uuid
+  created_date          DateTime?             @db.Timestamptz(6)
+  deactivated_at        DateTime?             @db.Timestamptz(6)
+  employees             employees             @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  onboarding_processes  onboarding_processes? @relation(fields: [onboarding_process_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                 users?                @relation(fields: [provisioned_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([employee_id], map: "idx_service_accounts_employee")
+  @@index([status], map: "idx_service_accounts_status")
+}
+
+model users {
+  id                                                                     String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id                                                            String?                          @unique @db.Uuid
+  email                                                                  String                           @unique
+  password_hash                                                          String
+  role_id                                                                String                           @db.Uuid
+  is_active                                                              Boolean                          @default(true)
+  last_login_at                                                          DateTime?                        @db.Timestamptz(6)
+  password_reset_token                                                   String?
+  password_reset_expires_at                                              DateTime?                        @db.Timestamptz(6)
+  created_at                                                             DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                                                             DateTime                         @default(now()) @db.Timestamptz(6)
+  asset_assignments_asset_assignments_assigned_byTousers                 asset_assignments[]              @relation("asset_assignments_assigned_byTousers")
+  asset_assignments_asset_assignments_return_processed_byTousers         asset_assignments[]              @relation("asset_assignments_return_processed_byTousers")
+  attendance_correction_requests                                         attendance_correction_requests[]
+  audit_log                                                              audit_log[]
+  contracts                                                              contracts[]
+  employee_allowances                                                    employee_allowances[]
+  employee_documents_employee_documents_uploaded_byTousers               employee_documents[]             @relation("employee_documents_uploaded_byTousers")
+  employee_documents_employee_documents_verified_byTousers               employee_documents[]             @relation("employee_documents_verified_byTousers")
+  employee_salary_structures                                             employee_salary_structures[]
+  it_ticket_activity                                                     it_ticket_activity[]
+  it_ticket_attachments                                                  it_ticket_attachments[]
+  it_ticket_comments                                                     it_ticket_comments[]
+  it_tickets                                                             it_tickets[]
+  leave_allocations                                                      leave_allocations[]
+  leave_requests                                                         leave_requests[]
+  login_history                                                          login_history[]
+  notifications                                                          notifications[]
+  offboarding_clearance_tasks                                            offboarding_clearance_tasks[]
+  offboarding_processes_offboarding_processes_created_byTousers          offboarding_processes[]          @relation("offboarding_processes_created_byTousers")
+  offboarding_processes_offboarding_processes_exit_interview_byTousers   offboarding_processes[]          @relation("offboarding_processes_exit_interview_byTousers")
+  offboarding_processes_offboarding_processes_manager_approved_byTousers offboarding_processes[]          @relation("offboarding_processes_manager_approved_byTousers")
+  onboarding_tasks                                                       onboarding_tasks[]
+  payroll_exceptions                                                     payroll_exceptions[]
+  payroll_runs_payroll_runs_approved_byTousers                           payroll_runs[]                   @relation("payroll_runs_approved_byTousers")
+  payroll_runs_payroll_runs_created_byTousers                            payroll_runs[]                   @relation("payroll_runs_created_byTousers")
+  reimbursements_reimbursements_finance_reviewed_byTousers               reimbursements[]                 @relation("reimbursements_finance_reviewed_byTousers")
+  reimbursements_reimbursements_manager_reviewed_byTousers               reimbursements[]                 @relation("reimbursements_manager_reviewed_byTousers")
+  service_accounts                                                       service_accounts[]
+  employees                                                              employees?                       @relation(fields: [employee_id], references: [id], onUpdate: NoAction)
+  roles                                                                  roles                            @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+enum account_status_enum {
+  requested
+  created
+  pending
+  failed
+  disabled
+}
+
+enum allowance_frequency_enum {
+  monthly
+  one_time
+}
+
+enum allowance_status_enum {
+  active
+  pending
+  inactive
+}
+
+enum asset_assignment_status_enum {
+  assigned
+  returned
+  under_repair
+}
+
+enum asset_condition_enum {
+  good
+  damaged
+  under_repair
+  retired
+}
+
+enum asset_request_status_enum {
+  pending
+  approved
+  rejected
+  fulfilled
+}
+
+enum asset_status_enum {
+  available
+  assigned
+  under_repair
+  retired
+}
+
+enum attendance_status_enum {
+  present
+  absent
+  late
+  half_day
+  on_leave
+  holiday
+  work_from_home
+}
+
+enum audit_action_enum {
+  insert
+  update
+  delete
+}
+
+enum calculation_type_enum {
+  fixed
+  percentage
+  formula
+}
+
+enum clearance_status_enum {
+  not_started
+  pending
+  completed
+}
+
+enum contract_status_enum {
+  draft
+  active
+  expired
+  terminated
+  renewal_pending
+}
+
+enum contract_type_enum {
+  permanent
+  fixed_term
+  probation
+  intern
+  consultant
+}
+
+enum correction_status_enum {
+  pending
+  approved
+  rejected
+}
+
+enum email_status_enum {
+  pending
+  sent
+  failed
+}
+
+enum employee_status_enum {
+  onboarding
+  active
+  on_leave
+  notice_period
+  exited
+}
+
+enum employment_type_enum {
+  full_time
+  part_time
+  contract
+  intern
+  consultant
+}
+
+enum gender_enum {
+  male
+  female
+  other
+  prefer_not_to_say
+}
+
+enum leave_request_status_enum {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum notification_type_enum {
+  leave_approved
+  leave_rejected
+  payroll_generated
+  payslip_available
+  reimbursement_approved
+  reimbursement_rejected
+  asset_assigned
+  ticket_updated
+  onboarding_task_pending
+  offboarding_task_pending
+  contract_expiring
+  account_provisioned
+  other
+}
+
+enum offboarding_exit_type_enum {
+  resignation
+  termination
+  retirement
+  end_of_contract
+}
+
+enum offboarding_status_enum {
+  in_progress
+  completed
+}
+
+enum onboarding_status_enum {
+  in_progress
+  completed
+}
+
+enum onboarding_task_status_enum {
+  not_started
+  in_progress
+  pending_approval
+  completed
+  blocked
+}
+
+enum payroll_employee_status_enum {
+  ready
+  excluded
+  flagged
+  error
+}
+
+enum payroll_exception_type_enum {
+  no_salary_structure
+  missing_bank_details
+  negative_net_salary
+  unapproved_reimbursement
+  excessive_unpaid_leave
+  expired_contract
+}
+
+enum payroll_run_status_enum {
+  draft
+  calculated
+  pending_approval
+  approved
+  processed
+  paid
+}
+
+enum reimbursement_status_enum {
+  draft
+  submitted
+  manager_approved
+  finance_approved
+  rejected
+  paid
+}
+
+enum salary_rule_type_enum {
+  earning
+  deduction
+}
+
+enum structure_status_enum {
+  draft
+  active
+  inactive
+}
+
+enum ticket_category_enum {
+  hardware
+  software
+  network
+  email
+  account_access
+  vpn
+  other
+}
+
+enum ticket_priority_enum {
+  low
+  medium
+  high
+  critical
+}
+
+enum ticket_status_enum {
+  open
+  assigned
+  in_progress
+  waiting_for_employee
+  resolved
+  closed
+}
