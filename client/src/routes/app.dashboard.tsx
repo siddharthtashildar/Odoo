@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeader, StatusBadge, TableSkeleton, EmptyState } from "@/components/bits";
+import { PageHeader, StatCard, StatusBadge, TableSkeleton, EmptyState } from "@/components/bits";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import { inr, ROLE_LABELS } from "@/lib/mock-data";
@@ -66,6 +66,37 @@ function Dashboard() {
   const nameOf = useEmployeeName();
   const ready = useDelayed();
   const navigate = useNavigate();
+
+  if (role === "employee") {
+    const myRecords = attendance.filter((a) => a.employeeId === persona.employeeId);
+    const countable = myRecords.filter((a) => a.status !== "Holiday" && a.status !== "On Leave");
+    const attended = countable.filter(
+      (a) => a.status === "Present" || a.status === "Late" || a.status === "Half Day",
+    ).length;
+    const myAttendancePercent = countable.length > 0 ? Math.round((attended / countable.length) * 100) : 0;
+
+    return (
+      <>
+        <PageHeader
+          title={`Good day, ${persona.name.split(" ")[0]}`}
+          description={`Your workspace overview · ${ROLE_LABELS[role]}`}
+        />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <StatCard
+            label="Attendance %"
+            value={`${myAttendancePercent}%`}
+            hint={
+              countable.length
+                ? `${attended} of ${countable.length} working days attended`
+                : "No attendance records yet"
+            }
+            icon={<UserCheck className="size-5" />}
+            tone="success"
+          />
+        </div>
+      </>
+    );
+  }
 
   const today = new Date().toISOString().slice(0, 10);
 
