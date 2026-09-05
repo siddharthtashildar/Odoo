@@ -493,6 +493,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const submitReimbursement = useCallback(async (r: ReimbursementClaim) => {
+    // Optimistic update — employee sees the claim immediately
     setState((s) => ({ ...s, reimbursements: [r, ...s.reimbursements] }));
     try {
       await api.reimbursements.create({
@@ -502,16 +503,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         amount: r.amount,
         description: r.description,
         receiptFileName: r.receiptFileName,
-        receiptUrl: (r as any).receiptUrl ?? r.receiptFileName,
+        receiptUrl: r.receiptUrl ?? r.receiptFileName,
       });
-      const res = await api.reimbursements.list();
-      if (Array.isArray(res)) {
-        setState((s) => ({ ...s, reimbursements: res as ReimbursementClaim[] }));
-      }
+      // Refresh from DB so both employee and HR Manager see the server-authoritative record
+      // (with the correct DB id, receipt_url, and status from the backend)
+      await refreshSlice("reimbursements");
     } catch (err) {
+      // Rollback the optimistic update so the employee is not misled
+      setState((s) => ({
+        ...s,
+        reimbursements: s.reimbursements.filter((item) => item.id !== r.id),
+      }));
       console.warn("[store] submitReimbursement sync error:", err);
+      throw err; // re-throw so the calling UI can show the error to the user
     }
-  }, []);
+  }, [refreshSlice]);
 
   const updateReimbursement = useCallback(async (id: string, patch: Partial<ReimbursementClaim>) => {
     setState((s) => ({

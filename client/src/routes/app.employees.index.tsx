@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  Download,
   Edit2,
   Eye,
   Plus,
@@ -399,16 +398,6 @@ function EmployeesPage() {
         description="Comprehensive enterprise workforce directory with lifecycle tracking, department filters, and role governance."
         actions={
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() =>
-                toast.success("Exporting employee directory as CSV", {
-                  description: `${rows.length} employee records included.`,
-                })
-              }
-            >
-              <Download className="mr-2 size-4" /> Export
-            </Button>
             {isHR && (
               <Button variant="outline" onClick={handleLoadDispatchedEmails}>
                 <Mail className="mr-2 size-4" /> Dispatched Emails

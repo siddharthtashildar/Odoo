@@ -149,7 +149,10 @@ export interface ReimbursementClaim {
   approvalStatus: ReimbursementApprovalStatus;
   paymentStatus: ReimbursementPaymentStatus;
   description: string;
+  /** Raw filename or JSON-encoded array of {name,url,type} attachments */
   receiptFileName?: string | undefined;
+  /** Same attachment data as receiptFileName — returned by the backend GET/POST */
+  receiptUrl?: string | null | undefined;
   paymentMethod: "Bank Transfer" | "Payroll Cycle" | "UPI";
 }
 

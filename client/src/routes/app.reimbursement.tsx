@@ -63,7 +63,7 @@ interface ParsedAttachment {
 }
 
 function parseClaimAttachments(claim: ReimbursementClaim): ParsedAttachment[] {
-  const raw = (claim as any).receiptUrl || claim.receiptFileName;
+  const raw = claim.receiptUrl || claim.receiptFileName;
   if (!raw) return [];
 
   try {
@@ -201,11 +201,18 @@ function ReimbursementPage() {
       paymentStatus: "unpaid",
       description: form.description.trim(),
       receiptFileName: receiptPayload,
+      receiptUrl: receiptPayload,
       paymentMethod: form.paymentMethod,
     };
-    (newClaim as any).receiptUrl = receiptPayload;
 
-    await submitReimbursement(newClaim);
+    try {
+      await submitReimbursement(newClaim);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to submit reimbursement";
+      toast.error("Submission failed", { description: msg });
+      return;
+    }
+
     log(`Submitted expense claim ${newClaim.id} for ${inr(newClaim.amount)}`, "Reimbursements");
     toast.success("Expense claim submitted", {
       description: attachments.length > 0
@@ -239,7 +246,29 @@ function ReimbursementPage() {
   };
 
   const handleDownloadReceipt = (claim: ReimbursementClaim) => {
-    toast.success(`Downloading receipt: ${claim.receiptFileName ?? "voucher.pdf"}`);
+    const attachs = parseClaimAttachments(claim);
+    if (attachs.length === 0) {
+      toast.info("No attachment found for this claim.");
+      return;
+    }
+    // Open the first attachment in a new window (same viewer used in the detail modal)
+    const att = attachs[0]!;
+    if (att.url && att.url !== "#") {
+      const win = window.open();
+      if (win) {
+        if (att.type?.startsWith("image/")) {
+          win.document.write(
+            `<title>${att.name}</title><body style="margin:0;background:#111;display:flex;justify-content:center;align-items:center;height:100vh;"><img src="${att.url}" style="max-width:95vw;max-height:95vh;object-fit:contain;"/></body>`,
+          );
+        } else {
+          win.document.write(
+            `<title>${att.name}</title><body style="margin:0;"><iframe src="${att.url}" style="width:100vw;height:100vh;border:none;"></iframe></body>`,
+          );
+        }
+      }
+    } else {
+      toast.info(`Attachment: ${att.name}`);
+    }
   };
 
   return (
