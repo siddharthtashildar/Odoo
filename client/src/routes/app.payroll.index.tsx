@@ -44,7 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import {
   calculatePayrollLine,
@@ -95,6 +95,8 @@ function PayrollList() {
   const netSalaryDisbursal = currentRun ? currentRun.lines.reduce((s, l) => s + l.net, 0) : 0;
   const currentPayrollStatus = currentRun ? currentRun.status : "draft";
 
+  const [page, setPage] = useState(1);
+
   // Rows of employee payroll lines for the selected run
   const linesWithMeta = useMemo(() => {
     if (!currentRun) return [];
@@ -110,6 +112,12 @@ function PayrollList() {
         return matchQ && matchDept;
       });
   }, [currentRun, employees, q, deptFilter]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(linesWithMeta.length / PAGE_SIZE) || 1;
+  const paginatedLines = useMemo(() => {
+    return linesWithMeta.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [linesWithMeta, page]);
 
   // Chart data: Gross vs Net salary
   const grossVsNetData = useMemo(() => {
@@ -443,83 +451,100 @@ function PayrollList() {
               icon={<BadgeIndianRupee className="size-8" />}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Employee ID</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead className="text-right">Basic Salary</TableHead>
-                    <TableHead className="text-right">Allowances</TableHead>
-                    <TableHead className="text-right">Deductions</TableHead>
-                    <TableHead className="text-right font-bold text-foreground">Net Salary</TableHead>
-                    <TableHead>Pay Period</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {linesWithMeta.map(({ line, emp }) => {
-                    const allowanceSum = line.hra + line.specialAllowance + line.bonus;
-                    return (
-                      <TableRow key={line.employeeId}>
-                        <TableCell>
-                          <div className="font-medium">{emp ? emp.name : nameOf(line.employeeId)}</div>
-                          <div className="text-xs text-muted-foreground">{emp?.designation}</div>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs font-semibold text-primary">
-                          {emp?.code ?? line.employeeId}
-                        </TableCell>
-                        <TableCell>{emp?.department ?? "General"}</TableCell>
-                        <TableCell className="text-right font-medium tabular-nums">
-                          {inr(line.basicSalary)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {inr(allowanceSum)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-destructive">
-                          -{inr(line.deductions)}
-                        </TableCell>
-                        <TableCell className="text-right font-bold tabular-nums text-primary">
-                          {inr(line.net)}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {currentRun?.period ?? "—"}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={currentRun?.status ?? "draft"} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 px-2"
-                              onClick={() => currentRun && setPayslipModalLine({ run: currentRun, line })}
-                              title="View payslip"
-                            >
-                              <Eye className="size-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 px-2"
-                              onClick={() =>
-                                toast.success(`Downloading PDF Payslip for ${emp?.name ?? line.employeeId}`)
-                              }
-                              title="Download payslip"
-                            >
-                              <Download className="size-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              {/* Pagination ON TOP of Employee Compensation Records */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={linesWithMeta.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Employee ID</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead className="text-right">Basic Salary</TableHead>
+                      <TableHead className="text-right">Allowances</TableHead>
+                      <TableHead className="text-right">Deductions</TableHead>
+                      <TableHead className="text-right font-bold text-foreground">Net Salary</TableHead>
+                      <TableHead>Pay Period</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedLines.map(({ line, emp }) => {
+                      const allowanceSum = line.hra + line.specialAllowance + line.bonus;
+                      return (
+                        <TableRow key={line.employeeId}>
+                          <TableCell>
+                            <div className="font-medium">{emp ? emp.name : nameOf(line.employeeId)}</div>
+                            <div className="text-xs text-muted-foreground">{emp?.designation}</div>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs font-semibold text-primary">
+                            {emp?.code ?? line.employeeId}
+                          </TableCell>
+                          <TableCell>{emp?.department ?? "General"}</TableCell>
+                          <TableCell className="text-right font-medium tabular-nums">
+                            {inr(line.basicSalary)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-muted-foreground">
+                            {inr(allowanceSum)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-destructive">
+                            -{inr(line.deductions)}
+                          </TableCell>
+                          <TableCell className="text-right font-bold tabular-nums text-primary">
+                            {inr(line.net)}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {currentRun?.period ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={currentRun?.status ?? "draft"} />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 px-2"
+                                onClick={() => currentRun && setPayslipModalLine({ run: currentRun, line })}
+                                title="View payslip"
+                              >
+                                <Eye className="size-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 px-2"
+                                onClick={() =>
+                                  toast.success(`Downloading PDF Payslip for ${emp?.name ?? line.employeeId}`)
+                                }
+                                title="Download payslip"
+                              >
+                                <Download className="size-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={linesWithMeta.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

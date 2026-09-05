@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { EmptyState, Field, PageHeader, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed } from "@/lib/store";
 import { inr, type Employee, type EmployeeStatus } from "@/lib/mock-data";
 
@@ -183,6 +183,8 @@ function EmployeesPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const [page, setPage] = useState(1);
+
   const departments = useMemo(() => Array.from(new Set(employees.map((e) => e.department))).sort(), [employees]);
 
   const rows = useMemo(() => {
@@ -197,6 +199,12 @@ function EmployeesPage() {
           e.designation.toLowerCase().includes(q.toLowerCase())),
     );
   }, [employees, dept, status, typeFilter, q]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE) || 1;
+  const paginatedRows = useMemo(() => {
+    return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [rows, page]);
 
   const handleCreate = async () => {
     const next: Record<string, string | undefined> = {};
@@ -486,110 +494,127 @@ function EmployeesPage() {
               icon={<Users className="size-8" />}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Job Title</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Joining Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Manager</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((e) => (
-                    <TableRow key={e.id}>
-                      <TableCell className="font-mono text-xs font-semibold text-primary">
-                        {e.code}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2.5">
-                          <Avatar className="size-8 shrink-0">
-                            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                              {e.name
-                                .split(" ")
-                                .map((p) => p[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium leading-none">{e.name}</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">{e.email}</p>
+            <>
+              {/* Pagination ON TOP of Employees' Staff Records */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Job Title</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Joining Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Manager</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRows.map((e) => (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-mono text-xs font-semibold text-primary">
+                          {e.code}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2.5">
+                            <Avatar className="size-8 shrink-0">
+                              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                                {e.name
+                                  .split(" ")
+                                  .map((p) => p[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium leading-none">{e.name}</p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">{e.email}</p>
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{e.department}</TableCell>
-                      <TableCell>{e.designation}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{e.employmentType}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{e.joinedOn}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={e.status} />
-                      </TableCell>
-                      <TableCell className="text-sm">{e.manager}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 px-2"
-                            title="View employee profile"
-                          >
-                            <Link to="/app/employees/$id" params={{ id: e.id }}>
-                              <Eye className="size-3.5" />
-                            </Link>
-                          </Button>
-
-                          {isHR && (
+                        </TableCell>
+                        <TableCell>{e.department}</TableCell>
+                        <TableCell>{e.designation}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{e.employmentType}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{e.joinedOn}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={e.status} />
+                        </TableCell>
+                        <TableCell className="text-sm">{e.manager}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
                             <Button
+                              asChild
                               size="sm"
                               variant="ghost"
-                              className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10"
-                              onClick={() => handleOpenProvision(e)}
-                              title="Provision Login Account & Email Credentials"
+                              className="h-8 px-2"
+                              title="View employee profile"
                             >
-                              <KeyRound className="size-3.5" />
+                              <Link to="/app/employees/$id" params={{ id: e.id }}>
+                                <Eye className="size-3.5" />
+                              </Link>
                             </Button>
-                          )}
 
-                          {canEdit && (
-                            <>
+                            {isHR && (
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 px-2"
-                                onClick={() => openEdit(e)}
-                                title="Edit employee"
+                                className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10"
+                                onClick={() => handleOpenProvision(e)}
+                                title="Provision Login Account & Email Credentials"
                               >
-                                <Edit2 className="size-3.5" />
+                                <KeyRound className="size-3.5" />
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className={`h-8 px-2 ${e.status === "exited" ? "text-success hover:text-success" : "text-destructive hover:text-destructive"}`}
-                                onClick={() => setDeactivateTarget(e)}
-                                title={e.status === "exited" ? "Reactivate" : "Deactivate"}
-                              >
-                                {e.status === "exited" ? (
-                                  <UserCheck className="size-3.5" />
-                                ) : (
-                                  <UserMinus className="size-3.5" />
-                                )}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                            )}
+
+                            {canEdit && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2"
+                                  onClick={() => openEdit(e)}
+                                  title="Edit employee"
+                                >
+                                  <Edit2 className="size-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className={`h-8 px-2 ${e.status === "exited" ? "text-success hover:text-success" : "text-destructive hover:text-destructive"}`}
+                                  onClick={() => setDeactivateTarget(e)}
+                                  title={e.status === "exited" ? "Reactivate" : "Deactivate"}
+                                >
+                                  {e.status === "exited" ? (
+                                    <UserCheck className="size-3.5" />
+                                  ) : (
+                                    <UserMinus className="size-3.5" />
+                                  )}
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

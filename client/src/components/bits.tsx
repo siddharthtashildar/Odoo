@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export function PageHeader({
   title,
@@ -182,3 +184,57 @@ export function Field({
     </div>
   );
 }
+
+export function TablePagination({
+  currentPage,
+  totalPages,
+  totalItems,
+  pageSize = 5,
+  onPageChange,
+  className,
+}: {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize?: number;
+  onPageChange: (page: number) => void;
+  className?: string;
+}) {
+  if (totalItems === 0) return null;
+  const startItem = (currentPage - 1) * pageSize + 1;
+  const endItem = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <div className={cn("flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-2 bg-muted/30 border-y border-border text-xs", className)}>
+      <span className="text-muted-foreground">
+        Showing <span className="font-semibold text-foreground">{startItem}–{endItem}</span> of <span className="font-semibold text-foreground">{totalItems}</span> staff records ({pageSize} per page)
+      </span>
+      <div className="flex items-center gap-1.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2.5 text-xs gap-1"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage <= 1}
+        >
+          <ChevronLeft className="size-3.5" /> Previous
+        </Button>
+        <span className="px-2 font-medium text-foreground">
+          Page {currentPage} of {Math.max(1, totalPages)}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2.5 text-xs gap-1"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage >= totalPages}
+        >
+          Next <ChevronRight className="size-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+

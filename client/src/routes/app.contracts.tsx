@@ -29,7 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import { inr, type Contract, type ContractStatus, type ContractType } from "@/lib/mock-data";
 
@@ -80,6 +80,8 @@ function ContractsPage() {
   const expiredCount = contracts.filter((c) => c.status === "Expired").length;
   const draftCount = contracts.filter((c) => c.status === "Draft").length;
 
+  const [page, setPage] = useState(1);
+
   const rows = useMemo(() => {
     return contracts.filter((c) => {
       const empName = nameOf(c.employeeId).toLowerCase();
@@ -93,6 +95,12 @@ function ContractsPage() {
       return matchQ && matchEmp && matchType && matchStatus;
     });
   }, [contracts, q, empFilter, typeFilter, statusFilter, nameOf]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE) || 1;
+  const paginatedRows = useMemo(() => {
+    return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [rows, page]);
 
   const handleCreate = () => {
     const next: Record<string, string | undefined> = {};
@@ -273,98 +281,117 @@ function ContractsPage() {
               icon={<FileSignature className="size-8" />}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Contract ID</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Contract Type</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead className="text-right">Annual Salary</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((c) => {
-                    const isExpiring = c.status === "Expiring Soon";
-                    return (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-mono text-xs font-semibold text-primary">
-                          {c.id}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{nameOf(c.employeeId)}</div>
-                          <div className="text-xs text-muted-foreground">{c.employeeId}</div>
-                        </TableCell>
-                        <TableCell>{c.contractType}</TableCell>
-                        <TableCell>{c.department}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{c.startDate}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5 text-xs">
-                            {c.endDate}
-                            {isExpiring && (
-                              <AlertTriangle className="size-3.5 text-warning" />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-medium tabular-nums">
-                          {inr(c.salary)}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={c.status} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 px-2"
-                              onClick={() => setViewContract(c)}
-                              title="View details"
-                            >
-                              <Eye className="size-3.5" />
-                            </Button>
-
-                            {canEdit && (
+            <>
+              {/* Pagination ON TOP of Employees' Staff Contracts */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Contract ID</TableHead>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Contract Type</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead className="text-right">Annual Salary</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRows.map((c) => {
+                      const isExpiring = c.status === "Expiring Soon";
+                      return (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-mono text-xs font-semibold text-primary">
+                            {c.id}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{nameOf(c.employeeId)}</div>
+                            <div className="text-xs text-muted-foreground">{c.employeeId}</div>
+                          </TableCell>
+                          <TableCell>{c.contractType}</TableCell>
+                          <TableCell>{c.department}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{c.startDate}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5 text-xs">
+                              {c.endDate}
+                              {isExpiring && (
+                                <AlertTriangle className="size-3.5 text-warning" />
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium tabular-nums">
+                            {inr(c.salary)}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={c.status} />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 px-2 text-primary"
-                                onClick={() => {
-                                  setRenewContract(c);
-                                  setNewEndDate(
-                                    new Date(new Date(c.endDate).setFullYear(new Date(c.endDate).getFullYear() + 1))
-                                      .toISOString()
-                                      .slice(0, 10),
-                                  );
-                                }}
-                                title="Renew contract"
+                                className="h-8 px-2"
+                                onClick={() => setViewContract(c)}
+                                title="View details"
                               >
-                                <RefreshCw className="size-3.5" />
+                                <Eye className="size-3.5" />
                               </Button>
-                            )}
 
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 px-2"
-                              onClick={() => handleDownload(c)}
-                              title="Download contract"
-                            >
-                              <Download className="size-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                              {canEdit && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2 text-primary"
+                                  onClick={() => {
+                                    setRenewContract(c);
+                                    setNewEndDate(
+                                      new Date(new Date(c.endDate).setFullYear(new Date(c.endDate).getFullYear() + 1))
+                                        .toISOString()
+                                        .slice(0, 10),
+                                    );
+                                  }}
+                                  title="Renew contract"
+                                >
+                                  <RefreshCw className="size-3.5" />
+                                </Button>
+                              )}
+
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 px-2"
+                                onClick={() =>
+                                  toast.success(`Downloading contract PDF for ${nameOf(c.employeeId)}`)
+                                }
+                                title="Download contract"
+                              >
+                                <Download className="size-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>
