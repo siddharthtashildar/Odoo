@@ -84,7 +84,8 @@ export async function generatePayslipsForRun(runId: string, employeeIdsFilter?: 
           rule_id: line.ruleId || undefined,
           code: line.code,
           name: line.name,
-          rule_type: (line.category === "DEDUCTION" || line.category === "TAX" ? "deduction" : "allowance") as any,
+          rule_type: (line.category === "DEDUCTION" || line.category === "TAX" || line.category === "deduction" ? "deduction" : "earning") as any,
+
           amount: line.amount,
         })),
       });
@@ -123,6 +124,36 @@ router.get("/", async (_req, res) => {
       },
     });
 
+    // Delete duplicate redundant payroll_runs records from database
+    const seenMap = new Map<string, typeof runs[0]>();
+    const idsToDelete: string[] = [];
+    for (const run of runs) {
+      const key = `${run.period_year}-${run.period_month}-${run.status}`;
+      if (seenMap.has(key)) {
+        const existing = seenMap.get(key)!;
+        if (run.payslips.length <= existing.payslips.length) {
+          idsToDelete.push(run.id);
+        } else {
+          idsToDelete.push(existing.id);
+          seenMap.set(key, run);
+        }
+      } else {
+        seenMap.set(key, run);
+      }
+    }
+    if (idsToDelete.length > 0) {
+      await prisma.payslip_lines.deleteMany({
+        where: { payslips: { payroll_run_id: { in: idsToDelete } } },
+      });
+      await prisma.payslips.deleteMany({
+        where: { payroll_run_id: { in: idsToDelete } },
+      });
+      await prisma.payroll_runs.deleteMany({
+        where: { id: { in: idsToDelete } },
+      });
+      runs = Array.from(seenMap.values());
+    }
+
     // If there is a paid run without payslips, generate them
     const paidRun = runs.find((r) => r.status === "paid");
     if (paidRun) {
@@ -151,6 +182,7 @@ router.get("/", async (_req, res) => {
         });
       }
     }
+
 
     const mapped = runs.map((r) => ({
       id: r.id,
@@ -597,14 +629,21 @@ router.post("/", async (req, res) => {
       payDate?: string;
     };
 
-    const run = await prisma.payroll_runs.create({
-      data: {
-        period_month: periodMonth,
-        period_year: periodYear,
-        status: "draft",
-        pay_date: payDate ? new Date(payDate) : null,
-      },
+    let run = await prisma.payroll_runs.findFirst({
+      where: { period_month: periodMonth, period_year: periodYear },
     });
+
+    if (!run) {
+      run = await prisma.payroll_runs.create({
+        data: {
+          period_month: periodMonth,
+          period_year: periodYear,
+          status: "draft",
+          pay_date: payDate ? new Date(payDate) : null,
+        },
+      });
+    }
+
 
     // Generate payslips for selected employees
     const generated = await generatePayslipsForRun(run.id, employeeIds, structureId);

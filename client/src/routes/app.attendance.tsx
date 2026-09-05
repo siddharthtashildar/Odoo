@@ -3,15 +3,7 @@ import { useMemo, useState } from "react";
 import { addMonths, endOfMonth, format, startOfMonth, subMonths } from "date-fns";
 import Holidays from "date-holidays";
 import { toast } from "sonner";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -381,14 +373,6 @@ const halfDayCount = dateRecords.filter((a) => a.status === "Half Day").length;
     return filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   }, [filteredRows, page]);
 
-  // Chart data: attendance by status
-  const chartData = [
-    { name: "Present", count: dateRecords.filter((a) => a.status === "Present").length },
-    { name: "Late", count: lateCount },
-    { name: "Half Day", count: halfDayCount },
-    { name: "On Leave", count: onLeaveCount },
-    { name: "Absent", count: Math.max(0, absentCount) },
-  ];
 
   const handleOpenCorrection = (r: AttendanceRecord) => {
     setCorrecting(r);
@@ -508,25 +492,6 @@ const halfDayCount = dateRecords.filter((a) => a.status === "Half Day").length;
         </div>
       )}
 
-      {!isEmployeeOnly && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Attendance Distribution</CardTitle>
-            <CardDescription>Daily status breakdown for {selectedDate}</CardDescription>
-          </CardHeader>
-          <CardContent className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="name" stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
-                <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--popover-foreground)" }} />
-                <Bar dataKey="count" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardHeader className="pb-3">
