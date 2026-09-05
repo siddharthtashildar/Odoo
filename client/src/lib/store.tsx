@@ -112,6 +112,19 @@ interface Store extends State {
   updateSchedule: (id: string, patch: Partial<WorkSchedule>) => Promise<void>;
   deleteSchedule: (id: string) => Promise<void>;
   assignSchedule: (scheduleId: string, employeeIds: string[]) => Promise<void>;
+  // Lifecycle
+  addOnboardingCase: (employeeId: string, assignedHr?: string, buddy?: string) => Promise<OnboardingCase | null>;
+  updateOnboardingTask: (processId: string, taskId: string, done: boolean) => Promise<void>;
+  updateOnboardingStatus: (processId: string, status: string) => Promise<void>;
+  addOffboardingCase: (employeeId: string, lastWorkingDay: string, reason?: string) => Promise<OffboardingCase | null>;
+  patchOffboardingCase: (id: string, patch: {
+    accessRevoked?: boolean;
+    assetsReturned?: boolean;
+    exitInterviewDone?: boolean;
+    finalSettlement?: string;
+    status?: string;
+    completeOffboarding?: boolean;
+  }) => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -123,7 +136,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Fetch all data from the database API on mount
   useEffect(() => {
-    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5001";
+    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
 
     async function fetchAll() {
       try {
@@ -182,6 +195,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             assets: assetRes.status === "fulfilled" && assetRes.value?.success ? assetRes.value.data : s.assets,
             helpdesk: helpdeskRes.status === "fulfilled" && helpdeskRes.value?.success ? helpdeskRes.value.data : s.helpdesk,
             schedules: schedRes.status === "fulfilled" && schedRes.value?.success ? schedRes.value.data : s.schedules,
+            onboarding: onbRes.status === "fulfilled" && onbRes.value?.success ? onbRes.value.data : s.onboarding,
+            offboarding: offRes.status === "fulfilled" && offRes.value?.success ? offRes.value.data : s.offboarding,
+            provisioning: prvRes.status === "fulfilled" && prvRes.value?.success ? prvRes.value.data : s.provisioning,
+            assetRequests: assetReqRes.status === "fulfilled" && assetReqRes.value?.success ? assetReqRes.value.data : s.assetRequests,
           }));
       } catch (err) {
         console.warn("[store] API unreachable", err);
@@ -404,6 +421,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       assets: "/api/assets",
       helpdesk: "/api/helpdesk",
       schedules: "/api/schedules",
+      onboarding: "/api/onboarding",
+      offboarding: "/api/offboarding",
+      provisioning: "/api/provisioning",
+      assetRequests: "/api/assets/requests",
     };
     const path = pathMap[key];
     if (!path) return;
@@ -415,7 +436,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch { /* keep current state */ }
   }, []);
 
-  const applyLeave = useCallback(async (req: LeaveRequest) => {
+  const applyLeave = useCallback(async (req: LeaveRequest): Promise<void> => {
     setState((s) => ({ ...s, leave: [req, ...s.leave] }));
     try {
       await api.leave.create({
@@ -428,20 +449,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       await refreshSlice("leave");
     } catch (err) {
+      setState((s) => ({ ...s, leave: s.leave.filter((l) => l.id !== req.id) }));
       console.warn("[store] applyLeave sync error:", err);
+      throw err;
     }
   }, [refreshSlice]);
 
-  const updateLeave = useCallback(async (id: string, patch: Partial<LeaveRequest>) => {
-    setState((s) => ({
-      ...s,
-      leave: s.leave.map((l) => (l.id === id ? { ...l, ...patch } : l)),
-    }));
+  const updateLeave = useCallback(async (id: string, patch: Partial<LeaveRequest>): Promise<void> => {
+    let prev: LeaveRequest | undefined;
+    setState((s) => {
+      prev = s.leave.find((l) => l.id === id);
+      return {
+        ...s,
+        leave: s.leave.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+      };
+    });
     try {
       await api.leave.patch(id, { status: patch.status });
       await refreshSlice("leave");
     } catch (err) {
+      if (prev) {
+        setState((s) => ({
+          ...s,
+          leave: s.leave.map((l) => (l.id === id ? prev! : l)),
+        }));
+      }
       console.warn("[store] updateLeave sync error:", err);
+      throw err;
     }
   }, [refreshSlice]);
 
@@ -758,6 +792,124 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ── Lifecycle actions ──────────────────────────────────────────────────────
+
+  const addOnboardingCase = useCallback(async (employeeId: string, assignedHr?: string, buddy?: string): Promise<OnboardingCase | null> => {
+    try {
+      const data: { employeeId: string; assignedHr?: string; buddy?: string } = { employeeId };
+      if (assignedHr) data.assignedHr = assignedHr;
+      if (buddy) data.buddy = buddy;
+      await api.onboarding.create(data);
+      const fresh = await api.onboarding.list();
+      if (Array.isArray(fresh)) {
+        setState((s) => ({ ...s, onboarding: fresh as OnboardingCase[] }));
+        return (fresh as OnboardingCase[]).find((c) => (c as any).employeeId === employeeId) ?? null;
+      }
+    } catch (err) {
+      console.warn("[store] addOnboardingCase error:", err);
+    }
+    return null;
+  }, []);
+
+  const updateOnboardingTask = useCallback(async (processId: string, taskId: string, done: boolean): Promise<void> => {
+    // Optimistic update
+    setState((s) => ({
+      ...s,
+      onboarding: s.onboarding.map((c) =>
+        c.id === processId
+          ? {
+              ...c,
+              tasks: c.tasks.map((t) => (t.id === taskId ? { ...t, done } : t)),
+              status: (() => {
+                const updatedTasks = c.tasks.map((t) => (t.id === taskId ? { ...t, done } : t));
+                const allDone = updatedTasks.every((t) => t.done);
+                return allDone ? ("Completed" as const) : ("In Progress" as const);
+              })(),
+            }
+          : c,
+      ),
+    }));
+    try {
+      await api.onboarding.patchTask(processId, taskId, { done });
+      // If all tasks done, update process status
+      await refreshSlice("onboarding");
+    } catch (err) {
+      console.warn("[store] updateOnboardingTask error:", err);
+    }
+  }, [refreshSlice]);
+
+  const updateOnboardingStatus = useCallback(async (processId: string, status: string): Promise<void> => {
+    setState((s) => ({
+      ...s,
+      onboarding: s.onboarding.map((c) =>
+        c.id === processId ? { ...c, status: status as any } : c,
+      ),
+    }));
+    try {
+      await api.onboarding.patch(processId, { status });
+    } catch (err) {
+      console.warn("[store] updateOnboardingStatus error:", err);
+    }
+  }, []);
+
+  const addOffboardingCase = useCallback(async (
+    employeeId: string,
+    lastWorkingDay: string,
+    reason?: string,
+  ): Promise<OffboardingCase | null> => {
+    try {
+      const data: { employeeId: string; lastWorkingDay: string; reason?: string } = { employeeId, lastWorkingDay };
+      if (reason) data.reason = reason;
+      await api.offboarding.create(data);
+      const fresh = await api.offboarding.list();
+      if (Array.isArray(fresh)) {
+        setState((s) => ({ ...s, offboarding: fresh as OffboardingCase[] }));
+        return (fresh as OffboardingCase[]).find((c) => (c as any).employeeId === employeeId) ?? null;
+      }
+    } catch (err) {
+      console.warn("[store] addOffboardingCase error:", err);
+    }
+    return null;
+  }, []);
+
+  const patchOffboardingCase = useCallback(async (
+    id: string,
+    patch: {
+      accessRevoked?: boolean;
+      assetsReturned?: boolean;
+      exitInterviewDone?: boolean;
+      finalSettlement?: string;
+      status?: string;
+      completeOffboarding?: boolean;
+    },
+  ): Promise<void> => {
+    // Optimistic update
+    setState((s) => ({
+      ...s,
+      offboarding: s.offboarding.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              ...(patch.accessRevoked !== undefined && { accessRevoked: patch.accessRevoked }),
+              ...(patch.assetsReturned !== undefined && { assetsReturned: patch.assetsReturned }),
+              ...(patch.exitInterviewDone !== undefined && { exitInterviewStatus: patch.exitInterviewDone ? ("Completed" as const) : ("Pending" as const) }),
+              ...(patch.finalSettlement !== undefined && { finalSettlement: patch.finalSettlement as "pending" | "processing" | "settled" }),
+              ...(patch.completeOffboarding && { finalSettlement: "settled" as const, clearanceStatus: "Cleared" as const, finalPayrollStatus: "Processed" as const }),
+            }
+          : c,
+      ) as OffboardingCase[],
+    }));
+    try {
+      await api.offboarding.patch(id, patch);
+      await refreshSlice("offboarding");
+      if (patch.completeOffboarding) {
+        await refreshSlice("employees");
+      }
+    } catch (err) {
+      console.warn("[store] patchOffboardingCase error:", err);
+    }
+  }, [refreshSlice]);
+
   const persona = useMemo(() => {
     if (state.currentUser) {
       const match = state.employees.find(
@@ -847,6 +999,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateSchedule,
       deleteSchedule,
       assignSchedule,
+      addOnboardingCase,
+      updateOnboardingTask,
+      updateOnboardingStatus,
+      addOffboardingCase,
+      patchOffboardingCase,
     }),
     [
       state,
@@ -876,6 +1033,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateSchedule,
       deleteSchedule,
       assignSchedule,
+      addOnboardingCase,
+      updateOnboardingTask,
+      updateOnboardingStatus,
+      addOffboardingCase,
+      patchOffboardingCase,
     ],
   );
 

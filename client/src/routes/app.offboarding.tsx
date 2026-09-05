@@ -57,7 +57,7 @@ export const Route = createFileRoute("/app/offboarding")({
 });
 
 function OffboardingPage() {
-  const { offboarding, employees, assets, update, log, patchEmployee, role } = useApp();
+  const { offboarding, employees, assets, update, log, patchEmployee, role, addOffboardingCase, patchOffboardingCase } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
 
@@ -80,13 +80,12 @@ function OffboardingPage() {
     (e) => e.status !== "exited" && !offboarding.some((o) => o.employeeId === e.id),
   );
 
-  const patchCase = (id: string, patch: Partial<OffboardingCase>) => {
-    const updated = offboarding.map((c) => (c.id === id ? { ...c, ...patch } : c));
-    update("offboarding", updated);
+  const patchCase = async (id: string, patch: Parameters<typeof patchOffboardingCase>[1]) => {
+    await patchOffboardingCase(id, patch);
   };
 
-  const returnAssets = (caseId: string, empId: string) => {
-    patchCase(caseId, { assetsReturned: true });
+  const returnAssets = async (caseId: string, empId: string) => {
+    await patchCase(caseId, { assetsReturned: true });
     update(
       "assets",
       assets.map((a) =>
@@ -101,9 +100,9 @@ function OffboardingPage() {
     log(`Recovered hardware assets from ${nameOf(empId)}`, "Offboarding");
   };
 
-  const handleRevokeAccess = () => {
+  const handleRevokeAccess = async () => {
     if (!revokeTarget) return;
-    patchCase(revokeTarget.id, { accessRevoked: true });
+    await patchCase(revokeTarget.id, { accessRevoked: true });
     toast.success("Access tokens revoked", {
       description: `Google Workspace, SSO and VPN disabled for ${nameOf(revokeTarget.employeeId)}.`,
     });
@@ -111,14 +110,9 @@ function OffboardingPage() {
     setRevokeTarget(null);
   };
 
-  const handleCompleteOffboarding = () => {
+  const handleCompleteOffboarding = async () => {
     if (!completeTarget) return;
-    patchCase(completeTarget.id, {
-      finalSettlement: "settled",
-      finalPayrollStatus: "Processed",
-      clearanceStatus: "Cleared",
-    });
-    patchEmployee(completeTarget.employeeId, { status: "exited" });
+    await patchCase(completeTarget.id, { completeOffboarding: true });
     toast.success("Offboarding completed", {
       description: `${nameOf(completeTarget.employeeId)} successfully cleared and marked as exited.`,
     });
@@ -126,41 +120,27 @@ function OffboardingPage() {
     setCompleteTarget(null);
   };
 
-  const handleScheduleExitInterview = (caseId: string) => {
-    patchCase(caseId, { exitInterviewStatus: "Scheduled" });
+  const handleScheduleExitInterview = async (caseId: string) => {
+    await patchCase(caseId, { exitInterviewDone: false, status: "Exit Interview" });
     toast.success("Exit interview scheduled", {
       description: "Calendar invitation sent to departing employee and HR.",
     });
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!employeeId) return setError("Choose the exiting employee.");
     if (!lwd) return setError("Set the last working day.");
     setError(undefined);
 
-    const emp = employees.find((e) => e.id === employeeId);
-
-    const newCase: OffboardingCase = {
-      id: `OFF-${90 + offboarding.length}`,
-      employeeId,
-      lastWorkingDay: lwd,
-      reason: reason || "Voluntary resignation",
-      manager: emp?.manager ?? "Sana Iqbal",
-      exitInterviewStatus: "Pending",
-      assetsReturned: false,
-      accessRevoked: false,
-      finalPayrollStatus: "Pending",
-      clearanceStatus: "Pending",
-      finalSettlement: "pending",
-      notes: "Offboarding initiated from HR workspace.",
-    };
-
-    update("offboarding", [newCase, ...offboarding]);
-    patchEmployee(employeeId, { status: "offboarding", exitOn: lwd });
-    log(`Started offboarding for ${nameOf(employeeId)}`, "Lifecycle");
-    toast.success("Offboarding initiated", {
-      description: `Target Last Working Day: ${lwd}`,
-    });
+    try {
+      await addOffboardingCase(employeeId, lwd, reason || "Voluntary resignation");
+      log(`Started offboarding for ${nameOf(employeeId)}`, "Lifecycle");
+      toast.success("Offboarding initiated", {
+        description: `Target Last Working Day: ${lwd}`,
+      });
+    } catch (err: any) {
+      toast.error("Failed to initiate offboarding", { description: err?.message });
+    }
 
     setOpen(false);
     setEmployeeId("");
@@ -409,13 +389,13 @@ function OffboardingPage() {
                     <p className="font-medium">1. HR Exit Interview</p>
                     <p className="text-xs text-muted-foreground">Feedback and exit survey submission</p>
                   </div>
-                  {showChecklist.exitInterviewStatus === "Scheduled" ? (
+                  {showChecklist.exitInterviewStatus === "Scheduled" || showChecklist.exitInterviewStatus === "Completed" ? (
                     <Button
                       size="sm"
                       variant="outline"
                       className="h-7 text-xs"
-                      onClick={() => {
-                        patchCase(showChecklist.id, { exitInterviewStatus: "Completed" });
+                      onClick={async () => {
+                        await patchCase(showChecklist.id, { exitInterviewDone: true });
                         toast.success("Exit interview marked as completed");
                       }}
                     >

@@ -78,11 +78,13 @@ function LeavePage() {
 
   const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState(isEmployeeOnly ? "pending" : "all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Summary Metrics
   const myAvailableLeave = me ? me.leaveBalance : 14;
-  const myLeaves = leave.filter((l) => l.employeeId === myId || (myCode && l.employeeId === myCode));
+  const myLeaves = leave.filter(
+    (l) => l.employeeId === myId || (myCode && (l.employeeId === myCode || (l as any).employeeCode === myCode)),
+  );
   const myUsedLeave = myLeaves
     .filter((l) => l.status === "approved" && l.type !== "Unpaid")
     .reduce((s, l) => s + l.days, 0);
@@ -102,10 +104,10 @@ function LeavePage() {
   const rows = useMemo(() => {
     return leave.filter((l) => {
       if (isEmployeeOnly) {
-        const isMine = l.employeeId === myId || (myCode && l.employeeId === myCode);
+        const isMine =
+          l.employeeId === myId ||
+          (myCode && (l.employeeId === myCode || (l as any).employeeCode === myCode));
         if (!isMine) return false;
-        // Employee only sees pending and cancelled
-        if (l.status !== "pending" && l.status !== "cancelled") return false;
       }
 
       const empName = nameOf(l.employeeId).toLowerCase();
@@ -125,33 +127,42 @@ function LeavePage() {
     return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   }, [rows, page]);
 
-  const decide = (id: string, status: "approved" | "rejected") => {
+  const decide = async (id: string, status: "approved" | "rejected") => {
     const req = leave.find((l) => l.id === id);
-    updateLeave(id, { status });
+    try {
+      await updateLeave(id, { status });
 
-    if (req && status === "approved") {
-      const emp = employees.find((e) => e.id === req.employeeId);
-      if (emp && req.type !== "Unpaid") {
-        patchEmployee(emp.id, { leaveBalance: Math.max(0, emp.leaveBalance - req.days) });
+      if (req && status === "approved") {
+        const emp = employees.find((e) => e.id === req.employeeId || (e.code && e.code === req.employeeId));
+        if (emp && req.type !== "Unpaid") {
+          patchEmployee(emp.id, { leaveBalance: Math.max(0, emp.leaveBalance - req.days) });
+        }
       }
+
+      log(`${status === "approved" ? "Approved" : "Rejected"} leave ${id}`, "Time Off");
+      toast[status === "approved" ? "success" : "error"](
+        `Leave request ${status}`,
+        { description: req ? `${nameOf(req.employeeId)} · ${req.days} day(s)` : undefined },
+      );
+      if (viewReq?.id === id) setViewReq(null);
+    } catch (err: any) {
+      toast.error(`Failed to update leave request`, { description: err?.message || String(err) });
     }
-
-    log(`${status === "approved" ? "Approved" : "Rejected"} leave ${id}`, "Time Off");
-    toast[status === "approved" ? "success" : "error"](
-      `Leave request ${status}`,
-      { description: req ? `${nameOf(req.employeeId)} · ${req.days} day(s)` : undefined },
-    );
-    if (viewReq?.id === id) setViewReq(null);
   };
 
-  const handleCancelRequest = (id: string) => {
-    updateLeave(id, { status: "cancelled" });
-    log(`Cancelled leave request ${id}`, "Time Off");
-    toast.success("Leave request cancelled");
-    if (viewReq?.id === id) setViewReq(null);
+  const handleCancelRequest = async (id: string) => {
+    try {
+      await updateLeave(id, { status: "cancelled" });
+      log(`Cancelled leave request ${id}`, "Time Off");
+      toast.success("Leave request cancelled");
+      if (viewReq?.id === id) setViewReq(null);
+    } catch (err: any) {
+      toast.error("Failed to cancel leave request", { description: err?.message || String(err) });
+    }
   };
 
-  const apply = () => {
+  const [submitting, setSubmitting] = useState(false);
+  const apply = async () => {
     const next: Record<string, string | undefined> = {};
     if (!form.from) next["from"] = "Start date is required.";
     if (!form.to) next["to"] = "End date is required.";
@@ -179,12 +190,18 @@ function LeavePage() {
       submittedAt: new Date().toISOString().slice(0, 10),
     };
 
-    applyLeave(req);
-    log(`Applied for ${days} day(s) of ${form.type} leave`, "Time Off");
-    toast.success("Leave request submitted", { description: "Stored in database and sent to HR manager for review." });
-
-    setForm({ type: "Casual", from: "", to: "", reason: "" });
-    setOpen(false);
+    setSubmitting(true);
+    try {
+      await applyLeave(req);
+      log(`Applied for ${days} day(s) of ${form.type} leave`, "Time Off");
+      toast.success("Leave request submitted", { description: "Stored in database and sent to HR manager for review." });
+      setForm({ type: "Casual", from: "", to: "", reason: "" });
+      setOpen(false);
+    } catch (err: any) {
+      toast.error("Failed to submit leave request", { description: err?.message || String(err) });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -289,23 +306,14 @@ function LeavePage() {
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
-                <SelectValue placeholder={isEmployeeOnly ? "Status" : "All Statuses"} />
+                <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                {isEmployeeOnly ? (
-                  <>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </>
-                ) : (
-                  <>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </>
-                )}
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -341,7 +349,7 @@ function LeavePage() {
                   )}
                   <div className="flex items-center justify-between pt-1">
                     <p className="text-xs text-muted-foreground">Submitted: {l.submittedAt ?? l.from}</p>
-                    {l.status === "pending" && l.employeeId === persona.employeeId && (
+                    {l.status === "pending" && (l.employeeId === myId || (myCode && l.employeeId === myCode)) && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -547,7 +555,9 @@ function LeavePage() {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={apply}>Submit Application</Button>
+            <Button onClick={apply} disabled={submitting}>
+              {submitting ? "Submitting..." : "Submit Application"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

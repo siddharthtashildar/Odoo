@@ -34,6 +34,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
+import { api } from "@/lib/api";
 import type { Employee, OnboardingCase, OnboardingStatus, ProvisioningRecord } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/onboarding")({
@@ -63,12 +64,14 @@ export function OnboardingPage() {
     onboarding,
     employees,
     provisioning,
-    addEmployee,
     update,
     log,
     patchEmployee,
     retryProvisioning,
     role,
+    addOnboardingCase,
+    updateOnboardingTask,
+    updateOnboardingStatus,
   } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
@@ -93,7 +96,7 @@ export function OnboardingPage() {
   const completedCases = onboarding.filter((c) => c.status === "Completed").length;
   const overdueCases = onboarding.filter((c) => c.status === "Overdue").length;
 
-  const handleCreateNewHire = () => {
+  const handleCreateNewHire = async () => {
     const next: Record<string, string | undefined> = {};
     if (hireForm.name.trim().length < 3) next["name"] = "Full name is required.";
     if (!/^\S+@\S+\.\S+$/.test(hireForm.email)) next["email"] = "Valid work email is required.";
@@ -102,123 +105,61 @@ export function OnboardingPage() {
     setHireErrors(next);
     if (Object.keys(next).length) return;
 
-    const empId = `E${1013 + employees.length}`;
-    const empCode = `PP-${1013 + employees.length}`;
+    try {
+      // 1. Create employee in DB (auto-provisions a user account)
+      const created = await api.employees.create({
+        name: hireForm.name.trim(),
+        email: hireForm.email.trim(),
+        department: hireForm.department,
+        designation: hireForm.designation.trim(),
+        manager: hireForm.manager,
+        employmentType: hireForm.employmentType,
+        joinedOn: hireForm.joiningDate,
+        ctc: Number(hireForm.ctc) || 1800000,
+        location: "Ahmedabad",
+        autoProvision: false,
+        role: "employee",
+      });
 
-    // 1. Create employee record
-    const emp: Employee = {
-      id: empId,
-      code: empCode,
-      name: hireForm.name.trim(),
-      email: hireForm.email.trim(),
-      phone: "+91 98000 12345",
-      department: hireForm.department,
-      designation: hireForm.designation.trim(),
-      location: "Ahmedabad",
-      manager: hireForm.manager,
-      employmentType: hireForm.employmentType,
-      status: "onboarding",
-      joinedOn: hireForm.joiningDate,
-      ctc: Number(hireForm.ctc) || 1800000,
-      bankAccount: "Pending",
-      pan: "Pending",
-      leaveBalance: 12,
-    };
-    addEmployee(emp);
+      // 2. Create onboarding case in DB
+      await addOnboardingCase(created.id, "Sana Iqbal", hireForm.manager);
 
-    // 2. Create simulated provisioning record
-    const prov: ProvisioningRecord = {
-      id: `PRV-${Date.now().toString().slice(-4)}`,
-      employeeId: empId,
-      employeeName: emp.name,
-      companyEmail: emp.email,
-      overallStatus: "In Progress",
-      invitationStatus: "Sent",
-      accountActivated: false,
-      defaultPermissions: ["Self-service Workspace", "Leave Application", "Expense Claims", "Profile Access"],
-      startedAt: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-      steps: [
-        { step: 1, key: "record_created", label: "Employee record created in HRIS", status: "completed" },
-        { step: 2, key: "email_generated", label: `Company email generated (${emp.email})`, status: "completed" },
-        { step: 3, key: "invite_sent", label: "Invitation email dispatched to employee inbox", status: "completed" },
-        { step: 4, key: "account_activated", label: "Employee password creation & activation", status: "in_progress" },
-        { step: 5, key: "permissions_assigned", label: "Default workspace permissions mapping", status: "pending" },
-        { step: 6, key: "onboarding_started", label: "Day-1 onboarding checklist assignment", status: "pending" },
-      ],
-    };
-    update("provisioning", [prov, ...provisioning]);
-
-    // 3. Create onboarding case with exact 8 checklist items
-    const onCase: OnboardingCase = {
-      id: `ON-${200 + onboarding.length + 5}`,
-      employeeId: empId,
-      startDate: hireForm.joiningDate,
-      dueDate: new Date(new Date(hireForm.joiningDate).setDate(new Date(hireForm.joiningDate).getDate() + 14))
-        .toISOString()
-        .slice(0, 10),
-      buddy: hireForm.manager,
-      assignedHr: "Sana Iqbal",
-      status: "Invitation Sent",
-      invitationSentDate: new Date().toISOString().slice(0, 10),
-      tasks: [
-        { id: "t1", label: "Complete personal profile", owner: "Employee", done: false, category: "Personal" },
-        { id: "t2", label: "Add emergency contact", owner: "Employee", done: false, category: "Personal" },
-        { id: "t3", label: "Accept company policies", owner: "Employee", done: false, category: "Compliance" },
-        { id: "t4", label: "Complete bank details", owner: "Payroll", done: false, category: "Finance" },
-        { id: "t5", label: "Complete tax information", owner: "Payroll", done: false, category: "Finance" },
-        { id: "t6", label: "Review contract", owner: "HR", done: false, category: "Legal" },
-        { id: "t7", label: "Attend orientation", owner: "HR", done: false, category: "Orientation" },
-        { id: "t8", label: "Receive company assets", owner: "IT", done: false, category: "IT" },
-      ],
-    };
-    update("onboarding", [onCase, ...onboarding]);
-
-    log(`Created employee account for ${emp.name} & initiated auto-provisioning`, "Provisioning");
-    toast.success("Employee account created & invite sent", {
-      description: `Automatic provisioning initiated for ${emp.email}`,
-    });
+      log(`Created employee account for ${created.name} & initiated onboarding`, "Onboarding");
+      toast.success("Employee account created & onboarding started", {
+        description: `Onboarding process initiated for ${created.email}`,
+      });
+    } catch (err: any) {
+      toast.error("Failed to create employee", { description: err?.message });
+    }
 
     setHireOpen(false);
     setHireForm(emptyHireForm);
   };
 
-  const handleToggleTask = (caseId: string, taskId: string) => {
-    const updated = onboarding.map((c) => {
-      if (c.id !== caseId) return c;
-      const tasks = c.tasks.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t));
-      const doneCount = tasks.filter((t) => t.done).length;
-      const allDone = doneCount === tasks.length;
-      const nextStatus: OnboardingStatus = allDone ? "Completed" : "In Progress";
+  const handleToggleTask = async (caseId: string, taskId: string) => {
+    const caseItem = onboarding.find((c) => c.id === caseId);
+    if (!caseItem) return;
+    const task = caseItem.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const newDone = !task.done;
 
-      if (allDone) {
-        patchEmployee(c.employeeId, { status: "active" });
-        toast.success(`${nameOf(c.employeeId)} completed all onboarding tasks!`, {
-          description: "Status moved to Active across all modules.",
-        });
-        log(`Completed onboarding for ${nameOf(c.employeeId)}`, "Onboarding");
-      }
+    await updateOnboardingTask(caseId, taskId, newDone);
 
-      return {
-        ...c,
-        tasks,
-        status: nextStatus,
-        completedDate: allDone ? new Date().toISOString().slice(0, 10) : undefined,
-      };
-    });
-
-    update("onboarding", updated);
+    // Check if all tasks now done
+    const updatedTasks = caseItem.tasks.map((t) => (t.id === taskId ? { ...t, done: newDone } : t));
+    const allDone = updatedTasks.every((t) => t.done);
+    if (allDone) {
+      await updateOnboardingStatus(caseId, "Completed");
+      patchEmployee(caseItem.employeeId, { status: "active" });
+      toast.success(`${nameOf(caseItem.employeeId)} completed all onboarding tasks!`, {
+        description: "Status moved to Active across all modules.",
+      });
+      log(`Completed onboarding for ${nameOf(caseItem.employeeId)}`, "Onboarding");
+    }
   };
 
-  const handleResendInvite = (c: OnboardingCase) => {
-    const nextDate = new Date().toISOString().slice(0, 10);
-    update(
-      "onboarding",
-      onboarding.map((item) =>
-        item.id === c.id
-          ? { ...item, status: "Invitation Sent", invitationSentDate: nextDate }
-          : item,
-      ),
-    );
+  const handleResendInvite = async (c: OnboardingCase) => {
+    await updateOnboardingStatus(c.id, "Invitation Sent");
     log(`Resent onboarding invitation email to ${nameOf(c.employeeId)}`, "Onboarding");
     toast.success("Invitation email re-dispatched", {
       description: `Sent to ${employees.find((e) => e.id === c.employeeId)?.email}`,

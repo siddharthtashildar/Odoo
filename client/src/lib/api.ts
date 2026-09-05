@@ -3,7 +3,7 @@
  * All requests go through here. Uses VITE_API_URL env variable.
  */
 
-const BASE = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5001";
+const BASE = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -253,6 +253,36 @@ export const api = {
       request<{ success: boolean; message: string }>("DELETE", `/api/schedules/${id}`),
     assign: (id: string, data: { employeeIds: string[]; contractIds?: string[] }) =>
       request<{ assignedCount: number }>("POST", `/api/schedules/${id}/assign`, data),
+  },
+
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  onboarding: {
+    list: () => request<unknown[]>("GET", "/api/onboarding"),
+    create: (data: { employeeId: string; assignedHr?: string; buddy?: string; notes?: string }) =>
+      request<{ id: string; employeeId: string; employeeName: string }>("POST", "/api/onboarding", data),
+    patch: (id: string, data: { status?: string }) =>
+      request<{ id: string }>("PATCH", `/api/onboarding/${id}`, data),
+    patchTask: (processId: string, taskId: string, data: { done: boolean }) =>
+      request<{ id: string }>("PATCH", `/api/onboarding/${processId}/tasks/${taskId}`, data),
+  },
+
+  // ── Offboarding ───────────────────────────────────────────────────────────
+  offboarding: {
+    list: () => request<unknown[]>("GET", "/api/offboarding"),
+    create: (data: { employeeId: string; lastWorkingDay: string; reason?: string; resignationDate?: string }) =>
+      request<{ id: string; employeeId: string; employeeName: string }>("POST", "/api/offboarding", data),
+    patch: (id: string, data: {
+      accessRevoked?: boolean;
+      assetsReturned?: boolean;
+      exitInterviewDone?: boolean;
+      exitInterviewNotes?: string;
+      finalSettlement?: string;
+      status?: string;
+      completeOffboarding?: boolean;
+    }) =>
+      request<{ id: string }>("PATCH", `/api/offboarding/${id}`, data),
+    patchClearance: (processId: string, taskId: string, data: { cleared: boolean }) =>
+      request<{ id: string }>("PATCH", `/api/offboarding/${processId}/clearance/${taskId}`, data),
   },
 
   // ── Health check ──────────────────────────────────────────────────────────
