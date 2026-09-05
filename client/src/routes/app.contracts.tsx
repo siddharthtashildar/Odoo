@@ -73,7 +73,7 @@ function ContractsPage() {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
-  const canEdit = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user" || role === "hr_user";
+  const canEdit = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
 
   const activeCount = contracts.filter((c) => c.status === "Active").length;
   const expiringCount = contracts.filter((c) => c.status === "Expiring Soon").length;

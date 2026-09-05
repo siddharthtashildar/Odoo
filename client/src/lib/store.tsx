@@ -137,17 +137,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         setState((s) => ({
           ...s,
-          employees:        ok(empRes,      seed.employees)         as State["employees"],
-          contracts:        ok(conRes,      seed.contracts)         as State["contracts"],
-          attendance:       ok(attRes,      seed.attendanceRecords) as State["attendance"],
-          leave:            ok(leaveRes,    seed.leaveRequests)     as State["leave"],
-          payroll:          ok(payrollRes,  seed.payrollRuns)       as State["payroll"],
-          salaryStructures: ok(structRes,   seed.salaryStructures)  as State["salaryStructures"],
-          salaryRecords:    ok(recordsRes,  seed.salaryRecords)     as State["salaryRecords"],
-          reimbursements:   ok(reimRes,     seed.reimbursements)    as State["reimbursements"],
-          allowances:       ok(allowRes,    seed.allowances)        as State["allowances"],
-          assets:           ok(assetRes,    seed.assets)            as State["assets"],
-          helpdesk:         ok(helpdeskRes, seed.helpdeskTickets)   as State["helpdesk"],
+          employees: ok(empRes, seed.employees) as State["employees"],
+          contracts: ok(conRes, seed.contracts) as State["contracts"],
+          attendance: ok(attRes, seed.attendanceRecords) as State["attendance"],
+          leave: ok(leaveRes, seed.leaveRequests) as State["leave"],
+          payroll: ok(payrollRes, seed.payrollRuns) as State["payroll"],
+          salaryStructures: ok(structRes, seed.salaryStructures) as State["salaryStructures"],
+          salaryRecords: ok(recordsRes, seed.salaryRecords) as State["salaryRecords"],
+          reimbursements: ok(reimRes, seed.reimbursements) as State["reimbursements"],
+          allowances: ok(allowRes, seed.allowances) as State["allowances"],
+          assets: ok(assetRes, seed.assets) as State["assets"],
+          helpdesk: ok(helpdeskRes, seed.helpdeskTickets) as State["helpdesk"],
         }));
       } catch (err) {
         console.warn("[store] API unreachable — using seed data", err);
@@ -463,10 +463,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       helpdesk: s.helpdesk.map((t) =>
         t.id === ticketId
           ? {
-              ...t,
-              comments: [...t.comments, comment],
-              updatedDate: new Date().toISOString().slice(0, 10),
-            }
+            ...t,
+            comments: [...t.comments, comment],
+            updatedDate: new Date().toISOString().slice(0, 10),
+          }
           : t,
       ),
     }));
@@ -481,57 +481,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
       provisioning: s.provisioning.map((p) =>
         p.id === id
           ? {
-              ...p,
-              overallStatus: "Completed",
-              invitationStatus: "Sent",
-              accountActivated: true,
-              steps: p.steps.map((st) => ({ ...st, status: "completed" as const })),
-            }
+            ...p,
+            overallStatus: "Completed",
+            invitationStatus: "Sent",
+            accountActivated: true,
+            steps: p.steps.map((st) => ({ ...st, status: "completed" as const })),
+          }
           : p,
       ),
     }));
   }, []);
 
   const persona = useMemo(() => {
-    if (state.currentUser) {
-      return {
-        employeeId: state.currentUser.employeeId || state.currentUser.id,
-        employeeCode: state.currentUser.employeeCode || "",
-        name: state.currentUser.name || state.currentUser.email,
-        email: state.currentUser.email,
-      };
+    const staticP = seed.ROLE_PERSONA[state.role];
+    if (staticP) {
+      const match = state.employees.find(
+        (e) =>
+          e.id === staticP.employeeId ||
+          e.code === staticP.employeeId ||
+          (Boolean(staticP.name) && e.name.toLowerCase().includes((staticP.name ?? "").split(" ")[0]?.toLowerCase() ?? "")) ||
+          (state.role === "payroll_manager" && (e.code === "PP-1005" || e.code === "PP-1004" || e.email.includes("arjun"))) ||
+          (state.role === "payroll_user" && (e.code === "PP-1004" || e.code === "PP-1005" || e.email.includes("devika"))),
+      );
+      if (match) {
+        return { employeeId: match.id, name: match.name };
+      }
     }
-    const fallback = seed.ROLE_PERSONA[state.role];
-    return {
-      employeeId: fallback?.employeeId || "E1001",
-      employeeCode: fallback?.employeeId || "PP-1001",
-      name: fallback?.name || "User",
-      email: "",
-    };
-  }, [state.currentUser, state.role]);
+    return staticP ?? { employeeId: "E1001", name: "Charmi Patel" };
+  }, [state.role, state.employees]);
 
   const value = useMemo<Store>(
     () => ({
       ...state,
       hydrated,
-      persona,
-      signIn: (role, user) => {
-        const newUser: CurrentUser = {
-          id: user?.id || user?.email || "USR",
-          email: user?.email || "",
-          name: user?.name || user?.email || "User",
-          role,
-          employeeId: user?.employeeId ?? null,
-          employeeCode: user?.employeeCode ?? null,
-        };
-        setState((s) => ({ ...s, signedIn: true, role, currentUser: newUser }));
-      },
-      signOut: () => {
-        setState((s) => ({ ...s, signedIn: false, currentUser: null }));
-        try {
-          localStorage.removeItem(KEY);
-        } catch {}
-      },
+      persona: seed.ROLE_PERSONA[state.role] ?? { employeeId: "E1001", name: "Charmi Patel" },
+      signIn: (role) => setState((s) => ({ ...s, signedIn: true, role })),
+      signOut: () => setState((s) => ({ ...s, signedIn: false })),
       setRole: (role) => setState((s) => ({ ...s, role })),
       log,
       update: (key, val) => setState((s) => ({ ...s, [key]: val })),
@@ -615,9 +600,7 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/contracts": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
   "/app/attendance": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
   "/app/leave": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/payroll": ["payroll_user", "payroll_manager", "admin"],
-  "/app/salary": ["payroll_user", "payroll_manager", "admin"],
-  "/app/salary-structure": ["payroll_user", "payroll_manager", "admin"],
+  "/app/payroll": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
   "/app/payslips": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
   "/app/reimbursement": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
   "/app/allowance": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
@@ -626,5 +609,5 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/helpdesk": ["employee", "it_asset_manager", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
   "/app/reports": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
   "/app/admin": ["admin"],
-  "/app/settings": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/settings": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
 };

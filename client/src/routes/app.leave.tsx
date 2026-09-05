@@ -55,7 +55,7 @@ function LeavePage() {
   const nameOf = useEmployeeName();
   const ready = useDelayed();
 
-  const isApprover = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const isApprover = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
   const isEmployeeOnly = role === "employee";
   const me = employees.find(
     (e) =>

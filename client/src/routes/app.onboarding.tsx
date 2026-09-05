@@ -86,7 +86,7 @@ export function OnboardingPage() {
 
   const [showProvisioningDetails, setShowProvisioningDetails] = useState<ProvisioningRecord | null>(null);
 
-  const canManage = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const canManage = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
 
   const totalCases = onboarding.length;
   const inProgressCases = onboarding.filter((c) => c.status === "In Progress" || c.status === "Account Created").length;

@@ -28,7 +28,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, Field, PageHeader, StatCard, StatusBadge } from "@/components/bits";
 import { useApp } from "@/lib/store";
-import { inr, ROLE_LABELS } from "@/lib/mock-data";
+import { inr, ROLE_LABELS, ROLE_PERSONA } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/me")({
   head: () => ({
@@ -60,12 +60,20 @@ function MyWorkspace() {
     log,
   } = useApp();
 
-  const me = employees.find(
-    (e) =>
-      e.id === persona.employeeId ||
-      e.code === persona.employeeCode ||
-      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
-  );
+  const staticP = ROLE_PERSONA[role];
+  const me =
+    employees.find((e) => e.id === persona.employeeId) ??
+    employees.find((e) => e.code === persona.employeeId) ??
+    employees.find(
+      (e) =>
+        staticP &&
+        (e.code === staticP.employeeId ||
+          (Boolean(staticP?.name) && e.name.toLowerCase().includes((staticP?.name ?? "").split(" ")[0]?.toLowerCase() ?? ""))),
+    ) ??
+    (role === "payroll_manager" ? employees.find((e) => e.email.includes("arjun") || e.code === "PP-1005" || e.code === "PP-1004") : undefined) ??
+    (role === "payroll_user" ? employees.find((e) => e.email.includes("devika") || e.code === "PP-1004" || e.code === "PP-1005") : undefined) ??
+    employees[0];
+
   const [phone, setPhone] = useState(me?.phone ?? "");
   const [error, setError] = useState<string | undefined>();
 
@@ -82,28 +90,17 @@ function MyWorkspace() {
   const myCode = me.code;
 
   // Personal private filtered slices
-  const myContract = contracts.find((c) => c.employeeId === myId || (myCode && c.employeeId === myCode));
-  const myAttendance = attendance.filter((a) => a.employeeId === myId || (myCode && a.employeeId === myCode));
-  const myLeave = leave.filter((l) => l.employeeId === myId || (myCode && l.employeeId === myCode));
-  const myPaidSlips = payroll.filter(
-    (r) => r.status === "paid" && r.lines.some((l) => l.employeeId === myId || (myCode && l.employeeId === myCode)),
-  );
+  const myContract = contracts.find((c) => c.employeeId === me.id);
+  const myAttendance = attendance.filter((a) => a.employeeId === me.id);
+  const myLeave = leave.filter((l) => l.employeeId === me.id);
+  const myPaidSlips = payroll.filter((r) => r.status === "paid" && r.lines.some((l) => l.employeeId === me.id));
   const lastSlip = myPaidSlips[0];
-  const lastLine = lastSlip?.lines.find((l) => l.employeeId === myId || (myCode && l.employeeId === myCode));
-  const myReimbursements = reimbursements.filter((r) => r.employeeId === myId || (myCode && r.employeeId === myCode));
-  const myAllowances = allowances.filter((a) => a.employeeId === myId || (myCode && a.employeeId === myCode));
-  const myAssets = assets.filter((a) => a.assignedTo === myId || (myCode && a.assignedTo === myCode));
-  const myTickets = helpdesk.filter((t) => t.requesterId === myId || (myCode && t.requesterId === myCode));
-  const onCase = onboarding.find((o) => o.employeeId === myId || (myCode && o.employeeId === myCode));
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const myTodayRecord = myAttendance.find((a) => a.date === todayStr);
-  const isPunchedIn = Boolean(
-    myTodayRecord &&
-      myTodayRecord.checkIn &&
-      myTodayRecord.checkIn !== "—" &&
-      (!myTodayRecord.checkOut || myTodayRecord.checkOut === "—"),
-  );
+  const lastLine = lastSlip?.lines.find((l) => l.employeeId === me.id);
+  const myReimbursements = reimbursements.filter((r) => r.employeeId === me.id);
+  const myAllowances = allowances.filter((a) => a.employeeId === me.id);
+  const myAssets = assets.filter((a) => a.assignedTo === me.id);
+  const myTickets = helpdesk.filter((t) => t.requesterId === me.id);
+  const onCase = onboarding.find((o) => o.employeeId === me.id);
 
   const saveContact = () => {
     if (!/^[+0-9 ()-]{8,}$/.test(phone)) {

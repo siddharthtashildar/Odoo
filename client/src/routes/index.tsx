@@ -196,11 +196,10 @@ function LoginPage() {
                       key={acc.email}
                       type="button"
                       onClick={() => fillAccount(acc)}
-                      className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${
-                        email === acc.email
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background hover:bg-muted text-muted-foreground hover:text-foreground border-border"
-                      }`}
+                      className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${email === acc.email
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background hover:bg-muted text-muted-foreground hover:text-foreground border-border"
+                        }`}
                     >
                       {acc.label}
                     </button>

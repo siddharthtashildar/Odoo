@@ -61,7 +61,7 @@ function AssetsPage() {
   const ready = useDelayed();
 
   const isEmployeeOnly = role === "employee";
-  const canManage = role === "it_asset_manager" || role === "admin" || role === "hr_manager" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const canManage = role === "it_asset_manager" || role === "admin" || role === "hr_manager" || role === "payroll_manager" || role === "payroll_user";
 
   const me = employees.find(
     (e) =>

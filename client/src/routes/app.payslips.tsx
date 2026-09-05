@@ -38,10 +38,9 @@ function Payslips() {
 
   const [who, setWho] = useState(myId);
   const [openSlip, setOpenSlip] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const canSwitch = role === "hr_user" || role === "payroll_manager" || role === "payroll_user" || role === "admin";
-  const target = canSwitch ? who : myId;
-  const employee = employees.find((e) => e.id === target || e.code === target);
+  const canSwitch = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin";
+  const target = canSwitch ? who : persona.employeeId;
+  const employee = employees.find((e) => e.id === target);
 
   const slips = payroll
     .filter((r) => r.status === "paid")
