@@ -47,9 +47,8 @@ const STATUS_COLORS: Record<SalaryRecord["status"], string> = {
   revised: "bg-accent/15 text-accent-foreground border-accent/20",
   pending: "bg-warning/15 text-warning-foreground border-warning/20",
 };
-
 function SalaryPage() {
-  const { salaryRecords: records, salaryStructures, update, role, employees } = useApp();
+  const { salaryRecords: records, salaryStructures, update, role, employees, payroll } = useApp();
   const nameOf = useEmployeeName();
   const [q, setQ] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
@@ -64,6 +63,18 @@ function SalaryPage() {
   const canAccess = role === "payroll_manager" || role === "payroll_user" || role === "admin";
   const canEdit = role === "payroll_manager" || role === "admin";
 
+  const activeEmployees = useMemo(() => {
+    return employees.filter((e) => e.status !== "exited");
+  }, [employees]);
+
+  const activeEmployeeIds = useMemo(() => {
+    return new Set(activeEmployees.map((e) => e.id));
+  }, [activeEmployees]);
+
+  const activeEmployeeCodes = useMemo(() => {
+    return new Set(activeEmployees.map((e) => e.code));
+  }, [activeEmployees]);
+
   const departments = useMemo(
     () => Array.from(new Set(employees.map((e) => e.department))).sort(),
     [employees],
@@ -73,6 +84,7 @@ function SalaryPage() {
 
   const enriched = useMemo(() => {
     return records
+      .filter((r) => activeEmployeeIds.has(r.employeeId) || activeEmployeeCodes.has((r as any).employeeCode) || activeEmployeeIds.has((r as any).employeeId))
       .map((r) => {
         const emp = employees.find((e) => e.id === r.employeeId || e.code === (r as any).employeeCode);
         const struct = salaryStructures.find((s) => s.id === r.structureId || s.name === (r as any).structureName);
@@ -92,7 +104,7 @@ function SalaryPage() {
         else cmp = a.netMonthly - b.netMonthly;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [records, employees, q, deptFilter, statusFilter, sortKey, sortDir]);
+  }, [records, employees, activeEmployeeIds, activeEmployeeCodes, q, deptFilter, statusFilter, sortKey, sortDir]);
 
   const PAGE_SIZE = 5;
   const totalPages = Math.ceil(enriched.length / PAGE_SIZE) || 1;
@@ -100,9 +112,25 @@ function SalaryPage() {
     return enriched.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   }, [enriched, page]);
 
-  const totalCTC = records.reduce((s, r) => s + r.annualCTC, 0);
-  const avgCTC = records.length ? totalCTC / records.length : 0;
-  const totalNet = records.reduce((s, r) => s + r.netMonthly, 0);
+  const totalAnnualCTC = useMemo(() => {
+    return activeEmployees.reduce((sum, e) => sum + (Number(e.ctc) || 0), 0);
+  }, [activeEmployees]);
+
+  const totalMonthlyGross = Math.round(totalAnnualCTC / 12);
+
+  const totalNet = useMemo(() => {
+    if (payroll && payroll.length > 0) {
+      const latestRun = payroll[0];
+      if (latestRun && latestRun.lines.length > 0) {
+        return latestRun.lines.reduce((s, l) => s + (Number(l.net) || 0), 0);
+      }
+    }
+    return activeEmployees.reduce((s, e) => {
+      const gross = Math.round((Number(e.ctc) || 0) / 12);
+      const ded = 2000 + Math.round(gross * 0.05);
+      return s + (gross - ded);
+    }, 0);
+  }, [payroll, activeEmployees]);
 
   const toggleSort = (key: typeof sortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -172,12 +200,11 @@ function SalaryPage() {
         description="Employee salary records, CTC breakdowns and structure assignments."
       />
 
-
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Employees on payroll" value={records.length} icon={<Users className="size-5" />} />
-        <StatCard label="Total annual CTC" value={inr(totalCTC)} icon={<TrendingUp className="size-5" />} tone="accent" />
-        <StatCard label="Total net disbursed / mo" value={inr(totalNet)} icon={<Wallet className="size-5" />} tone="success" />
+        <StatCard label="Employees on payroll" value={activeEmployees.length} hint={`${activeEmployees.length} active eligible`} icon={<Users className="size-5" />} />
+        <StatCard label="Total annual CTC" value={inr(totalAnnualCTC)} hint={`Monthly Gross: ${inr(totalMonthlyGross)}`} icon={<TrendingUp className="size-5" />} tone="accent" />
+        <StatCard label="Total net disbursed / mo" value={inr(totalNet)} hint="Take-home disbursal" icon={<Wallet className="size-5" />} tone="success" />
       </div>
 
       {/* Filters */}

@@ -311,6 +311,7 @@ export async function sendPayslipEmail(payload: PayslipEmailPayload): Promise<{
   let messageId = `slip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   let previewUrl: string | undefined = undefined;
 
+  let sentSuccessfully = false;
   const smtpHost = process.env.SMTP_HOST?.trim();
   const smtpUser = process.env.SMTP_USER?.trim();
   const smtpPass = process.env.SMTP_PASS?.trim();
@@ -320,8 +321,9 @@ export async function sendPayslipEmail(payload: PayslipEmailPayload): Promise<{
       const transporter = nodemailer.createTransport({
         host: smtpHost,
         port: Number(process.env.SMTP_PORT || 465),
-        secure: true,
+        secure: process.env.SMTP_SECURE !== "false",
         auth: { user: smtpUser, pass: smtpPass },
+        connectionTimeout: 5000,
       });
       const info = await transporter.sendMail({
         from: process.env.EMAIL_FROM || `"PeoplePay360 Payroll" <${smtpUser}>`,
@@ -330,10 +332,13 @@ export async function sendPayslipEmail(payload: PayslipEmailPayload): Promise<{
         html: htmlContent,
       });
       messageId = info.messageId;
+      sentSuccessfully = true;
     } catch (err) {
-      console.warn("SMTP Payslip error:", err);
+      console.warn("SMTP Payslip error, executing fallback dispatcher:", err);
     }
-  } else {
+  }
+
+  if (!sentSuccessfully) {
     try {
       const testAccount = await nodemailer.createTestAccount();
       const transporter = nodemailer.createTransport({
@@ -352,9 +357,10 @@ export async function sendPayslipEmail(payload: PayslipEmailPayload): Promise<{
       const testUrl = nodemailer.getTestMessageUrl(info);
       if (testUrl) previewUrl = testUrl;
     } catch (err) {
-      console.warn("Ethereal Payslip warning:", err);
+      console.warn("Ethereal Payslip fallback warning:", err);
     }
   }
+
 
   const record: DispatchedEmailRecord = {
     id: messageId,

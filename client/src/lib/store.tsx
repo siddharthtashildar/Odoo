@@ -213,7 +213,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Poll all key data slices to keep the UI in sync across all roles
   useEffect(() => {
     if (!hydrated) return;
-    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5001";
+    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
     const isManager = state.role === "hr_manager" || state.role === "admin";
     const intervalMs = isManager ? 5000 : 10000;
 
