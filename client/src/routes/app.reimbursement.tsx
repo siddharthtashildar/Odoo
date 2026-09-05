@@ -72,7 +72,7 @@ function ReimbursementPage() {
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [simulatedFile, setSimulatedFile] = useState<string | null>(null);
 
-  const canApprove = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin" || role === "hr_user";
+  const canApprove = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin";
   const isEmployeeOnly = role === "employee";
 
   // Compute metrics

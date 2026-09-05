@@ -47,36 +47,36 @@ import { ROLE_LABELS, type Role } from "@/lib/mock-data";
 
 const NAV: { to: string; label: string; icon: typeof Users; roles: Role[]; group: string }[] = [
   // Overview
-  { to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Overview", roles: ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
-  { to: "/app/me", label: "My Workspace", icon: UserRound, group: "Overview", roles: ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
+  { to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Overview", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
+  { to: "/app/me", label: "My Workspace", icon: UserRound, group: "Overview", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
 
   // People & Lifecycle
-  { to: "/app/employees", label: "Employees", icon: Users, group: "People", roles: ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
-  { to: "/app/onboarding", label: "Onboarding", icon: UserPlus, group: "People", roles: ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
-  { to: "/app/offboarding", label: "Offboarding", icon: UserMinus, group: "People", roles: ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
-  { to: "/app/contracts", label: "Contracts", icon: FileSignature, group: "People", roles: ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/employees", label: "Employees", icon: Users, group: "People", roles: ["hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
+  { to: "/app/onboarding", label: "Onboarding", icon: UserPlus, group: "People", roles: ["hr_manager", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/offboarding", label: "Offboarding", icon: UserMinus, group: "People", roles: ["hr_manager", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/contracts", label: "Contracts", icon: FileSignature, group: "People", roles: ["hr_manager", "payroll_user", "payroll_manager", "admin"] },
 
   // Time & Attendance
-  { to: "/app/attendance", label: "Attendance", icon: Clock, group: "Time & Leave", roles: ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
-  { to: "/app/leave", label: "Time Off", icon: CalendarDays, group: "Time & Leave", roles: ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/attendance", label: "Attendance", icon: Clock, group: "Time & Leave", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
+  { to: "/app/leave", label: "Time Off", icon: CalendarDays, group: "Time & Leave", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"] },
 
   // Compensation & Finance
   { to: "/app/payroll", label: "Payroll", icon: Coins, group: "Compensation", roles: ["payroll_user", "payroll_manager", "admin"] },
   { to: "/app/salary", label: "Salary", icon: IndianRupee, group: "Compensation", roles: ["payroll_user", "payroll_manager", "admin"] },
   { to: "/app/salary-structure", label: "Salary Structure", icon: LayoutList, group: "Compensation", roles: ["payroll_user", "payroll_manager", "admin"] },
-  { to: "/app/payslips", label: "Payslips", icon: Receipt, group: "Compensation", roles: ["employee", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
-  { to: "/app/reimbursement", label: "Reimbursement", icon: ReceiptText, group: "Compensation", roles: ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
-  { to: "/app/allowance", label: "Allowance", icon: HandCoins, group: "Compensation", roles: ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/payslips", label: "Payslips", icon: Receipt, group: "Compensation", roles: ["employee", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
+  { to: "/app/reimbursement", label: "Reimbursement", icon: ReceiptText, group: "Compensation", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/allowance", label: "Allowance", icon: HandCoins, group: "Compensation", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"] },
 
   // Operations & IT
-  { to: "/app/assets", label: "AssetFlow", icon: Laptop, group: "Operations", roles: ["employee", "it_asset_manager", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
-  { to: "/app/asset-requests", label: "Asset Requests", icon: PackageCheck, group: "Operations", roles: ["employee", "it_asset_manager", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
-  { to: "/app/helpdesk", label: "IT Helpdesk", icon: LifeBuoy, group: "Operations", roles: ["employee", "it_asset_manager", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/assets", label: "AssetFlow", icon: Laptop, group: "Operations", roles: ["employee", "it_asset_manager", "hr_manager", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/asset-requests", label: "Asset Requests", icon: PackageCheck, group: "Operations", roles: ["employee", "it_asset_manager", "hr_manager", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/helpdesk", label: "IT Helpdesk", icon: LifeBuoy, group: "Operations", roles: ["employee", "it_asset_manager", "hr_manager", "payroll_user", "payroll_manager", "admin"] },
 
   // Insights & Governance
-  { to: "/app/reports", label: "Reports", icon: FileBarChart2, group: "Insights", roles: ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/reports", label: "Reports", icon: FileBarChart2, group: "Insights", roles: ["hr_manager", "payroll_user", "payroll_manager", "admin"] },
   { to: "/app/admin", label: "Administration", icon: ShieldCheck, group: "Insights", roles: ["admin"] },
-  { to: "/app/settings", label: "Settings", icon: Settings, group: "Insights", roles: ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
+  { to: "/app/settings", label: "Settings", icon: Settings, group: "Insights", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
 ];
 
 function useTheme() {

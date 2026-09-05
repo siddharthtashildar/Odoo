@@ -33,7 +33,6 @@ const QUICK_ACCOUNTS: Array<{ label: string; email: string; role: Role }> = [
   { label: "HR Manager", email: "sana.iqbal@peoplepay360.io", role: "hr_manager" },
   { label: "Payroll Manager", email: "arjun.nair@peoplepay360.io", role: "payroll_manager" },
   { label: "Payroll User", email: "charmi.patel@peoplepay360.io", role: "payroll_user" },
-  { label: "HR User", email: "devika.rao@peoplepay360.io", role: "hr_user" },
   { label: "IT Asset Manager", email: "karan.shah@peoplepay360.io", role: "it_asset_manager" },
   { label: "Employee", email: "rohan.mehta@peoplepay360.io", role: "employee" },
   { label: "Administrator", email: "admin@peoplepay360.io", role: "admin" },
@@ -190,11 +189,10 @@ function LoginPage() {
                       key={acc.email}
                       type="button"
                       onClick={() => fillAccount(acc)}
-                      className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${
-                        email === acc.email
+                      className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${email === acc.email
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-background hover:bg-muted text-muted-foreground hover:text-foreground border-border"
-                      }`}
+                        }`}
                     >
                       {acc.label}
                     </button>

@@ -59,7 +59,6 @@ export async function sendCredentialsEmail(payload: CredentialsEmailPayload): Pr
   const roleLabels: Record<string, string> = {
     admin: "System Administrator",
     hr_manager: "HR Manager",
-    hr_user: "HR Specialist / User",
     payroll_manager: "Payroll Manager",
     payroll_user: "Payroll Specialist",
     it_asset_manager: "IT Asset Manager",

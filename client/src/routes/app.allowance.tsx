@@ -66,7 +66,7 @@ function AllowancePage() {
   const [form, setForm] = useState(emptyAllowance);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
-  const canManage = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin" || role === "hr_user";
+  const canManage = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin";
   const isEmployeeOnly = role === "employee";
 
   // Summaries

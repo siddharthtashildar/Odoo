@@ -100,7 +100,7 @@ function EmployeesPage() {
 
   const [deactivateTarget, setDeactivateTarget] = useState<Employee | null>(null);
 
-  const canEdit = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const canEdit = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
   const isHR = role === "hr_manager" || role === "admin";
 
   const [provisionTarget, setProvisionTarget] = useState<Employee | null>(null);
@@ -722,7 +722,6 @@ function EmployeesPage() {
                   <SelectContent>
                     <SelectItem value="employee">Employee (Self-Service)</SelectItem>
                     <SelectItem value="hr_manager">HR Manager (Full HR/People)</SelectItem>
-                    <SelectItem value="hr_user">HR Specialist (HR Operations)</SelectItem>
                     <SelectItem value="payroll_manager">Payroll Manager (Full Payroll/Salary)</SelectItem>
                     <SelectItem value="payroll_user">Payroll Officer (Read Payroll)</SelectItem>
                     <SelectItem value="admin">System Administrator</SelectItem>
@@ -904,7 +903,6 @@ function EmployeesPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="employee">Employee (Standard Workspace)</SelectItem>
-                        <SelectItem value="hr_user">HR User (People Ops Specialist)</SelectItem>
                         <SelectItem value="hr_manager">HR Manager (Full People Ops)</SelectItem>
                         <SelectItem value="payroll_user">Payroll User (Read-only Payroll)</SelectItem>
                         <SelectItem value="payroll_manager">Payroll Manager (Full Payroll CRUD)</SelectItem>

@@ -18,7 +18,6 @@ async function main() {
   const roleNames = [
     { name: "admin", description: "Full system administrator" },
     { name: "hr_manager", description: "HR Manager — full people ops access" },
-    { name: "hr_user", description: "HR User — limited HR access" },
     { name: "payroll_manager", description: "Payroll Manager — full payroll CRUD" },
     { name: "payroll_user", description: "Payroll User — read-only payroll" },
     { name: "it_asset_manager", description: "IT Asset Manager" },
@@ -164,7 +163,7 @@ async function main() {
   const userData = [
     { email: "admin@peoplepay360.io", role: "admin", empCode: null },
     { email: "sana.iqbal@peoplepay360.io", role: "hr_manager", empCode: "PP-1003" },
-    { email: "devika.rao@peoplepay360.io", role: "hr_user", empCode: "PP-1005" },
+    { email: "devika.rao@peoplepay360.io", role: "payroll_user", empCode: "PP-1005" },
     { email: "arjun.nair@peoplepay360.io", role: "payroll_manager", empCode: "PP-1004" },
     { email: "charmi.patel@peoplepay360.io", role: "payroll_user", empCode: "PP-1001" },
     { email: "karan.shah@peoplepay360.io", role: "it_asset_manager", empCode: "PP-1006" },
