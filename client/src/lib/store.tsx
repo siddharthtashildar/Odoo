@@ -167,30 +167,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
           fetch(`${API}/api/audit`).then((r) => r.json()),
         ]);
 
-        const ok = <T,>(res: PromiseSettledResult<{ success: boolean; data: T }>, fallback: T): T =>
-          res.status === "fulfilled" && res.value?.success && Array.isArray(res.value.data) ? res.value.data : fallback;
-
-        setState((s) => ({
-          ...s,
-          employees: ok(empRes, []) as State["employees"],
-          contracts: ok(conRes, []) as State["contracts"],
-          attendance: ok(attRes, []) as State["attendance"],
-          leave: ok(leaveRes, []) as State["leave"],
-          payroll: ok(payrollRes, []) as State["payroll"],
-          salaryStructures: ok(structRes, []) as State["salaryStructures"],
-          salaryRecords: ok(recordsRes, []) as State["salaryRecords"],
-          reimbursements: ok(reimRes, []) as State["reimbursements"],
-          allowances: ok(allowRes, []) as State["allowances"],
-          assets: ok(assetRes, []) as State["assets"],
-          assetRequests: ok(assetReqRes, []) as State["assetRequests"],
-          helpdesk: ok(helpdeskRes, []) as State["helpdesk"],
-          schedules: ok(schedRes, []) as State["schedules"],
-          onboarding: ok(onbRes, []) as State["onboarding"],
-          offboarding: ok(offRes, []) as State["offboarding"],
-          provisioning: ok(prvRes, []) as State["provisioning"],
-          users: ok(usrRes, []) as State["users"],
-          audit: ok(audRes, []) as State["audit"],
-        }));
+          // Preserve existing state on failed fetches instead of falling back to seed data
+          setState((s) => ({
+            ...s,
+            employees: empRes.status === "fulfilled" && empRes.value?.success ? empRes.value.data : s.employees,
+            contracts: conRes.status === "fulfilled" && conRes.value?.success ? conRes.value.data : s.contracts,
+            attendance: attRes.status === "fulfilled" && attRes.value?.success ? attRes.value.data : s.attendance,
+            leave: leaveRes.status === "fulfilled" && leaveRes.value?.success ? leaveRes.value.data : s.leave,
+            payroll: payrollRes.status === "fulfilled" && payrollRes.value?.success ? payrollRes.value.data : s.payroll,
+            salaryStructures: structRes.status === "fulfilled" && structRes.value?.success ? structRes.value.data : s.salaryStructures,
+            salaryRecords: recordsRes.status === "fulfilled" && recordsRes.value?.success ? recordsRes.value.data : s.salaryRecords,
+            reimbursements: reimRes.status === "fulfilled" && reimRes.value?.success ? reimRes.value.data : s.reimbursements,
+            allowances: allowRes.status === "fulfilled" && allowRes.value?.success ? allowRes.value.data : s.allowances,
+            assets: assetRes.status === "fulfilled" && assetRes.value?.success ? assetRes.value.data : s.assets,
+            helpdesk: helpdeskRes.status === "fulfilled" && helpdeskRes.value?.success ? helpdeskRes.value.data : s.helpdesk,
+            schedules: schedRes.status === "fulfilled" && schedRes.value?.success ? schedRes.value.data : s.schedules,
+          }));
       } catch (err) {
         console.warn("[store] API unreachable", err);
       } finally {
@@ -200,6 +192,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     void fetchAll();
   }, []);
+
+  // Poll all key data slices to keep the UI in sync across all roles
+  useEffect(() => {
+    if (!hydrated) return;
+    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
+    const isManager = state.role === "hr_manager" || state.role === "admin";
+    const intervalMs = isManager ? 5000 : 10000;
+
+    const endpoints: Array<{ path: string; key: keyof State }> = [
+      { path: "/api/leave", key: "leave" },
+      { path: "/api/attendance", key: "attendance" },
+      { path: "/api/contracts", key: "contracts" },
+      { path: "/api/reimbursements", key: "reimbursements" },
+      { path: "/api/allowances", key: "allowances" },
+      { path: "/api/helpdesk", key: "helpdesk" },
+      { path: "/api/assets", key: "assets" },
+    ];
+
+    const poll = async () => {
+      const results = await Promise.allSettled(
+        endpoints.map((ep) => fetch(`${API}${ep.path}`).then((r) => r.json())),
+      );
+      setState((s) => {
+        const next = { ...s };
+        results.forEach((r, i) => {
+          const ep = endpoints[i];
+          if (ep && r.status === "fulfilled" && r.value?.success) {
+            (next as any)[ep.key] = r.value.data;
+          }
+        });
+        return next;
+      });
+    };
+    const interval = setInterval(poll, intervalMs);
+    return () => clearInterval(interval);
+  }, [hydrated, state.role]);
 
   // Persist role + signed-in status + currentUser to localStorage
   useEffect(() => {
@@ -248,27 +276,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const addContract = useCallback((c: Contract) => {
+  const addContract = useCallback(async (c: Contract) => {
     setState((s) => ({ ...s, contracts: [c, ...s.contracts] }));
-    api.contracts
-      .create({
+    try {
+      await api.contracts.create({
         employeeId: c.employeeId,
         contractType: c.contractType,
         salary: c.salary,
         startDate: c.startDate,
         endDate: c.endDate || undefined,
-      })
-      .catch((err) => console.warn("[store] addContract sync error:", err));
+      });
+      await refreshSlice("contracts");
+    } catch (err) {
+      console.warn("[store] addContract sync error:", err);
+    }
   }, []);
 
-  const updateContract = useCallback((id: string, patch: Partial<Contract>) => {
+  const updateContract = useCallback(async (id: string, patch: Partial<Contract>) => {
     setState((s) => ({
       ...s,
       contracts: s.contracts.map((c) => (c.id === id ? { ...c, ...patch } : c)),
     }));
-    api.contracts
-      .patch(id, patch as Record<string, unknown>)
-      .catch((err) => console.warn("[store] updateContract sync error:", err));
+    try {
+      await api.contracts.patch(id, patch as Record<string, unknown>);
+      await refreshSlice("contracts");
+    } catch (err) {
+      console.warn("[store] updateContract sync error:", err);
+    }
   }, []);
 
   const punchAttendance = useCallback(
@@ -344,37 +378,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const correctAttendance = useCallback((id: string, patch: Partial<AttendanceRecord>) => {
+  const correctAttendance = useCallback(async (id: string, patch: Partial<AttendanceRecord>) => {
     setState((s) => ({
       ...s,
       attendance: s.attendance.map((a) => (a.id === id ? { ...a, ...patch } : a)),
     }));
-    api.attendance
-      .patch(id, patch as Record<string, unknown>)
-      .catch((err) => console.warn("[store] correctAttendance sync error:", err));
+    try {
+      await api.attendance.patch(id, patch as Record<string, unknown>);
+      await refreshSlice("attendance");
+    } catch (err) {
+      console.warn("[store] correctAttendance sync error:", err);
+    }
+  }, []);
+
+  const refreshSlice = useCallback(async (key: keyof State) => {
+    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
+    const pathMap: Partial<Record<keyof State, string>> = {
+      employees: "/api/employees",
+      contracts: "/api/contracts",
+      attendance: "/api/attendance",
+      leave: "/api/leave",
+      payroll: "/api/payroll",
+      reimbursements: "/api/reimbursements",
+      allowances: "/api/allowances",
+      assets: "/api/assets",
+      helpdesk: "/api/helpdesk",
+      schedules: "/api/schedules",
+    };
+    const path = pathMap[key];
+    if (!path) return;
+    try {
+      const res = await fetch(`${API}${path}`).then((r) => r.json());
+      if (res?.success) {
+        setState((s) => ({ ...s, [key]: res.data }));
+      }
+    } catch { /* keep current state */ }
   }, []);
 
   const applyLeave = useCallback(async (req: LeaveRequest) => {
     setState((s) => ({ ...s, leave: [req, ...s.leave] }));
     try {
-      const res = (await api.leave.create({
+      await api.leave.create({
         employeeId: req.employeeId,
         leaveType: req.type,
         startDate: req.from,
         endDate: req.to,
         days: req.days,
         reason: req.reason,
-      })) as LeaveRequest;
-      if (res?.id) {
-        setState((s) => ({
-          ...s,
-          leave: s.leave.map((l) => (l.id === req.id ? { ...l, ...res } : l)),
-        }));
-      }
+      });
+      await refreshSlice("leave");
     } catch (err) {
       console.warn("[store] applyLeave sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const updateLeave = useCallback(async (id: string, patch: Partial<LeaveRequest>) => {
     setState((s) => ({
@@ -383,10 +439,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
     try {
       await api.leave.patch(id, { status: patch.status });
+      await refreshSlice("leave");
     } catch (err) {
       console.warn("[store] updateLeave sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const generatePayslips = useCallback(async (employeeId?: string) => {
     try {
@@ -410,14 +467,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         amount: r.amount,
         description: r.description,
       });
-      const list = await api.reimbursements.list();
-      if (Array.isArray(list)) {
-        setState((s) => ({ ...s, reimbursements: list as ReimbursementClaim[] }));
-      }
+      await refreshSlice("reimbursements");
     } catch (err) {
       console.warn("[store] submitReimbursement sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const updateReimbursement = useCallback(async (id: string, patch: Partial<ReimbursementClaim>) => {
     setState((s) => ({
@@ -428,50 +482,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await api.reimbursements.patch(id, {
         approvalStatus: patch.approvalStatus,
         status: patch.approvalStatus,
-        paymentStatus: patch.paymentStatus,
       });
-      const list = await api.reimbursements.list();
-      if (Array.isArray(list)) {
-        setState((s) => ({ ...s, reimbursements: list as ReimbursementClaim[] }));
-      }
+      await refreshSlice("reimbursements");
     } catch (err) {
       console.warn("[store] updateReimbursement sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const addAllowance = useCallback(async (a: AllowanceRecord) => {
     setState((s) => ({ ...s, allowances: [a, ...s.allowances] }));
     try {
-      const res = (await api.allowances.create({
+      await api.allowances.create({
         employeeId: a.employeeId,
         allowanceType: a.type,
         amount: a.amount,
         effectiveFrom: a.effectiveDate,
         status: a.status === "approved" ? "active" : a.status || "pending",
-      })) as AllowanceRecord;
-      if (res?.id) {
-        setState((s) => ({
-          ...s,
-          allowances: s.allowances.map((item) => (item.id === a.id ? { ...item, ...res } : item)),
-        }));
-      }
+      });
+      await refreshSlice("allowances");
     } catch (err) {
       console.warn("[store] addAllowance sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
-  const updateAllowance = useCallback((id: string, patch: Partial<AllowanceRecord>) => {
+  const updateAllowance = useCallback(async (id: string, patch: Partial<AllowanceRecord>) => {
     setState((s) => ({
       ...s,
       allowances: s.allowances.map((a) => (a.id === id ? { ...a, ...patch } : a)),
     }));
-    api.allowances
-      .patch(id, {
+    try {
+      await api.allowances.patch(id, {
         status: patch.status,
         amount: patch.amount,
-      })
-      .catch((err) => console.warn("[store] updateAllowance sync error:", err));
-  }, []);
+      });
+      await refreshSlice("allowances");
+    } catch (err) {
+      console.warn("[store] updateAllowance sync error:", err);
+    }
+  }, [refreshSlice]);
 
   const createTicket = useCallback(async (t: HelpdeskTicket) => {
     setState((s) => ({ ...s, helpdesk: [t, ...s.helpdesk] }));
@@ -483,14 +531,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         subject: t.subject,
         description: t.description,
       });
-      const res = await api.helpdesk.list();
-      if (Array.isArray(res)) {
-        setState((prev) => ({ ...prev, helpdesk: res as HelpdeskTicket[] }));
-      }
+      await refreshSlice("helpdesk");
     } catch (err) {
       console.warn("[store] createTicket sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const updateTicket = useCallback(async (id: string, patch: Partial<HelpdeskTicket>) => {
     setState((s) => ({
@@ -501,14 +546,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
     try {
       await api.helpdesk.patch(id, patch as Record<string, unknown>);
-      const res = await api.helpdesk.list();
-      if (Array.isArray(res)) {
-        setState((prev) => ({ ...prev, helpdesk: res as HelpdeskTicket[] }));
-      }
+      await refreshSlice("helpdesk");
     } catch (err) {
       console.warn("[store] updateTicket sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const addTicketComment = useCallback(async (ticketId: string, author: string, text: string) => {
     const comment = {
@@ -531,93 +573,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
     try {
       await api.helpdesk.addComment(ticketId, { userId: author, comment: text });
-      const res = await api.helpdesk.list();
-      if (Array.isArray(res)) {
-        setState((prev) => ({ ...prev, helpdesk: res as HelpdeskTicket[] }));
-      }
+      await refreshSlice("helpdesk");
     } catch (err) {
       console.warn("[store] addTicketComment sync error:", err);
     }
-  }, []);
-
-  const addAsset = useCallback(async (a: Asset) => {
-    setState((s) => ({ ...s, assets: [a, ...s.assets] }));
-    try {
-      await api.assets.create({
-        name: a.name,
-        tag: a.tag,
-        category: a.category,
-        serial: a.serial,
-        value: a.value,
-        location: a.location,
-        condition: a.condition,
-        status: a.status,
-        assignedTo: a.assignedTo,
-      });
-      const res = await api.assets.list();
-      if (Array.isArray(res)) {
-        setState((prev) => ({ ...prev, assets: res as Asset[] }));
-      }
-    } catch (err) {
-      console.warn("[store] addAsset sync error:", err);
-    }
-  }, []);
-
-  const updateAsset = useCallback(async (id: string, patch: Partial<Asset>) => {
-    setState((s) => ({
-      ...s,
-      assets: s.assets.map((a) => (a.id === id ? { ...a, ...patch } : a)),
-    }));
-    try {
-      await api.assets.patch(id, patch as Record<string, unknown>);
-      const res = await api.assets.list();
-      if (Array.isArray(res)) {
-        setState((prev) => ({ ...prev, assets: res as Asset[] }));
-      }
-    } catch (err) {
-      console.warn("[store] updateAsset sync error:", err);
-    }
-  }, []);
-
-  const addAssetRequest = useCallback(async (req: AssetRequest) => {
-    setState((s) => ({ ...s, assetRequests: [req, ...s.assetRequests] }));
-    try {
-      await api.assets.createRequest({
-        employeeId: req.employeeId,
-        item: req.item,
-        category: req.category,
-        reason: req.justification,
-        requiredFrom: req.requiredFrom,
-        requiredUntil: req.requiredUntil,
-      });
-      const res = await api.assets.requests();
-      if (Array.isArray(res)) {
-        setState((prev) => ({ ...prev, assetRequests: res as AssetRequest[] }));
-      }
-    } catch (err) {
-      console.warn("[store] addAssetRequest sync error:", err);
-    }
-  }, []);
-
-  const updateAssetRequest = useCallback(async (id: string, patch: Partial<AssetRequest> & { fulfilledAssetId?: string }) => {
-    setState((s) => ({
-      ...s,
-      assetRequests: s.assetRequests.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-    }));
-    try {
-      await api.assets.patchRequest(id, patch as Record<string, unknown>);
-      const [reqRes, astRes] = await Promise.all([api.assets.requests(), api.assets.list()]);
-      if (Array.isArray(reqRes)) {
-        setState((prev) => ({
-          ...prev,
-          assetRequests: reqRes as AssetRequest[],
-          ...(Array.isArray(astRes) ? { assets: astRes as Asset[] } : {}),
-        }));
-      }
-    } catch (err) {
-      console.warn("[store] updateAssetRequest sync error:", err);
-    }
-  }, []);
+  }, [refreshSlice]);
 
   const retryProvisioning = useCallback((id: string) => {
     setState((s) => ({
