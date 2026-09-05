@@ -660,6 +660,11 @@ function EmployeeDashboard({
   const myTickets = helpdesk.filter((t) => t.requesterId === myId || (myCode && t.requesterId === myCode));
   const myOpenTickets = myTickets.filter((t) => t.status === "Open" || t.status === "In Progress");
 
+  // Attendance percentage (present days / total working days)
+  const attendanceRecords = myAttendance.filter((a) => a.status !== "Holiday");
+  const presentDays = myAttendance.filter((a) => a.status === "Present" || a.status === "Late").length;
+  const attendancePercent = attendanceRecords.length > 0 ? Math.round((presentDays / attendanceRecords.length) * 100) : 0;
+
   // Recent attendance (last 5 records)
   const recentAttendance = myAttendance.slice(0, 5);
 
@@ -793,80 +798,27 @@ function EmployeeDashboard({
           </div>
         </Link>
 
-        {/* 6. IT Helpdesk */}
+        {/* 6. Attendance Percentage */}
         <Link
-          to="/app/helpdesk"
+          to="/app/attendance"
           className="group block rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-sm"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              IT Tickets
+              Attendance %
             </span>
-            <div className="rounded-lg bg-primary/10 p-2 text-primary transition-colors">
-              <LifeBuoy className="size-4" />
+            <div className="rounded-lg bg-success/15 p-2 text-success transition-colors">
+              <CheckCircle2 className="size-4" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-bold font-display">
-            {myOpenTickets.length} <span className="text-sm font-normal text-muted-foreground">Open</span>
+          <div className="mt-2 text-2xl font-bold font-display tabular-nums">
+            {attendancePercent}<span className="text-sm font-normal text-muted-foreground">%</span>
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {myTickets.length} total tickets
+            {presentDays} of {attendanceRecords.length} days
           </div>
         </Link>
       </div>
-
-      {/* Quick Actions Strip */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-            Employee Self-Service Actions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate({ to: "/app/leave" })}
-            >
-              <CalendarDays className="size-3.5 text-warning" /> Apply for Time Off
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate({ to: "/app/reimbursement" })}
-            >
-              <Receipt className="size-3.5 text-info" /> Submit Expense Claim
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate({ to: "/app/payslips" })}
-            >
-              <BadgeIndianRupee className="size-3.5 text-accent" /> View Payslips
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate({ to: "/app/helpdesk" })}
-            >
-              <LifeBuoy className="size-3.5 text-primary" /> Request IT Support
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate({ to: "/app/me" })}
-            >
-              <UserCheck className="size-3.5 text-success" /> View My Profile
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Two Column Layout: Recent Attendance & Leave Applications */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -949,77 +901,42 @@ function EmployeeDashboard({
         </Card>
       </div>
 
-      {/* Two Column Layout: Assigned Assets & Open IT Tickets */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* My Assigned Hardware */}
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle>My Assigned Equipment</CardTitle>
-              <CardDescription>Company laptops, monitors, and accessories</CardDescription>
-            </div>
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/app/assets">View assets</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {myAssets.length === 0 ? (
-              <EmptyState title="No equipment assigned" description="You currently have no hardware items checked out." />
-            ) : (
-              <div className="space-y-3">
-                {myAssets.map((asset) => (
-                  <div key={asset.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-md bg-muted p-2">
-                        <Laptop className="size-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{asset.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Tag: {asset.tag} · S/N: {asset.serial || "N/A"}
-                        </p>
-                      </div>
+      {/* My Assigned Hardware */}
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>My Assigned Equipment</CardTitle>
+            <CardDescription>Company laptops, monitors, and accessories</CardDescription>
+          </div>
+          <Button asChild size="sm" variant="ghost">
+            <Link to="/app/assets">View assets</Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {myAssets.length === 0 ? (
+            <EmptyState title="No equipment assigned" description="You currently have no hardware items checked out." />
+          ) : (
+            <div className="space-y-3">
+              {myAssets.map((asset) => (
+                <div key={asset.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-md bg-muted p-2">
+                      <Laptop className="size-4 text-muted-foreground" />
                     </div>
-                    <StatusBadge status={asset.status} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* My Open IT Tickets */}
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle>My Helpdesk Tickets</CardTitle>
-              <CardDescription>Support requests and resolution progress</CardDescription>
-            </div>
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/app/helpdesk">New ticket</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {myTickets.length === 0 ? (
-              <EmptyState title="No tickets raised" description="Need hardware, software, or account assistance? Open a ticket." />
-            ) : (
-              <div className="divide-y divide-border">
-                {myTickets.slice(0, 5).map((t) => (
-                  <div key={t.id} className="flex items-center justify-between py-2.5">
                     <div>
-                      <p className="text-sm font-medium">{t.subject}</p>
+                      <p className="text-sm font-medium">{asset.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {t.category} · Priority: {t.priority} · {t.createdDate}
+                        Tag: {asset.tag} · S/N: {asset.serial || "N/A"}
                       </p>
                     </div>
-                    <StatusBadge status={t.status} />
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  <StatusBadge status={asset.status} />
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </>
   );
 }

@@ -29,7 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import type { HelpdeskTicket, TicketCategory, TicketPriority, TicketStatus } from "@/lib/mock-data";
 
@@ -88,6 +88,8 @@ function HelpdeskPage() {
   const resolvedCount = activeTicketSet.filter((t) => t.status === "Resolved" || t.status === "Closed").length;
   const myAssignedCount = isEmployeeOnly ? myTickets.length : helpdesk.filter((t) => t.assignedTechnician === persona.name).length;
 
+  const [page, setPage] = useState(1);
+
   const rows = useMemo(() => {
     return helpdesk.filter((t) => {
       if (isEmployeeOnly) {
@@ -106,6 +108,12 @@ function HelpdeskPage() {
       return matchQ && matchCat && matchPriority && matchStatus;
     });
   }, [helpdesk, isEmployeeOnly, myId, myCode, q, catFilter, priorityFilter, statusFilter, nameOf]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE) || 1;
+  const paginatedRows = useMemo(() => {
+    return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [rows, page]);
 
   const activeTicket = helpdesk.find((t) => t.id === activeTicketId) ?? null;
 
@@ -301,60 +309,77 @@ function HelpdeskPage() {
               icon={<LifeBuoy className="size-8" />}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ticket ID</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Requester</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Assigned Technician</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Updated</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-mono text-xs font-semibold text-primary">
-                        {t.id}
-                      </TableCell>
-                      <TableCell className="max-w-[280px]">
-                        <p className="font-medium truncate text-sm">{t.subject}</p>
-                        <p className="text-xs text-muted-foreground truncate">{t.description}</p>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{nameOf(t.requesterId)}</div>
-                        <div className="text-xs text-muted-foreground">{t.requesterId}</div>
-                      </TableCell>
-                      <TableCell>{t.category}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={t.priority} />
-                      </TableCell>
-                      <TableCell className="text-sm">{t.assignedTechnician}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={t.status} />
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{t.updatedDate}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2"
-                          onClick={() => setActiveTicketId(t.id)}
-                          title="Open ticket thread"
-                        >
-                          <Eye className="size-3.5 mr-1" /> View
-                        </Button>
-                      </TableCell>
+            <>
+              {/* Pagination ON TOP of IT Helpdesk Tickets */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ticket ID</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Requester</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Assigned Technician</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Updated</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRows.map((t) => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-mono text-xs font-semibold text-primary">
+                          {t.id}
+                        </TableCell>
+                        <TableCell className="max-w-[280px]">
+                          <p className="font-medium truncate text-sm">{t.subject}</p>
+                          <p className="text-xs text-muted-foreground truncate">{t.description}</p>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{nameOf(t.requesterId)}</div>
+                          <div className="text-xs text-muted-foreground">{t.requesterId}</div>
+                        </TableCell>
+                        <TableCell>{t.category}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={t.priority} />
+                        </TableCell>
+                        <TableCell className="text-sm">{t.assignedTechnician}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={t.status} />
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{t.updatedDate}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2"
+                            onClick={() => setActiveTicketId(t.id)}
+                            title="Open ticket thread"
+                          >
+                            <Eye className="size-3.5 mr-1" /> View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

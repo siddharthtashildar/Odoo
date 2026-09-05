@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { EmptyState, PageHeader, StatCard, TableSkeleton } from "@/components/bits";
+import { EmptyState, PageHeader, StatCard, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed } from "@/lib/store";
 import { inr } from "@/lib/mock-data";
 
@@ -65,8 +65,13 @@ function Payslips() {
     }))
     .filter((s) => s.line);
 
-  const ytd = slips.reduce((s, x) => s + (x.line?.net ?? 0), 0);
+  const ytd = slips.reduce((sum, s) => sum + (s.line?.net ?? 0), 0);
   const active = slips.find((s) => s.run.id === openSlip);
+
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(slips.length / PAGE_SIZE) || 1;
+  const paginatedSlips = slips.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -98,7 +103,7 @@ function Payslips() {
               <Receipt className="size-4 mr-1.5" /> Generate Payslip
             </Button>
             {canSwitch && (
-              <Select value={who} onValueChange={setWho}>
+              <Select value={who} onValueChange={(val) => { setWho(val); setPage(1); }}>
                 <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {employees.map((e) => (
@@ -117,9 +122,20 @@ function Payslips() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{employee?.name ?? "Employee"}</CardTitle>
-          <CardDescription>{employee?.designation} · {employee?.department}</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div>
+            <CardTitle>{employee?.name ?? "Employee"}</CardTitle>
+            <CardDescription>{employee?.designation} · {employee?.department}</CardDescription>
+          </div>
+          {slips.length > 0 && (
+            <TablePagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={slips.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          )}
         </CardHeader>
         <CardContent className="p-0">
           {!ready ? (
@@ -131,32 +147,43 @@ function Payslips() {
               description="Click 'Generate Payslip' above to compute compensation and publish your statement."
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Period</TableHead>
-                    <TableHead className="text-right">Gross</TableHead>
-                    <TableHead className="text-right">Deductions</TableHead>
-                    <TableHead className="text-right">Net</TableHead>
-                    <TableHead className="text-right">Slip</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {slips.map(({ run, line }) => (
-                    <TableRow key={run.id}>
-                      <TableCell className="font-medium">{run.period}</TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(line!.gross + line!.bonus)}</TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">{inr(line!.deductions)}</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">{inr(line!.net)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="ghost" onClick={() => setOpenSlip(run.id)}>View</Button>
-                      </TableCell>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Period</TableHead>
+                      <TableHead className="text-right">Gross</TableHead>
+                      <TableHead className="text-right">Deductions</TableHead>
+                      <TableHead className="text-right">Net</TableHead>
+                      <TableHead className="text-right">Slip</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedSlips.map(({ run, line }) => (
+                      <TableRow key={run.id}>
+                        <TableCell className="font-medium">{run.period}</TableCell>
+                        <TableCell className="text-right tabular-nums">{inr(line!.gross + line!.bonus)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">{inr(line!.deductions)}</TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">{inr(line!.net)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="ghost" onClick={() => setOpenSlip(run.id)}>View</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="p-4 border-t border-border/40">
+                <TablePagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  totalItems={slips.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setPage}
+                />
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

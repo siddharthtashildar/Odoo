@@ -28,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import type { LeaveRequest, LeaveType } from "@/lib/mock-data";
 
@@ -78,7 +78,7 @@ function LeavePage() {
 
   const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(isEmployeeOnly ? "pending" : "all");
 
   // Summary Metrics
   const myAvailableLeave = me ? me.leaveBalance : 14;
@@ -97,11 +97,15 @@ function LeavePage() {
     ? myLeaves.filter((l) => l.status === "rejected")
     : leave.filter((l) => l.status === "rejected");
 
+  const [page, setPage] = useState(1);
+
   const rows = useMemo(() => {
     return leave.filter((l) => {
       if (isEmployeeOnly) {
         const isMine = l.employeeId === myId || (myCode && l.employeeId === myCode);
         if (!isMine) return false;
+        // Employee only sees pending and cancelled
+        if (l.status !== "pending" && l.status !== "cancelled") return false;
       }
 
       const empName = nameOf(l.employeeId).toLowerCase();
@@ -114,6 +118,12 @@ function LeavePage() {
       return matchQ && matchType && matchStatus;
     });
   }, [leave, isEmployeeOnly, myId, myCode, q, typeFilter, statusFilter, nameOf]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE) || 1;
+  const paginatedRows = useMemo(() => {
+    return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [rows, page]);
 
   const decide = (id: string, status: "approved" | "rejected") => {
     const req = leave.find((l) => l.id === id);
@@ -189,22 +199,26 @@ function LeavePage() {
         }
       />
 
-      {/* 5 Required Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          label="Available Leave"
-          value={`${myAvailableLeave} Days`}
-          hint="Your remaining paid balance"
-          icon={<CalendarDays className="size-5" />}
-          tone="accent"
-        />
-        <StatCard
-          label="Used Leave"
-          value={`${myUsedLeave} Days`}
-          hint="Approved leaves this calendar year"
-          icon={<Clock className="size-5" />}
-          tone="default"
-        />
+      {/* Summary Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {isEmployeeOnly && (
+          <>
+            <StatCard
+              label="Available Leave"
+              value={`${myAvailableLeave} Days`}
+              hint="Your remaining paid balance"
+              icon={<CalendarDays className="size-5" />}
+              tone="accent"
+            />
+            <StatCard
+              label="Used Leave"
+              value={`${myUsedLeave} Days`}
+              hint="Approved leaves this calendar year"
+              icon={<Clock className="size-5" />}
+              tone="default"
+            />
+          </>
+        )}
         <StatCard
           label="Pending Requests"
           value={pendingRequests.length}
@@ -244,41 +258,54 @@ function LeavePage() {
           </div>
 
           <div className="mt-2 grid gap-3 sm:grid-cols-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
-              <Input
-                placeholder="Search employee or reason..."
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+            {!isEmployeeOnly && (
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search employee or reason..."
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            )}
 
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Leave Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Leave Types</SelectItem>
-                <SelectItem value="Casual">Casual Leave</SelectItem>
-                <SelectItem value="Sick">Sick Leave</SelectItem>
-                <SelectItem value="Earned">Earned Leave</SelectItem>
-                <SelectItem value="Maternity">Maternity Leave</SelectItem>
-                <SelectItem value="Paternity">Paternity Leave</SelectItem>
-                <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
-              </SelectContent>
-            </Select>
+            {!isEmployeeOnly && (
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Leave Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Leave Types</SelectItem>
+                  <SelectItem value="Casual">Casual Leave</SelectItem>
+                  <SelectItem value="Sick">Sick Leave</SelectItem>
+                  <SelectItem value="Earned">Earned Leave</SelectItem>
+                  <SelectItem value="Maternity">Maternity Leave</SelectItem>
+                  <SelectItem value="Paternity">Paternity Leave</SelectItem>
+                  <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="All Statuses" />
+                <SelectValue placeholder={isEmployeeOnly ? "Status" : "All Statuses"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                {!isEmployeeOnly && <SelectItem value="approved">Approved</SelectItem>}
-                {!isEmployeeOnly && <SelectItem value="rejected">Rejected</SelectItem>}
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                {isEmployeeOnly ? (
+                  <>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -295,25 +322,67 @@ function LeavePage() {
               description="No applications match your selected filters."
               icon={<CalendarDays className="size-8" />}
             />
+          ) : isEmployeeOnly ? (
+            // Employee-friendly list/card layout
+            <div className="divide-y divide-border">
+              {rows.map((l) => (
+                <div key={l.id} className="flex flex-col gap-2 p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="font-medium">{l.type} Leave</p>
+                      <p className="text-sm text-muted-foreground">
+                        {l.from} → {l.to} · <span className="font-medium text-foreground">{l.days} day{l.days !== 1 ? 's' : ''}</span>
+                      </p>
+                    </div>
+                    <StatusBadge status={l.status} />
+                  </div>
+                  {l.reason && (
+                    <p className="text-xs text-muted-foreground">{l.reason}</p>
+                  )}
+                  <div className="flex items-center justify-between pt-1">
+                    <p className="text-xs text-muted-foreground">Submitted: {l.submittedAt ?? l.from}</p>
+                    {l.status === "pending" && l.employeeId === persona.employeeId && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs text-destructive"
+                        onClick={() => handleCancelRequest(l.id)}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Request ID</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Leave Type</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead className="text-right">Number of Days</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Submitted Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((l) => (
+            <>
+              {/* Pagination ON TOP of Leave Requests */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Request ID</TableHead>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Leave Type</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead className="text-right">Number of Days</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Submitted Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRows.map((l) => (
                     <TableRow key={l.id}>
                       <TableCell className="font-mono text-xs font-semibold text-primary">
                         {l.id}
@@ -390,7 +459,15 @@ function LeavePage() {
                 </TableBody>
               </Table>
             </div>
-          )}
+            <TablePagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={rows.length}
+              pageSize={5}
+              onPageChange={setPage}
+            />
+          </>
+        )}
         </CardContent>
       </Card>
 
@@ -414,25 +491,34 @@ function LeavePage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Casual">Casual Leave</SelectItem>
-                  <SelectItem value="Sick">Sick Leave</SelectItem>
-                  <SelectItem value="Earned">Earned Leave</SelectItem>
-                  <SelectItem value="Maternity">Maternity Leave</SelectItem>
-                  <SelectItem value="Paternity">Paternity Leave</SelectItem>
-                  <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
+                  {isEmployeeOnly ? (
+                    <>
+                      <SelectItem value="Casual">Paid Leave</SelectItem>
+                      <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="Casual">Casual Leave</SelectItem>
+                      <SelectItem value="Sick">Sick Leave</SelectItem>
+                      <SelectItem value="Earned">Earned Leave</SelectItem>
+                      <SelectItem value="Maternity">Maternity Leave</SelectItem>
+                      <SelectItem value="Paternity">Paternity Leave</SelectItem>
+                      <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="From" error={errors["from"]}>
+              <Field label="Start Date" error={errors["from"]}>
                 <Input
                   type="date"
                   value={form.from}
                   onChange={(e) => setForm({ ...form, from: e.target.value })}
                 />
               </Field>
-              <Field label="To" error={errors["to"]}>
+              <Field label="End Date" error={errors["to"]}>
                 <Input
                   type="date"
                   value={form.to}
@@ -443,14 +529,14 @@ function LeavePage() {
 
             {form.from && form.to && dayCount(form.from, form.to) > 0 && (
               <p className="text-xs text-muted-foreground">
-                Total duration: <span className="font-semibold text-foreground">{dayCount(form.from, form.to)} calendar day(s)</span>
+                Total: <span className="font-semibold text-foreground">{dayCount(form.from, form.to)} day{dayCount(form.from, form.to) !== 1 ? 's' : ''}</span>
               </p>
             )}
 
-            <Field label="Reason" error={errors["reason"]}>
+            <Field label="Reason for Leave" error={errors["reason"]}>
               <Textarea
                 rows={3}
-                placeholder="Describe reason for leave..."
+                placeholder="Describe your reason for leave..."
                 value={form.reason}
                 onChange={(e) => setForm({ ...form, reason: e.target.value })}
               />

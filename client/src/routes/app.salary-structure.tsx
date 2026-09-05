@@ -75,7 +75,7 @@ const emptyForm = () => ({
   applicableTo: "All" as SalaryStructure["applicableTo"],
   status: "draft" as SalaryStructureStatus,
   effectiveFrom: "",
-  components: [emptyComponent()],
+  components: [],
 });
 
 function SalaryStructurePage() {
@@ -126,8 +126,8 @@ function SalaryStructurePage() {
   const handleSave = () => {
     if (!form.name.trim()) { toast.error("Structure name is required"); return; }
     if (!form.effectiveFrom) { toast.error("Effective date is required"); return; }
-    if (form.components.some((c) => !c.name.trim() || c.value <= 0)) {
-      toast.error("All components need a name and a positive value");
+    if (form.components.some((c) => !c.name.trim() || c.value < 0)) {
+      toast.error("All components need a name and a non-negative value");
       return;
     }
 
@@ -256,27 +256,53 @@ function SalaryStructurePage() {
                     <span>Created by <strong>{s.createdBy}</strong></span>
                     <span>Last updated <strong>{s.updatedAt}</strong></span>
                   </div>
-                  <div className="space-y-1">
-                    {s.components.map((c, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between rounded-md px-3 py-1.5 odd:bg-muted/30 text-sm"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs font-semibold uppercase tracking-wide ${COMPONENT_TYPE_COLORS[c.type]}`}
+                  
+                  {/* Earnings/Allowances */}
+                  <div className="mb-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-success mb-2">Earnings / Allowances</div>
+                    {s.components.filter(c => c.type === "earning").length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">None configured</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {s.components.filter(c => c.type === "earning").map((c, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between rounded-md px-3 py-1.5 bg-muted/30 text-sm"
                           >
-                            {c.type}
-                          </span>
-                          <span>{c.name}</span>
-                        </div>
-                        <span className="tabular-nums text-muted-foreground">
-                          {c.basis === "fixed"
-                            ? `₹${c.value.toLocaleString("en-IN")} / mo`
-                            : `${c.value}% of basic`}
-                        </span>
+                            <span>{c.name}</span>
+                            <span className="tabular-nums text-muted-foreground">
+                              {c.basis === "fixed"
+                                ? `₹${c.value.toLocaleString("en-IN")} / mo`
+                                : `${c.value}% of basic`}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+                  </div>
+
+                  {/* Deductions */}
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-destructive mb-2">Deductions</div>
+                    {s.components.filter(c => c.type === "deduction").length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">None configured</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {s.components.filter(c => c.type === "deduction").map((c, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between rounded-md px-3 py-1.5 bg-muted/30 text-sm"
+                          >
+                            <span>{c.name}</span>
+                            <span className="tabular-nums text-muted-foreground">
+                              {c.basis === "fixed"
+                                ? `₹${c.value.toLocaleString("en-IN")} / mo`
+                                : `${c.value}% of basic`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               )}
@@ -292,7 +318,7 @@ function SalaryStructurePage() {
             <DialogHeader>
               <DialogTitle>{editTarget ? "Edit Structure" : "New Salary Structure"}</DialogTitle>
               <DialogDescription>
-                Define the pay components — earnings, deductions and employer contributions.
+                Configure earnings/allowances and deductions that make up the salary structure.
               </DialogDescription>
             </DialogHeader>
 
@@ -355,58 +381,136 @@ function SalaryStructurePage() {
                 </div>
               </div>
 
-              {/* Components */}
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <Label>Components</Label>
-                  <Button size="sm" variant="outline" onClick={addComponent} id="add-component-btn">
-                    <Plus className="mr-1 size-3.5" /> Add
-                  </Button>
+              {/* Components - Organized by Type */}
+              <div className="space-y-4">
+                {/* Earnings / Allowances Section */}
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <Label className="font-semibold text-success">Earnings / Allowances</Label>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => {
+                        const earning = emptyComponent();
+                        earning.type = "earning";
+                        setForm(f => ({ ...f, components: [...f.components, earning] }));
+                      }}
+                      id="add-earning-btn"
+                    >
+                      <Plus className="mr-1 size-3.5" /> Add Earning
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {form.components.filter(c => c.type === "earning").length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic px-2 py-1.5">No earnings configured yet</p>
+                    ) : (
+                      form.components
+                        .map((c, origIdx) => ({ c, origIdx }))
+                        .filter(({ c }) => c.type === "earning")
+                        .map(({ origIdx }) => {
+                          const c = form.components[origIdx];
+                          return (
+                            <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
+                              <Input
+                                placeholder="e.g. Basic Salary, HRA, Transport Allowance"
+                                value={c.name}
+                                onChange={(e) => patchComponent(origIdx, { name: e.target.value })}
+                                className="flex-1 min-w-0 h-8 text-sm"
+                              />
+                              <Select value={c.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
+                                <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percent_of_basic">% of Basic</SelectItem>
+                                  <SelectItem value="fixed">Fixed (₹/mo)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                min={0}
+                                placeholder={c.basis === "fixed" ? "₹ amount" : "%"}
+                                value={c.value || ""}
+                                onChange={(e) => patchComponent(origIdx, { value: Number(e.target.value) })}
+                                className="w-20 h-8 text-sm text-right"
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="size-8 shrink-0 text-destructive hover:text-destructive"
+                                onClick={() => removeComponent(origIdx)}
+                                aria-label="Remove component"
+                              >
+                                <Minus className="size-3.5" />
+                              </Button>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {form.components.map((c, i) => (
-                    <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
-                      <Input
-                        placeholder="Component name"
-                        value={c.name}
-                        onChange={(e) => patchComponent(i, { name: e.target.value })}
-                        className="flex-1 min-w-0 h-8 text-sm"
-                      />
-                      <Select value={c.type} onValueChange={(v) => patchComponent(i, { type: v as SalaryComponent["type"] })}>
-                        <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="earning">Earning</SelectItem>
-                          <SelectItem value="deduction">Deduction</SelectItem>
-                          <SelectItem value="employer">Employer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={c.basis} onValueChange={(v) => patchComponent(i, { basis: v as SalaryComponent["basis"] })}>
-                        <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="percent_of_basic">% of Basic</SelectItem>
-                          <SelectItem value="fixed">Fixed (₹/mo)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        min={0}
-                        placeholder={c.basis === "fixed" ? "₹ amount" : "%"}
-                        value={c.value || ""}
-                        onChange={(e) => patchComponent(i, { value: Number(e.target.value) })}
-                        className="w-20 h-8 text-sm text-right"
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="size-8 shrink-0 text-destructive hover:text-destructive"
-                        onClick={() => removeComponent(i)}
-                        aria-label="Remove component"
-                        disabled={form.components.length === 1}
-                      >
-                        <Minus className="size-3.5" />
-                      </Button>
-                    </div>
-                  ))}
+
+                {/* Deductions Section */}
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <Label className="font-semibold text-destructive">Deductions</Label>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => {
+                        const deduction = emptyComponent();
+                        deduction.type = "deduction";
+                        setForm(f => ({ ...f, components: [...f.components, deduction] }));
+                      }}
+                      id="add-deduction-btn"
+                    >
+                      <Plus className="mr-1 size-3.5" /> Add Deduction
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {form.components.filter(c => c.type === "deduction").length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic px-2 py-1.5">No deductions configured yet</p>
+                    ) : (
+                      form.components
+                        .map((c, origIdx) => ({ c, origIdx }))
+                        .filter(({ c }) => c.type === "deduction")
+                        .map(({ origIdx }) => {
+                          const c = form.components[origIdx];
+                          return (
+                            <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
+                              <Input
+                                placeholder="e.g. Income Tax, PF, Professional Tax"
+                                value={c.name}
+                                onChange={(e) => patchComponent(origIdx, { name: e.target.value })}
+                                className="flex-1 min-w-0 h-8 text-sm"
+                              />
+                              <Select value={c.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
+                                <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percent_of_basic">% of Basic</SelectItem>
+                                  <SelectItem value="fixed">Fixed (₹/mo)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                min={0}
+                                placeholder={c.basis === "fixed" ? "₹ amount" : "%"}
+                                value={c.value || ""}
+                                onChange={(e) => patchComponent(origIdx, { value: Number(e.target.value) })}
+                                className="w-20 h-8 text-sm text-right"
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="size-8 shrink-0 text-destructive hover:text-destructive"
+                                onClick={() => removeComponent(origIdx)}
+                                aria-label="Remove component"
+                              >
+                                <Minus className="size-3.5" />
+                              </Button>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

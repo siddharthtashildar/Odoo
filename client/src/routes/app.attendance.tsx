@@ -39,7 +39,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import type { AttendanceRecord, AttendanceStatus } from "@/lib/mock-data";
 
@@ -350,10 +350,12 @@ function StaffAttendance() {
   const dateRecords = attendance.filter((a) => a.date === selectedDate);
   const presentCount = dateRecords.filter((a) => a.status === "Present" || a.status === "Late").length;
   const lateCount = dateRecords.filter((a) => a.status === "Late").length;
-  const halfDayCount = dateRecords.filter((a) => a.status === "Half Day").length;
+const halfDayCount = dateRecords.filter((a) => a.status === "Half Day").length;
   const onLeaveCount = dateRecords.filter((a) => a.status === "On Leave").length;
   const absentCount = employees.filter((e) => e.status === "active").length - presentCount - onLeaveCount;
   const attendanceRate = employees.length > 0 ? Math.round((presentCount / employees.length) * 100) : 0;
+
+  const [page, setPage] = useState(1);
 
   // Filtered rows
   const filteredRows = useMemo(() => {
@@ -364,13 +366,22 @@ function StaffAttendance() {
       }
       const emp = employees.find((e) => e.id === a.employeeId || e.code === a.employeeId);
       const empName = emp ? emp.name.toLowerCase() : "";
-      const matchQ = empName.includes(q.toLowerCase()) || a.employeeId.toLowerCase().includes(q.toLowerCase());
-      const matchDate = selectedDate === "all" || a.date === selectedDate;
+      const matchQ =
+        a.employeeId.toLowerCase().includes(q.toLowerCase()) ||
+        empName.includes(q.toLowerCase()) ||
+        (a.location && a.location.toLowerCase().includes(q.toLowerCase()));
+      const matchDate = !selectedDate || a.date === selectedDate;
       const matchDept = deptFilter === "all" || emp?.department === deptFilter;
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       return matchQ && matchDate && matchDept && matchStatus;
     });
   }, [attendance, employees, q, selectedDate, deptFilter, statusFilter, isEmployeeOnly, myId, myCode]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE) || 1;
+  const paginatedAttendance = useMemo(() => {
+    return filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [filteredRows, page]);
 
   // Chart data: attendance by status
   const chartData = [
@@ -651,59 +662,76 @@ function StaffAttendance() {
               icon={<Clock className="size-8" />}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Check-in</TableHead>
-                    <TableHead>Check-out</TableHead>
-                    <TableHead className="text-right">Working Hours</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Remarks</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell>
-                        <div className="font-medium">{nameOf(r.employeeId)}</div>
-                        <div className="text-xs text-muted-foreground">{r.employeeId}</div>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.date}</TableCell>
-                      <TableCell className="font-mono text-xs">{r.checkIn}</TableCell>
-                      <TableCell className="font-mono text-xs">{r.checkOut}</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {r.workingHours > 0 ? `${r.workingHours} hrs` : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={r.status} />
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.location}</TableCell>
-                      <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
-                        {r.remarks ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {canManage && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 px-2"
-                            onClick={() => handleOpenCorrection(r)}
-                            title="Manual attendance correction"
-                          >
-                            <Edit2 className="size-3.5" />
-                          </Button>
-                        )}
-                      </TableCell>
+            <>
+              {/* Pagination ON TOP of Attendance Punch Logs */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={filteredRows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Check-in</TableHead>
+                      <TableHead>Check-out</TableHead>
+                      <TableHead className="text-right">Working Hours</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Remarks</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedAttendance.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>
+                          <div className="font-medium">{nameOf(r.employeeId)}</div>
+                          <div className="text-xs text-muted-foreground">{r.employeeId}</div>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{r.date}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.checkIn}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.checkOut}</TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {r.workingHours > 0 ? `${r.workingHours} hrs` : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={r.status} />
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{r.location}</TableCell>
+                        <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
+                          {r.remarks ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canManage && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2"
+                              onClick={() => handleOpenCorrection(r)}
+                              title="Manual attendance correction"
+                            >
+                              <Edit2 className="size-3.5" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={filteredRows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

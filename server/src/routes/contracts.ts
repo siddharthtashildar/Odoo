@@ -95,10 +95,36 @@ router.post("/", async (req, res) => {
 // PATCH /api/contracts/:id
 router.patch("/:id", async (req, res) => {
   try {
-    const { status } = req.body as { status: string };
+    const { status, startDate, endDate, salary, contractType, terms } = req.body as {
+      status?: string;
+      startDate?: string;
+      endDate?: string;
+      salary?: number;
+      contractType?: string;
+      terms?: string;
+    };
+
+    const updateData: any = { updated_at: new Date() };
+    if (status) updateData.status = status;
+    if (startDate) updateData.start_date = new Date(startDate);
+    if (endDate) updateData.end_date = new Date(endDate);
+    if (salary) updateData.salary = Number(salary);
+    if (contractType) {
+      const normType =
+        contractType === "intern" ? "intern" :
+        contractType === "consultant" ? "consultant" :
+        contractType === "fixed_term" || contractType === "contract" ? "fixed_term" :
+        contractType === "probation" ? "probation" :
+        contractType === "Fixed-term" ? "fixed_term" :
+        contractType === "Internship" ? "intern" :
+        contractType === "Consultancy" ? "consultant" : "permanent";
+      updateData.contract_type = normType;
+    }
+    if (terms) updateData.working_hours_per_week = terms; // Note: storing in working_hours_per_week as placeholder
+
     const updated = await prisma.contracts.update({
       where: { id: req.params.id },
-      data: { status: status as any, updated_at: new Date() },
+      data: updateData,
     });
     res.json({ success: true, data: { id: updated.id } });
   } catch (err) {
