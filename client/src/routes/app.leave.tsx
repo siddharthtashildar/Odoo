@@ -51,13 +51,20 @@ const dayCount = (from: string, to: string) => {
 };
 
 function LeavePage() {
-  const { leave, update, log, persona, role, employees, patchEmployee } = useApp();
+  const { leave, applyLeave, updateLeave, log, persona, role, employees, patchEmployee } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
 
-  const isApprover = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const isApprover = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
   const isEmployeeOnly = role === "employee";
-  const me = employees.find((e) => e.id === persona.employeeId);
+  const me = employees.find(
+    (e) =>
+      e.id === persona.employeeId ||
+      e.code === persona.employeeCode ||
+      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+  );
+  const myId = me?.id || persona.employeeId;
+  const myCode = me?.code || persona.employeeCode;
 
   const [open, setOpen] = useState(false);
   const [viewReq, setViewReq] = useState<LeaveRequest | null>(null);
@@ -75,21 +82,26 @@ function LeavePage() {
 
   // Summary Metrics
   const myAvailableLeave = me ? me.leaveBalance : 14;
-  const myLeaves = leave.filter((l) => l.employeeId === persona.employeeId);
+  const myLeaves = leave.filter((l) => l.employeeId === myId || (myCode && l.employeeId === myCode));
   const myUsedLeave = myLeaves
     .filter((l) => l.status === "approved" && l.type !== "Unpaid")
     .reduce((s, l) => s + l.days, 0);
 
-  const pendingRequests = leave.filter((l) => l.status === "pending");
-  const approvedRequests = leave.filter((l) => l.status === "approved");
-  const rejectedRequests = leave.filter((l) => l.status === "rejected");
+  const pendingRequests = isEmployeeOnly
+    ? myLeaves.filter((l) => l.status === "pending")
+    : leave.filter((l) => l.status === "pending");
+  const approvedRequests = isEmployeeOnly
+    ? myLeaves.filter((l) => l.status === "approved")
+    : leave.filter((l) => l.status === "approved");
+  const rejectedRequests = isEmployeeOnly
+    ? myLeaves.filter((l) => l.status === "rejected")
+    : leave.filter((l) => l.status === "rejected");
 
   const rows = useMemo(() => {
     return leave.filter((l) => {
-      if (isEmployeeOnly && l.employeeId !== persona.employeeId) return false;
       if (isEmployeeOnly) {
-        const status = String(l.status).toLowerCase();
-        if (status === "approved" || status === "rejected") return false;
+        const isMine = l.employeeId === myId || (myCode && l.employeeId === myCode);
+        if (!isMine) return false;
       }
 
       const empName = nameOf(l.employeeId).toLowerCase();
@@ -101,14 +113,11 @@ function LeavePage() {
       const matchStatus = statusFilter === "all" || l.status === statusFilter;
       return matchQ && matchType && matchStatus;
     });
-  }, [leave, isEmployeeOnly, persona.employeeId, q, typeFilter, statusFilter, nameOf]);
+  }, [leave, isEmployeeOnly, myId, myCode, q, typeFilter, statusFilter, nameOf]);
 
   const decide = (id: string, status: "approved" | "rejected") => {
     const req = leave.find((l) => l.id === id);
-    update(
-      "leave",
-      leave.map((l) => (l.id === id ? { ...l, status } : l)),
-    );
+    updateLeave(id, { status });
 
     if (req && status === "approved") {
       const emp = employees.find((e) => e.id === req.employeeId);
@@ -126,10 +135,7 @@ function LeavePage() {
   };
 
   const handleCancelRequest = (id: string) => {
-    update(
-      "leave",
-      leave.map((l) => (l.id === id ? { ...l, status: "cancelled" } : l)),
-    );
+    updateLeave(id, { status: "cancelled" });
     log(`Cancelled leave request ${id}`, "Time Off");
     toast.success("Leave request cancelled");
     if (viewReq?.id === id) setViewReq(null);
@@ -152,8 +158,8 @@ function LeavePage() {
     }
 
     const req: LeaveRequest = {
-      id: `LV-${510 + leave.length}`,
-      employeeId: persona.employeeId,
+      id: `LV-${Date.now().toString().slice(-4)}`,
+      employeeId: myId,
       type: form.type,
       from: form.from,
       to: form.to,
@@ -163,9 +169,9 @@ function LeavePage() {
       submittedAt: new Date().toISOString().slice(0, 10),
     };
 
-    update("leave", [req, ...leave]);
+    applyLeave(req);
     log(`Applied for ${days} day(s) of ${form.type} leave`, "Time Off");
-    toast.success("Leave request submitted", { description: "Your manager and HR have been notified." });
+    toast.success("Leave request submitted", { description: "Stored in database and sent to HR manager for review." });
 
     setForm({ type: "Casual", from: "", to: "", reason: "" });
     setOpen(false);

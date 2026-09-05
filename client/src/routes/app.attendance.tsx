@@ -308,15 +308,24 @@ function StaffAttendance() {
   const [editStatus, setEditStatus] = useState<AttendanceStatus>("Present");
   const [editRemarks, setEditRemarks] = useState("");
 
-  const canManage = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const canManage = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
+  const me = employees.find(
+    (e) =>
+      e.id === persona.employeeId ||
+      e.code === persona.employeeCode ||
+      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+  );
+  const myId = me?.id || persona.employeeId;
+  const myCode = me?.code || persona.employeeCode;
+  const isEmployeeOnly = role === "employee";
 
   // Check if current persona is punched in today
   const myTodayRecord = attendance.find(
-    (a) => a.employeeId === persona.employeeId && a.date === today,
+    (a) => (a.employeeId === myId || (myCode && a.employeeId === myCode)) && a.date === today,
   );
   const isPunchedIn = !!myTodayRecord && myTodayRecord.checkOut === "—";
 
-  // Calculate metrics for selected date
+  // Calculate metrics for selected date (company-wide for HR)
   const dateRecords = attendance.filter((a) => a.date === selectedDate);
   const presentCount = dateRecords.filter((a) => a.status === "Present" || a.status === "Late").length;
   const lateCount = dateRecords.filter((a) => a.status === "Late").length;
@@ -328,8 +337,11 @@ function StaffAttendance() {
   // Filtered rows
   const filteredRows = useMemo(() => {
     return attendance.filter((a) => {
-      if (role === "employee" && a.employeeId !== persona.employeeId) return false;
-      const emp = employees.find((e) => e.id === a.employeeId);
+      if (isEmployeeOnly) {
+        const isMine = a.employeeId === myId || (myCode && a.employeeId === myCode);
+        if (!isMine) return false;
+      }
+      const emp = employees.find((e) => e.id === a.employeeId || e.code === a.employeeId);
       const empName = emp ? emp.name.toLowerCase() : "";
       const matchQ = empName.includes(q.toLowerCase()) || a.employeeId.toLowerCase().includes(q.toLowerCase());
       const matchDate = selectedDate === "all" || a.date === selectedDate;
@@ -337,7 +349,7 @@ function StaffAttendance() {
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       return matchQ && matchDate && matchDept && matchStatus;
     });
-  }, [attendance, employees, q, selectedDate, deptFilter, statusFilter, role, persona.employeeId]);
+  }, [attendance, employees, q, selectedDate, deptFilter, statusFilter, isEmployeeOnly, myId, myCode]);
 
   // Chart data: attendance by status
   const chartData = [
@@ -349,26 +361,17 @@ function StaffAttendance() {
   ];
 
   const handlePunchToggle = () => {
-    punchAttendance(persona.employeeId);
-    if (isPunchedIn) {
-      log(`Punched out for the day`, "Attendance");
-      toast.success("Punched out successfully", {
-        description: `Have a great evening, ${persona.name}!`,
-      });
-    } else {
-      log(`Punched in for work`, "Attendance");
-      toast.success("Punched in successfully", {
-        description: `Logged at ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
-      });
-    }
+    punchAttendance(myId);
+    log(`${isPunchedIn ? "Clocked out from" : "Clocked in to"} attendance workspace`, "Attendance");
+    toast.success(isPunchedIn ? "Clocked out successfully" : "Clocked in successfully");
   };
 
-  const handleOpenCorrection = (record: AttendanceRecord) => {
-    setCorrecting(record);
-    setEditCheckIn(record.checkIn);
-    setEditCheckOut(record.checkOut);
-    setEditStatus(record.status);
-    setEditRemarks(record.remarks ?? "");
+  const handleOpenCorrection = (r: AttendanceRecord) => {
+    setCorrecting(r);
+    setEditCheckIn(r.checkIn);
+    setEditCheckOut(r.checkOut);
+    setEditStatus(r.status);
+    setEditRemarks(r.remarks ?? "");
   };
 
   const handleSaveCorrection = () => {
@@ -386,11 +389,21 @@ function StaffAttendance() {
 
   const departments = useMemo(() => Array.from(new Set(employees.map((e) => e.department))).sort(), [employees]);
 
+  // Employee-only metrics
+  const myTotalRecords = attendance.filter((a) => a.employeeId === myId || (myCode && a.employeeId === myCode));
+  const myPresentDays = myTotalRecords.filter((a) => a.status === "Present" || a.status === "Late").length;
+  const myTotalHours = myTotalRecords.reduce((s, a) => s + (a.workingHours || 0), 0);
+  const myAvgHours = myPresentDays > 0 ? (myTotalHours / myPresentDays).toFixed(1) : "0";
+
   return (
     <>
       <PageHeader
-        title="Attendance Management"
-        description="Daily biometric & web punch logging, working hours tracking, status verification and attendance corrections."
+        title={isEmployeeOnly ? "My Attendance" : "Attendance Management"}
+        description={
+          isEmployeeOnly
+            ? `Daily clock records, punch timings, and work hours for ${me?.name || persona.name}`
+            : "Daily biometric & web punch logging, working hours tracking, status verification and attendance corrections."
+        }
         actions={
           <Button
             variant={isPunchedIn ? "destructive" : "default"}
@@ -410,74 +423,116 @@ function StaffAttendance() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          label="Present Today"
-          value={presentCount}
-          hint={`${attendanceRate}% attendance rate`}
-          icon={<UserCheck className="size-5" />}
-          tone="success"
-        />
-        <StatCard
-          label="Absent Today"
-          value={Math.max(0, absentCount)}
-          hint="Unplanned absences"
-          icon={<UserX className="size-5" />}
-          tone="default"
-        />
-        <StatCard
-          label="Late Arrivals"
-          value={lateCount}
-          hint="Punched in after 09:30 AM"
-          icon={<Clock className="size-5" />}
-          tone="warning"
-        />
-        <StatCard
-          label="Half Day / Early"
-          value={halfDayCount}
-          hint="Partial working hours"
-          icon={<Clock className="size-5" />}
-          tone="accent"
-        />
-        <StatCard
-          label="On Leave"
-          value={onLeaveCount}
-          hint="Approved leaves active"
-          icon={<CalendarIcon className="size-5" />}
-          tone="default"
-        />
-      </div>
+      {isEmployeeOnly ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard
+            label="Today's Status"
+            value={isPunchedIn ? "Clocked In" : myTodayRecord ? myTodayRecord.status : "Not Clocked In"}
+            hint={myTodayRecord?.checkIn ? `In at ${myTodayRecord.checkIn}` : "Tap button to punch"}
+            icon={<UserCheck className="size-5" />}
+            tone={isPunchedIn ? "success" : "default"}
+          />
+          <StatCard
+            label="Days Present"
+            value={`${myPresentDays} Days`}
+            hint="Sanctioned work days"
+            icon={<Clock className="size-5" />}
+            tone="accent"
+          />
+          <StatCard
+            label="Total Logged Hours"
+            value={`${myTotalHours.toFixed(1)} hrs`}
+            hint="Cumulative working hours"
+            icon={<Clock className="size-5" />}
+            tone="default"
+          />
+          <StatCard
+            label="Daily Average"
+            value={`${myAvgHours} hrs/day`}
+            hint="Standard target: 8.5 hrs"
+            icon={<Clock className="size-5" />}
+            tone="warning"
+          />
+          <StatCard
+            label="Assigned Office"
+            value={myTodayRecord?.location || "Ahmedabad"}
+            hint="Geofenced desk"
+            icon={<CheckCircle2 className="size-5" />}
+            tone="success"
+          />
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard
+            label="Present Today"
+            value={presentCount}
+            hint={`${attendanceRate}% attendance rate`}
+            icon={<UserCheck className="size-5" />}
+            tone="success"
+          />
+          <StatCard
+            label="Absent Today"
+            value={Math.max(0, absentCount)}
+            hint="Unplanned absences"
+            icon={<UserX className="size-5" />}
+            tone="default"
+          />
+          <StatCard
+            label="Late Arrivals"
+            value={lateCount}
+            hint="Punched in after 09:30 AM"
+            icon={<Clock className="size-5" />}
+            tone="warning"
+          />
+          <StatCard
+            label="Half Day / Early"
+            value={halfDayCount}
+            hint="Partial working hours"
+            icon={<Clock className="size-5" />}
+            tone="accent"
+          />
+          <StatCard
+            label="On Leave"
+            value={onLeaveCount}
+            hint="Approved leaves active"
+            icon={<CalendarIcon className="size-5" />}
+            tone="default"
+          />
+        </div>
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Attendance Distribution</CardTitle>
-            <CardDescription>Daily status breakdown for {selectedDate}</CardDescription>
-          </CardHeader>
-          <CardContent className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="name" stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
-                <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--popover)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    color: "var(--popover-foreground)",
-                  }}
-                />
-                <Bar dataKey="count" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      <div className={`grid gap-4 ${isEmployeeOnly ? "lg:grid-cols-1" : "lg:grid-cols-3"}`}>
+        {!isEmployeeOnly && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Attendance Distribution</CardTitle>
+              <CardDescription>Daily status breakdown for {selectedDate}</CardDescription>
+            </CardHeader>
+            <CardContent className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="name" stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
+                  <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      color: "var(--popover-foreground)",
+                    }}
+                  />
+                  <Bar dataKey="count" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card>
+        <Card className={isEmployeeOnly ? "w-full" : ""}>
           <CardHeader>
             <CardTitle>Quick Attendance Punch</CardTitle>
-            <CardDescription>Signed in as {persona.name}</CardDescription>
+            <CardDescription>Signed in as {me?.name || persona.name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-border bg-muted/40 p-3.5">

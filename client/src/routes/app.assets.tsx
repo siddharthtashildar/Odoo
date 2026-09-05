@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -61,7 +61,16 @@ function AssetsPage() {
   const ready = useDelayed();
 
   const isEmployeeOnly = role === "employee";
-  const canManage = role === "it_asset_manager" || role === "admin" || role === "hr_manager" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const canManage = role === "it_asset_manager" || role === "admin" || role === "hr_manager" || role === "payroll_manager" || role === "payroll_user";
+
+  const me = employees.find(
+    (e) =>
+      e.id === persona.employeeId ||
+      e.code === persona.employeeCode ||
+      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+  );
+  const myId = me?.id || persona.employeeId;
+  const myCode = me?.code || persona.employeeCode;
 
   const [q, setQ] = useState("");
   const [catFilter, setCatFilter] = useState("all");
@@ -81,14 +90,18 @@ function AssetsPage() {
   const [viewHistoryTarget, setViewHistoryTarget] = useState<Asset | null>(null);
 
   // Summaries
+  const myAssets = assets.filter((a) => a.assignedTo === myId || (myCode && a.assignedTo === myCode));
   const availableCount = assets.filter((a) => a.status === "Available" || a.status === "in_stock").length;
-  const assignedCount = assets.filter((a) => a.status === "Assigned" || a.status === "assigned").length;
+  const assignedCount = isEmployeeOnly ? myAssets.length : assets.filter((a) => a.status === "Assigned" || a.status === "assigned").length;
   const maintenanceCount = assets.filter((a) => a.status === "Under Maintenance" || a.status === "repair").length;
-  const totalBookValue = assets.reduce((s, a) => s + a.value, 0);
+  const totalBookValue = isEmployeeOnly ? myAssets.reduce((s, a) => s + a.value, 0) : assets.reduce((s, a) => s + a.value, 0);
 
   const rows = useMemo(() => {
     return assets.filter((a) => {
-      if (isEmployeeOnly && a.assignedTo !== persona.employeeId) return false;
+      if (isEmployeeOnly) {
+        const isMine = a.assignedTo === myId || (myCode && a.assignedTo === myCode);
+        if (!isMine) return false;
+      }
 
       const assigneeName = a.assignedTo ? nameOf(a.assignedTo).toLowerCase() : "";
       const matchQ =
@@ -102,7 +115,7 @@ function AssetsPage() {
         a.status.toLowerCase().replace(/_/g, " ") === statusFilter.toLowerCase().replace(/_/g, " ");
       return matchQ && matchCat && matchStatus;
     });
-  }, [assets, isEmployeeOnly, persona.employeeId, q, catFilter, statusFilter, nameOf]);
+  }, [assets, isEmployeeOnly, myId, myCode, q, catFilter, statusFilter, nameOf]);
 
   const handleAddAsset = () => {
     const next: Record<string, string | undefined> = {};
@@ -271,12 +284,20 @@ function AssetsPage() {
   return (
     <>
       <PageHeader
-        title="AssetFlow"
-        description="Unified hardware, peripherals, mobile devices, access cards, and SaaS licenses asset management."
+        title={isEmployeeOnly ? "My Work Equipment" : "AssetFlow"}
+        description={
+          isEmployeeOnly
+            ? `Hardware, peripherals, and software licenses issued to ${me?.name || persona.name}`
+            : "Unified hardware, peripherals, mobile devices, access cards, and SaaS licenses asset management."
+        }
         actions={
-          canManage && (
+          canManage ? (
             <Button onClick={() => setAddOpen(true)}>
               <Plus className="mr-2 size-4" /> Add Asset
+            </Button>
+          ) : (
+            <Button asChild variant="outline">
+              <Link to="/app/asset-requests">Request New Device</Link>
             </Button>
           )
         }

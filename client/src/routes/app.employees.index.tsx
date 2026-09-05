@@ -11,7 +11,14 @@ import {
   UserCheck,
   UserMinus,
   Users,
+  KeyRound,
+  Mail,
+  Copy,
+  Check,
+  Send,
+  ShieldCheck,
 } from "lucide-react";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -61,6 +68,9 @@ const emptyForm = {
   employmentType: "Full-time" as Employee["employmentType"],
   ctc: "",
   joinedOn: new Date().toISOString().slice(0, 10),
+  role: "employee",
+  autoProvision: true,
+  customPassword: "",
 };
 
 function EmployeesPage() {
@@ -74,6 +84,7 @@ function EmployeesPage() {
   const [typeFilter, setTypeFilter] = useState("all");
 
   const [addOpen, setAddOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
@@ -89,7 +100,88 @@ function EmployeesPage() {
 
   const [deactivateTarget, setDeactivateTarget] = useState<Employee | null>(null);
 
-  const canEdit = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const canEdit = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
+  const isHR = role === "hr_manager" || role === "admin";
+
+  const [provisionTarget, setProvisionTarget] = useState<Employee | null>(null);
+  const [provisionRole, setProvisionRole] = useState<string>("employee");
+  const [customPassword, setCustomPassword] = useState<string>("");
+  const [provisionLoading, setProvisionLoading] = useState(false);
+  const [provisionResult, setProvisionResult] = useState<{
+    credentials: { email: string; temporaryPassword: string; loginUrl: string };
+    emailDispatched: boolean;
+    previewUrl?: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const [emailsDialogOpen, setEmailsDialogOpen] = useState(false);
+  const [dispatchedEmails, setDispatchedEmails] = useState<
+    Array<{
+      id: string;
+      to: string;
+      subject: string;
+      employeeName: string;
+      role: string;
+      temporaryPassword: string;
+      sentAt: string;
+    }>
+  >([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+
+  const handleOpenProvision = (emp: Employee) => {
+    setProvisionTarget(emp);
+    setProvisionRole("employee");
+    setCustomPassword("");
+    setProvisionResult(null);
+    setCopied(false);
+  };
+
+  const handleExecuteProvision = async () => {
+    if (!provisionTarget) return;
+    setProvisionLoading(true);
+    try {
+      const res = await api.auth.provisionUser(
+        {
+          employeeId: provisionTarget.id,
+          email: provisionTarget.email,
+          role: provisionRole,
+          customPassword: customPassword.trim() || undefined,
+        },
+        role,
+      );
+      setProvisionResult(res);
+      log(`Provisioned user account for ${provisionTarget.name} (${provisionRole}) and sent credentials email`, "Auth");
+      toast.success("User account created and credentials dispatched!", {
+        description: `Login details emailed to ${provisionTarget.email}`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to provision user";
+      toast.error(msg);
+    } finally {
+      setProvisionLoading(false);
+    }
+  };
+
+  const handleLoadDispatchedEmails = async () => {
+    setEmailsDialogOpen(true);
+    setLoadingEmails(true);
+    try {
+      const emails = await api.auth.getDispatchedEmails(role);
+      setDispatchedEmails(emails);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load emails";
+      toast.error(msg);
+    } finally {
+      setLoadingEmails(false);
+    }
+  };
+
+  const copyPassword = (pwd: string) => {
+    navigator.clipboard.writeText(pwd);
+    setCopied(true);
+    toast.success("Temporary password copied to clipboard");
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const departments = useMemo(() => Array.from(new Set(employees.map((e) => e.department))).sort(), [employees]);
 
@@ -106,7 +198,7 @@ function EmployeesPage() {
     );
   }, [employees, dept, status, typeFilter, q]);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const next: Record<string, string | undefined> = {};
     if (form.name.trim().length < 3) next["name"] = "Enter the full name.";
     if (!/^\S+@\S+\.\S+$/.test(form.email)) next["email"] = "Enter a valid work email.";
@@ -116,86 +208,121 @@ function EmployeesPage() {
     setErrors(next);
     if (Object.keys(next).length) return;
 
-    const id = `E${1013 + employees.length}`;
-    const code = `PP-${1013 + employees.length}`;
+    setCreateLoading(true);
+    try {
+      const res = await api.employees.create({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        department: form.department,
+        designation: form.designation.trim(),
+        location: form.location,
+        manager: form.manager,
+        employmentType: form.employmentType,
+        joinedOn: form.joinedOn,
+        ctc: Number(form.ctc),
+        role: form.role,
+        autoProvision: form.autoProvision,
+        customPassword: form.customPassword.trim() || undefined,
+      });
 
-    const emp: Employee = {
-      id,
-      code,
-      name: form.name.trim(),
-      email: form.email.trim(),
-      phone: "+91 98000 12345",
-      department: form.department,
-      designation: form.designation.trim(),
-      location: form.location,
-      manager: form.manager,
-      employmentType: form.employmentType,
-      status: "onboarding",
-      joinedOn: form.joinedOn,
-      ctc: Number(form.ctc),
-      bankAccount: "Pending",
-      pan: "Pending",
-      leaveBalance: 12,
-    };
+      const emp: Employee = {
+        id: res.id,
+        code: res.code,
+        name: res.name,
+        email: res.email,
+        phone: res.phone || "+91 98000 12345",
+        department: res.department,
+        designation: res.designation,
+        location: form.location,
+        manager: res.manager,
+        employmentType: (res.employmentType as Employee["employmentType"]) || form.employmentType,
+        status: (res.status as EmployeeStatus) || "active",
+        joinedOn: res.joinedOn,
+        ctc: res.ctc,
+        bankAccount: "Pending",
+        pan: "Pending",
+        leaveBalance: 12,
+      };
 
-    addEmployee(emp);
+      addEmployee(emp);
 
-    // 1. Create Onboarding record with 8 checklist items
-    const onCase = {
-      id: `ON-${200 + onboarding.length + 5}`,
-      employeeId: id,
-      startDate: form.joinedOn,
-      dueDate: new Date(new Date(form.joinedOn).setDate(new Date(form.joinedOn).getDate() + 14))
-        .toISOString()
-        .slice(0, 10),
-      buddy: form.manager,
-      assignedHr: "Sana Iqbal",
-      status: "Account Created" as const,
-      invitationSentDate: new Date().toISOString().slice(0, 10),
-      accountCreatedDate: new Date().toISOString().slice(0, 10),
-      tasks: [
-        { id: "t1", label: "Complete personal profile", owner: "Employee" as const, done: false, category: "Personal" },
-        { id: "t2", label: "Add emergency contact", owner: "Employee" as const, done: false, category: "Personal" },
-        { id: "t3", label: "Accept company policies", owner: "Employee" as const, done: false, category: "Compliance" },
-        { id: "t4", label: "Complete bank details", owner: "Payroll" as const, done: false, category: "Finance" },
-        { id: "t5", label: "Complete tax information", owner: "Payroll" as const, done: false, category: "Finance" },
-        { id: "t6", label: "Review contract", owner: "HR" as const, done: false, category: "Legal" },
-        { id: "t7", label: "Attend orientation", owner: "HR" as const, done: false, category: "Orientation" },
-        { id: "t8", label: "Receive company assets", owner: "IT" as const, done: false, category: "IT" },
-      ],
-    };
-    update("onboarding", [onCase, ...onboarding]);
+      // 1. Create Onboarding record linked to real employee ID
+      const onCase = {
+        id: `ON-${200 + onboarding.length + 5}`,
+        employeeId: res.id,
+        startDate: form.joinedOn,
+        dueDate: new Date(new Date(form.joinedOn).setDate(new Date(form.joinedOn).getDate() + 14))
+          .toISOString()
+          .slice(0, 10),
+        buddy: form.manager,
+        assignedHr: "Sana Iqbal",
+        status: "Account Created" as const,
+        invitationSentDate: new Date().toISOString().slice(0, 10),
+        accountCreatedDate: new Date().toISOString().slice(0, 10),
+        tasks: [
+          { id: "t1", label: "Complete personal profile", owner: "Employee" as const, done: false, category: "Personal" },
+          { id: "t2", label: "Add emergency contact", owner: "Employee" as const, done: false, category: "Personal" },
+          { id: "t3", label: "Accept company policies", owner: "Employee" as const, done: false, category: "Compliance" },
+          { id: "t4", label: "Complete bank details", owner: "Payroll" as const, done: false, category: "Finance" },
+          { id: "t5", label: "Complete tax information", owner: "Payroll" as const, done: false, category: "Finance" },
+          { id: "t6", label: "Review contract", owner: "HR" as const, done: false, category: "Legal" },
+          { id: "t7", label: "Attend orientation", owner: "HR" as const, done: false, category: "Orientation" },
+          { id: "t8", label: "Receive company assets", owner: "IT" as const, done: false, category: "IT" },
+        ],
+      };
+      update("onboarding", [onCase, ...onboarding]);
 
-    // 2. Trigger automatic simulated account provisioning
-    const provRecord = {
-      id: `PRV-${Date.now().toString().slice(-4)}`,
-      employeeId: id,
-      employeeName: emp.name,
-      companyEmail: emp.email,
-      overallStatus: "Completed" as const,
-      invitationStatus: "Sent" as const,
-      accountActivated: false,
-      defaultPermissions: ["Self-service Workspace", "Leave Application", "Expense Claims", "Profile Access"],
-      startedAt: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-      completedAt: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-      steps: [
-        { step: 1, key: "record_created", label: "Employee record created in HRIS", status: "completed" as const },
-        { step: 2, key: "email_generated", label: `Company email generated (${emp.email})`, status: "completed" as const },
-        { step: 3, key: "invite_sent", label: "Activation email dispatched with secure invitation token", status: "completed" as const },
-        { step: 4, key: "account_activated", label: "Waiting for password setup", status: "in_progress" as const },
-        { step: 5, key: "permissions_assigned", label: "Standard Employee permissions assigned", status: "completed" as const },
-        { step: 6, key: "onboarding_started", label: "Onboarding checklist assigned", status: "completed" as const },
-      ],
-    };
-    update("provisioning", [provRecord, ...provisioning]);
+      // 2. Add Provisioning tracking
+      if (res.provision) {
+        const provRecord = {
+          id: `PRV-${Date.now().toString().slice(-4)}`,
+          employeeId: res.id,
+          employeeName: emp.name,
+          companyEmail: emp.email,
+          overallStatus: "Completed" as const,
+          invitationStatus: "Sent" as const,
+          accountActivated: false,
+          defaultPermissions: ["Self-service Workspace", "Leave Application", "Expense Claims", "Profile Access"],
+          startedAt: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          completedAt: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          steps: [
+            { step: 1, key: "record_created", label: "Employee record created in HRIS", status: "completed" as const },
+            { step: 2, key: "email_generated", label: `Company email generated (${emp.email})`, status: "completed" as const },
+            { step: 3, key: "invite_sent", label: "Activation email dispatched with secure invitation token", status: "completed" as const },
+            { step: 4, key: "account_activated", label: "Waiting for password setup", status: "in_progress" as const },
+            { step: 5, key: "permissions_assigned", label: "Standard Employee permissions assigned", status: "completed" as const },
+            { step: 6, key: "onboarding_started", label: "Onboarding checklist assigned", status: "completed" as const },
+          ],
+        };
+        update("provisioning", [provRecord, ...provisioning]);
+      }
 
-    log(`Added employee ${emp.name} (${code}) & initiated account provisioning`, "People");
-    toast.success(`${emp.name} added to directory`, {
-      description: "Company account provisioned & onboarding checklist initialized.",
-    });
+      log(`Added employee ${emp.name} (${res.code}) in database & sent credentials`, "People");
 
-    setForm(emptyForm);
-    setAddOpen(false);
+      if (res.provision?.previewUrl) {
+        toast.success(`${emp.name} added & credentials emailed!`, {
+          description: `Temporary password: ${res.provision.credentials.temporaryPassword}`,
+          action: {
+            label: "Open Email",
+            onClick: () => window.open(res.provision!.previewUrl, "_blank"),
+          },
+        });
+      } else if (res.provision) {
+        toast.success(`${emp.name} created & credentials dispatched!`, {
+          description: `Password: ${res.provision.credentials.temporaryPassword}`,
+        });
+      } else {
+        toast.success(`${emp.name} created in database`);
+      }
+
+      setForm(emptyForm);
+      setAddOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create employee";
+      toast.error(msg);
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
   const openEdit = (emp: Employee) => {
@@ -210,28 +337,48 @@ function EmployeesPage() {
     });
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editTarget) return;
-    patchEmployee(editTarget.id, {
-      designation: editForm.designation.trim(),
-      department: editForm.department,
-      manager: editForm.manager,
-      location: editForm.location,
-      ctc: Number(editForm.ctc) || editTarget.ctc,
-      status: editForm.status,
-    });
-    log(`Updated employee profile for ${editTarget.name}`, "People");
-    toast.success("Employee record updated");
-    setEditTarget(null);
+    try {
+      await api.employees.patch(editTarget.id, {
+        designation: editForm.designation.trim(),
+        department: editForm.department,
+        manager: editForm.manager,
+        location: editForm.location,
+        ctc: Number(editForm.ctc) || editTarget.ctc,
+        status: editForm.status,
+      });
+
+      patchEmployee(editTarget.id, {
+        designation: editForm.designation.trim(),
+        department: editForm.department,
+        manager: editForm.manager,
+        location: editForm.location,
+        ctc: Number(editForm.ctc) || editTarget.ctc,
+        status: editForm.status,
+      });
+      log(`Updated employee profile for ${editTarget.name}`, "People");
+      toast.success("Employee record updated in database");
+      setEditTarget(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update employee";
+      toast.error(msg);
+    }
   };
 
-  const handleToggleActive = () => {
+  const handleToggleActive = async () => {
     if (!deactivateTarget) return;
     const nextStatus = deactivateTarget.status === "exited" ? "active" : "exited";
-    patchEmployee(deactivateTarget.id, { status: nextStatus });
-    log(`Changed status of ${deactivateTarget.name} to ${nextStatus}`, "People");
-    toast.success(`${deactivateTarget.name} marked as ${nextStatus}`);
-    setDeactivateTarget(null);
+    try {
+      await api.employees.patch(deactivateTarget.id, { status: nextStatus });
+      patchEmployee(deactivateTarget.id, { status: nextStatus });
+      log(`Changed status of ${deactivateTarget.name} to ${nextStatus}`, "People");
+      toast.success(`${deactivateTarget.name} marked as ${nextStatus}`);
+      setDeactivateTarget(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update status";
+      toast.error(msg);
+    }
   };
 
   return (
@@ -251,6 +398,11 @@ function EmployeesPage() {
             >
               <Download className="mr-2 size-4" /> Export
             </Button>
+            {isHR && (
+              <Button variant="outline" onClick={handleLoadDispatchedEmails}>
+                <Mail className="mr-2 size-4" /> Dispatched Emails
+              </Button>
+            )}
             {canEdit && (
               <Button onClick={() => setAddOpen(true)}>
                 <Plus className="mr-2 size-4" /> Add employee
@@ -392,6 +544,18 @@ function EmployeesPage() {
                               <Eye className="size-3.5" />
                             </Link>
                           </Button>
+
+                          {isHR && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10"
+                              onClick={() => handleOpenProvision(e)}
+                              title="Provision Login Account & Email Credentials"
+                            >
+                              <KeyRound className="size-3.5" />
+                            </Button>
+                          )}
 
                           {canEdit && (
                             <>
@@ -545,13 +709,43 @@ function EmployeesPage() {
                 />
               </Field>
             </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+              <Field label="System Role & Permissions">
+                <Select
+                  value={form.role}
+                  onValueChange={(v) => setForm({ ...form, role: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employee">Employee (Self-Service)</SelectItem>
+                    <SelectItem value="hr_manager">HR Manager (Full HR/People)</SelectItem>
+                    <SelectItem value="payroll_manager">Payroll Manager (Full Payroll/Salary)</SelectItem>
+                    <SelectItem value="payroll_user">Payroll Officer (Read Payroll)</SelectItem>
+                    <SelectItem value="admin">System Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field label="Initial Password (Optional)">
+                <Input
+                  placeholder="Auto-generate secure key"
+                  value={form.customPassword}
+                  onChange={(e) => setForm({ ...form, customPassword: e.target.value })}
+                />
+              </Field>
+            </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreate}>Provision Employee</Button>
+            <Button onClick={handleCreate} disabled={createLoading}>
+              {createLoading ? "Creating & Provisioning..." : "Create & Provision Employee"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -669,6 +863,193 @@ function EmployeesPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Provision Account & Email Credentials Dialog */}
+      {provisionTarget && (
+        <Dialog open={!!provisionTarget} onOpenChange={(o) => !o && setProvisionTarget(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-2 text-primary">
+                <ShieldCheck className="size-5" />
+                <DialogTitle>Provision Login Account</DialogTitle>
+              </div>
+              <DialogDescription>
+                Create a secure Better Auth account for <strong>{provisionTarget.name}</strong> and email their login credentials.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border bg-muted/40 p-3 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Work Email:</span>
+                  <span className="font-medium">{provisionTarget.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Department:</span>
+                  <span>{provisionTarget.department}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Designation:</span>
+                  <span>{provisionTarget.designation}</span>
+                </div>
+              </div>
+
+              {!provisionResult ? (
+                <>
+                  <Field label="Assigned System Role">
+                    <Select value={provisionRole} onValueChange={setProvisionRole}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="employee">Employee (Standard Workspace)</SelectItem>
+                        <SelectItem value="hr_manager">HR Manager (Full People Ops)</SelectItem>
+                        <SelectItem value="payroll_user">Payroll User (Read-only Payroll)</SelectItem>
+                        <SelectItem value="payroll_manager">Payroll Manager (Full Payroll CRUD)</SelectItem>
+                        <SelectItem value="it_asset_manager">IT Asset Manager (Assets & Inventory)</SelectItem>
+                        <SelectItem value="admin">Administrator (Full System Control)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field label="Temporary Password (optional)">
+                    <Input
+                      placeholder="Leave blank to auto-generate secure password"
+                      value={customPassword}
+                      onChange={(e) => setCustomPassword(e.target.value)}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      If left blank, a secure random key like <code>PP360!ABC123</code> will be created.
+                    </p>
+                  </Field>
+
+                  <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-primary leading-relaxed">
+                    📧 <strong>Automatic Delivery:</strong> As soon as you click provision, an official onboarding email containing the login credentials and workspace link will be sent to <strong>{provisionTarget.email}</strong>.
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-success/30 bg-success/10 p-4">
+                    <p className="text-sm font-semibold text-success flex items-center gap-1.5">
+                      <Check className="size-4" /> Account Provisioned &amp; Credentials Emailed!
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      An email was dispatched to <strong>{provisionResult.credentials.email}</strong>.
+                    </p>
+
+                    <div className="mt-3 rounded-md bg-background/80 p-2.5 border space-y-1.5 text-xs font-mono">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Email:</span>
+                        <span>{provisionResult.credentials.email}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Temp Password:</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-foreground">{provisionResult.credentials.temporaryPassword}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0"
+                            onClick={() => copyPassword(provisionResult.credentials.temporaryPassword)}
+                          >
+                            {copied ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {provisionResult.previewUrl && (
+                      <div className="mt-3 text-center">
+                        <a
+                          href={provisionResult.previewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                        >
+                          📬 Open Live Delivered Email in Webmail &rarr;
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              {!provisionResult ? (
+                <>
+                  <Button variant="outline" onClick={() => setProvisionTarget(null)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleExecuteProvision} disabled={provisionLoading}>
+                    <Send className="mr-2 size-4" />
+                    {provisionLoading ? "Provisioning & Emailing..." : "Provision & Email Credentials"}
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => setProvisionTarget(null)}>Done</Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dispatched Emails Audit Dialog */}
+      <Dialog open={emailsDialogOpen} onOpenChange={setEmailsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-primary">
+              <Mail className="size-5" />
+              <DialogTitle>Dispatched Credential Emails Log</DialogTitle>
+            </div>
+            <DialogDescription>
+              Audit trail of employee login credentials dispatched via email.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-96 overflow-y-auto py-2">
+            {loadingEmails ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">Loading email log...</div>
+            ) : dispatchedEmails.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No credentials emails recorded in this session yet. Provision an employee account to see the log here.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {dispatchedEmails.map((em) => (
+                  <div key={em.id} className="rounded-lg border p-3 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-sm">{em.employeeName}</span>
+                      <span className="text-muted-foreground font-mono">{em.sentAt.slice(0, 16).replace("T", " ")}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>To: <strong>{em.to}</strong></span>
+                      <span className="rounded bg-muted px-1.5 py-0.5 font-medium uppercase text-[10px]">{em.role}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between rounded bg-muted/60 px-2 py-1 font-mono">
+                      <span>Temp Password: <strong>{em.temporaryPassword}</strong></span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-5 px-1 text-[11px]"
+                        onClick={() => copyPassword(em.temporaryPassword)}
+                      >
+                        <Copy className="size-3 mr-1" /> Copy
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailsDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

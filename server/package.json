@@ -4,22 +4,33 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-  "dev": "tsx src/server.ts",
-  "test": "echo \"Error: no test specified\" && exit 1"
-},
+    "dev": "tsx watch src/server.ts",
+    "seed": "tsx src/seed.ts",
+    "prisma:generate": "node node_modules/.bin/prisma generate",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "overrides": {
+    "prisma": "6.19.3"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "6.19.3",
+    "@types/nodemailer": "^8.0.1",
+    "better-auth": "^1.7.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "nodemailer": "^10.0.0",
     "pg": "^8.23.0"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.22",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.1",
+    "prisma": "6.19.3",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }

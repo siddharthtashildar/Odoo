@@ -1,7 +1,6 @@
 export type Role =
   | "employee"
   | "hr_manager"
-  | "hr_user"
   | "payroll_user"
   | "payroll_manager"
   | "it_asset_manager"
@@ -10,7 +9,6 @@ export type Role =
 export const ROLE_LABELS: Record<Role, string> = {
   employee: "Employee",
   hr_manager: "HR Manager",
-  hr_user: "HR User",
   payroll_user: "Payroll User",
   payroll_manager: "Payroll Manager",
   it_asset_manager: "IT Asset Manager",
@@ -1858,7 +1856,7 @@ export const assetRequests: AssetRequest[] = [
 export const orgUsers: OrgUser[] = [
   { id: "U1", name: "Charmi Patel", email: "charmi.patel@peoplepay360.io", role: "employee", active: true },
   { id: "U2", name: "Sana Iqbal", email: "sana.iqbal@peoplepay360.io", role: "hr_manager", active: true },
-  { id: "U3", name: "Priya Deshmukh", email: "priya.deshmukh@peoplepay360.io", role: "hr_user", active: true },
+  { id: "U3", name: "Priya Deshmukh", email: "priya.deshmukh@peoplepay360.io", role: "hr_manager", active: true },
   { id: "U4", name: "Devika Rao", email: "devika.rao@peoplepay360.io", role: "payroll_user", active: true },
   { id: "U5", name: "Arjun Nair", email: "arjun.nair@peoplepay360.io", role: "payroll_manager", active: true },
   { id: "U6", name: "Neel Shah", email: "neel.shah@peoplepay360.io", role: "it_asset_manager", active: true },
@@ -1879,7 +1877,6 @@ export const auditLog: AuditEntry[] = [
 export const ROLE_PERSONA: Record<Role, { employeeId: string; name: string }> = {
   employee: { employeeId: "E1001", name: "Charmi Patel" },
   hr_manager: { employeeId: "E1003", name: "Sana Iqbal" },
-  hr_user: { employeeId: "E1007", name: "Priya Deshmukh" },
   payroll_user: { employeeId: "E1004", name: "Devika Rao" },
   payroll_manager: { employeeId: "E1005", name: "Arjun Nair" },
   it_asset_manager: { employeeId: "E1006", name: "Neel Shah" },

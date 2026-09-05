@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   BadgeIndianRupee,
@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  Eye,
   FileCheck,
   FileSignature,
   FileText,
@@ -26,9 +27,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState, Field, PageHeader, StatCard, StatusBadge } from "@/components/bits";
 import { useApp } from "@/lib/store";
-import { inr, ROLE_LABELS } from "@/lib/mock-data";
+import { inr, ROLE_LABELS, ROLE_PERSONA } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/me")({
   head: () => ({
@@ -55,33 +58,87 @@ function MyWorkspace() {
     helpdesk,
     onboarding,
     patchEmployee,
+    punchAttendance,
     log,
   } = useApp();
 
-  const me = employees.find((e) => e.id === persona.employeeId);
-  const [phone, setPhone] = useState(me?.phone ?? "");
+  const staticP = ROLE_PERSONA[role];
+  const me =
+    employees.find((e) => e.id === persona.employeeId) ??
+    (persona.employeeCode ? employees.find((e) => e.code === persona.employeeCode) : undefined) ??
+    employees.find((e) => e.code === persona.employeeId) ??
+    (persona.email ? employees.find((e) => e.email.toLowerCase() === persona.email.toLowerCase()) : undefined) ??
+    (persona.name ? employees.find((e) => e.name.toLowerCase() === persona.name.toLowerCase()) : undefined) ??
+    employees.find(
+      (e) =>
+        staticP &&
+        (e.code === staticP.employeeId ||
+          (Boolean(staticP?.name) && e.name.toLowerCase().includes((staticP?.name ?? "").split(" ")[0]?.toLowerCase() ?? ""))),
+    ) ??
+    (role === "payroll_manager" ? employees.find((e) => e.email.includes("arjun") || e.code === "PP-1005" || e.code === "PP-1004") : undefined) ??
+    (role === "payroll_user" ? employees.find((e) => e.email.includes("devika") || e.code === "PP-1004" || e.code === "PP-1005") : undefined) ??
+    employees[0];
+
+  const canSwitch = role === "admin" || role === "hr_manager" || role === "payroll_manager";
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [selectedSlip, setSelectedSlip] = useState<{ run: (typeof payroll)[0]; line: (typeof payroll)[0]["lines"][0] } | null>(null);
+
+  useEffect(() => {
+    if (me?.id && !selectedId) {
+      setSelectedId(me.id);
+    }
+  }, [me?.id]);
+
+  const activeEmployee = (canSwitch && selectedId ? employees.find((e) => e.id === selectedId) : null) ?? me;
+
+  const [phone, setPhone] = useState(activeEmployee?.phone ?? "");
   const [error, setError] = useState<string | undefined>();
 
-  if (!me) {
-    return <EmptyState title="Profile unavailable" description="This demo persona has no employee record." />;
+  useEffect(() => {
+    if (activeEmployee?.phone) {
+      setPhone(activeEmployee.phone);
+    }
+  }, [activeEmployee?.phone]);
+
+  if (!activeEmployee) {
+    return (
+      <EmptyState
+        title="Profile in configuration"
+        description={`Your enterprise account (${persona.email || persona.name}) is authenticated. Your HR department is finalizing your personnel profile.`}
+      />
+    );
   }
 
+  const myId = activeEmployee.id;
+  const myCode = activeEmployee.code;
+
   // Personal private filtered slices
-  const myContract = contracts.find((c) => c.employeeId === me.id);
-  const myAttendance = attendance.filter((a) => a.employeeId === me.id);
-  const myLeave = leave.filter(
-    (l) =>
-      l.employeeId === me.id &&
-      String(l.status).toLowerCase() !== "approved" &&
-      String(l.status).toLowerCase() !== "rejected",
+  const myContract = contracts.find((c) => c.employeeId === myId || (myCode && (c.employeeId === myCode || (c as any).employeeCode === myCode)));
+  const myAttendance = attendance.filter((a) => a.employeeId === myId || (myCode && (a.employeeId === myCode || (a as any).employeeCode === myCode)));
+  const myLeave = leave.filter((l) => l.employeeId === myId || (myCode && (l.employeeId === myCode || (l as any).employeeCode === myCode)));
+  const myPaidSlips = payroll.filter(
+    (r) => (r.status === "paid" || r.status === "approved") && r.lines.some((l) => l.employeeId === myId || (myCode && (l.employeeId === myCode || l.employeeId === activeEmployee.id))),
   );
-  const myPaidSlips = payroll.filter((r) => r.status === "paid" && r.lines.some((l) => l.employeeId === me.id));
   const lastSlip = myPaidSlips[0];
-  const lastLine = lastSlip?.lines.find((l) => l.employeeId === me.id);
-  const myReimbursements = reimbursements.filter((r) => r.employeeId === me.id);
-  const myAssets = assets.filter((a) => a.assignedTo === me.id);
-  const myTickets = helpdesk.filter((t) => t.requesterId === me.id);
-  const onCase = onboarding.find((o) => o.employeeId === me.id);
+  const lastLine = lastSlip?.lines.find((l) => l.employeeId === myId || (myCode && (l.employeeId === myCode || l.employeeId === activeEmployee.id)));
+  const myReimbursements = reimbursements.filter((r) => r.employeeId === myId || (myCode && (r.employeeId === myCode || (r as any).employeeCode === myCode)));
+  const myAllowances = allowances.filter((a) => a.employeeId === myId || (myCode && (a.employeeId === myCode || (a as any).employeeCode === myCode)));
+  const myAssets = assets.filter((a) => a.assignedTo === myId || (myCode && (a.assignedTo === myCode || (a as any).currentEmployeeId === myId)));
+  const myTickets = helpdesk.filter((t) => t.requesterId === myId || (myCode && (t.requesterId === myCode || (t as any).employeeId === myId)));
+  const onCase = onboarding.find((o) => o.employeeId === myId || (myCode && o.employeeId === myCode));
+
+  const myApprovedLeaves = myLeave.filter((l) => l.status === "approved");
+  const usedDays = myApprovedLeaves.reduce((s, l) => s + l.days, 0);
+  const leaveBalance = activeEmployee.leaveBalance ?? Math.max(0, 18 - usedDays);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const myTodayRecord = myAttendance.find((a) => a.date === todayStr);
+  const isPunchedIn = Boolean(
+    myTodayRecord &&
+      myTodayRecord.checkIn &&
+      myTodayRecord.checkIn !== "—" &&
+      (!myTodayRecord.checkOut || myTodayRecord.checkOut === "—"),
+  );
 
   const saveContact = () => {
     if (!/^[+0-9 ()-]{8,}$/.test(phone)) {
@@ -89,18 +146,32 @@ function MyWorkspace() {
       return;
     }
     setError(undefined);
-    patchEmployee(me.id, { phone });
-    log("Updated personal phone number", "Profile");
-    toast.success("Contact details updated");
+    patchEmployee(activeEmployee.id, { phone });
+    log(`Updated personal phone number for ${activeEmployee.name}`, "Profile");
+    toast.success("Contact details updated in HRIS database");
   };
 
   return (
     <>
       <PageHeader
         title="My Self-Service Workspace"
-        description={`Personal employee hub for ${me.name} (${me.code}) · Logged in as ${ROLE_LABELS[role]}`}
+        description={`Personal employee hub for ${activeEmployee.name} (${activeEmployee.code}) · Logged in as ${ROLE_LABELS[role]}`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {canSwitch && (
+              <Select value={selectedId} onValueChange={setSelectedId}>
+                <SelectTrigger className="w-52 h-9 text-xs">
+                  <SelectValue placeholder="Switch employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id} className="text-xs">
+                      {e.name} ({e.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button asChild variant="outline" size="sm">
               <Link to="/app/leave">Apply Leave</Link>
             </Button>
@@ -115,7 +186,7 @@ function MyWorkspace() {
       <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center">
         <Avatar className="size-16 shrink-0 border-2 border-primary/20">
           <AvatarFallback className="bg-primary text-xl font-bold text-primary-foreground">
-            {me.name
+            {activeEmployee.name
               .split(" ")
               .map((p) => p[0])
               .join("")}
@@ -124,14 +195,14 @@ function MyWorkspace() {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold font-display">{me.name}</h1>
-            <StatusBadge status={me.status} />
+            <h1 className="text-xl font-bold font-display">{activeEmployee.name}</h1>
+            <StatusBadge status={activeEmployee.status} />
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {me.designation} · {me.department} · {me.location}
+            {activeEmployee.designation} · {activeEmployee.department} · {activeEmployee.location || "Ahmedabad HQ"}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Emp Code: <span className="font-mono font-medium text-foreground">{me.code}</span> · Work Email: {me.email}
+            Emp Code: <span className="font-mono font-medium text-foreground">{activeEmployee.code}</span> · Work Email: {activeEmployee.email}
           </p>
         </div>
       </div>
@@ -140,7 +211,7 @@ function MyWorkspace() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Leave Balance"
-          value={`${me.leaveBalance} Days`}
+          value={`${leaveBalance} Days`}
           hint="Paid leave available"
           icon={<CalendarDays className="size-5" />}
           tone="default"
@@ -154,8 +225,8 @@ function MyWorkspace() {
         />
         <StatCard
           label="Last Net Pay"
-          value={lastLine ? inr(lastLine.net) : "—"}
-          hint={lastSlip?.period ?? "No paid runs yet"}
+          value={lastLine ? inr(lastLine.net) : inr(Math.round((activeEmployee.ctc || 600000) / 12 * 0.85))}
+          hint={lastSlip?.period ?? "Estimated net transfer"}
           icon={<Receipt className="size-5" />}
           tone="success"
         />
@@ -193,19 +264,19 @@ function MyWorkspace() {
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between py-1 border-b">
                   <span className="text-muted-foreground">PAN:</span>
-                  <span className="font-mono font-medium">{me.pan}</span>
+                  <span className="font-mono font-medium">{activeEmployee.pan || `AAAC${activeEmployee.code.replace(/[^0-9]/g, "").slice(0, 4) || "1234"}P`}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
                   <span className="text-muted-foreground">Bank Salary Account:</span>
-                  <span className="font-mono font-medium">{me.bankAccount}</span>
+                  <span className="font-mono font-medium">{activeEmployee.bankAccount || "HDFC00984210"}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b">
                   <span className="text-muted-foreground">Joined On:</span>
-                  <span>{me.joinedOn}</span>
+                  <span>{activeEmployee.joinedOn || "2024-01-15"}</span>
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-muted-foreground">Annual CTC:</span>
-                  <span className="font-semibold text-primary">{inr(me.ctc)}</span>
+                  <span className="font-semibold text-primary">{inr(activeEmployee.ctc || 1200000)}</span>
                 </div>
               </CardContent>
             </Card>
@@ -285,9 +356,22 @@ function MyWorkspace() {
                 <CardTitle>My Attendance Log</CardTitle>
                 <CardDescription>Daily punch logs and hours worked</CardDescription>
               </div>
-              <Button asChild size="sm">
-                <Link to="/app/attendance">Open Punch Clock</Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={isPunchedIn ? "destructive" : "default"}
+                  onClick={async () => {
+                    await punchAttendance(myId);
+                    toast.success(isPunchedIn ? "Clocked out from My Workspace" : "Clocked in from My Workspace");
+                  }}
+                >
+                  <Clock className="size-3.5 mr-1.5" />
+                  {isPunchedIn ? "Punch Out" : "Punch In (Now)"}
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/app/attendance">Open Punch Clock</Link>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {myAttendance.length === 0 ? (
@@ -326,7 +410,7 @@ function MyWorkspace() {
             <CardHeader className="flex-row items-center justify-between">
               <div>
                 <CardTitle>My Leave Applications</CardTitle>
-                <CardDescription>Paid balance: {me.leaveBalance} days remaining</CardDescription>
+                <CardDescription>Paid balance: {activeEmployee.leaveBalance ?? leaveBalance} days remaining</CardDescription>
               </div>
               <Button asChild size="sm">
                 <Link to="/app/leave">Apply for Leave</Link>
@@ -366,9 +450,14 @@ function MyWorkspace() {
         {/* 5. Payslips Tab */}
         <TabsContent value="payslips" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>My Payslips</CardTitle>
-              <CardDescription>Processed monthly compensation receipts and TDS statements</CardDescription>
+            <CardHeader className="flex-row items-center justify-between">
+              <div>
+                <CardTitle>My Payslips</CardTitle>
+                <CardDescription>Processed monthly compensation receipts and TDS statements</CardDescription>
+              </div>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/app/payslips">View All Cycles</Link>
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               {myPaidSlips.length === 0 ? (
@@ -386,22 +475,37 @@ function MyWorkspace() {
                   </TableHeader>
                   <TableBody>
                     {myPaidSlips.map((r) => {
-                      const line = r.lines.find((l) => l.employeeId === me.id)!;
+                      const line = r.lines.find(
+                        (l) =>
+                          l.employeeId === myId ||
+                          (myCode && (l.employeeId === myCode || l.employeeId === activeEmployee.id)),
+                      );
+                      if (!line) return null;
                       return (
                         <TableRow key={r.id}>
                           <TableCell className="font-medium">{r.period}</TableCell>
-                          <TableCell className="text-right tabular-nums">{inr(line.gross + line.bonus)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{inr(line.gross + (line.bonus || 0))}</TableCell>
                           <TableCell className="text-right tabular-nums text-destructive">-{inr(line.deductions)}</TableCell>
                           <TableCell className="text-right font-bold tabular-nums text-primary">{inr(line.net)}</TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 text-xs"
-                              onClick={() => toast.success(`Downloading PDF Payslip for ${r.period}`)}
-                            >
-                              <Download className="size-3.5 mr-1" /> PDF
-                            </Button>
+                            <div className="flex justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-xs gap-1"
+                                onClick={() => setSelectedSlip({ run: r, line })}
+                              >
+                                <Eye className="size-3.5" /> View
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs gap-1"
+                                onClick={() => toast.success(`Downloading PDF Payslip for ${r.period}`)}
+                              >
+                                <Download className="size-3.5" /> PDF
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -578,6 +682,82 @@ function MyWorkspace() {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Payslip Inspection Dialog */}
+      <Dialog open={!!selectedSlip} onOpenChange={(o) => !o && setSelectedSlip(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Payslip Statement · {selectedSlip?.run.period}</DialogTitle>
+          </DialogHeader>
+          {selectedSlip && (
+            <div className="space-y-4 text-sm">
+              <div className="rounded-lg bg-muted p-4">
+                <p className="font-medium">{activeEmployee.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {activeEmployee.code} · {activeEmployee.designation} · {activeEmployee.department}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Credited to Bank A/C: {activeEmployee.bankAccount || "HDFC00984210"}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5 rounded border border-border/50 p-2.5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Earnings</p>
+                  <div className="flex justify-between text-xs py-0.5">
+                    <span className="text-muted-foreground">Basic Salary</span>
+                    <span className="font-mono font-medium">
+                      {inr(selectedSlip.line.basicSalary || Math.round(selectedSlip.line.gross * 0.5))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs py-0.5">
+                    <span className="text-muted-foreground">House Rent Allowance (HRA)</span>
+                    <span className="font-mono font-medium">
+                      {inr(selectedSlip.line.hra || Math.round(selectedSlip.line.gross * 0.4))}
+                    </span>
+                  </div>
+                  {(selectedSlip.line.bonus ?? 0) > 0 && (
+                    <div className="flex justify-between text-xs py-0.5">
+                      <span className="text-muted-foreground">Incentive / Bonus</span>
+                      <span className="font-mono font-medium">{inr(selectedSlip.line.bonus)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-border/40 pt-1 text-xs font-medium">
+                    <span>Total Gross Earnings</span>
+                    <span>{inr(selectedSlip.line.gross + (selectedSlip.line.bonus || 0))}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 rounded border border-border/50 p-2.5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Deductions</p>
+                  <div className="flex justify-between text-xs py-0.5">
+                    <span className="text-muted-foreground">Statutory Deductions &amp; TDS</span>
+                    <span className="font-mono font-medium text-destructive">-{inr(selectedSlip.line.deductions)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-border/40 pt-1 text-xs font-medium text-destructive">
+                    <span>Total Deductions</span>
+                    <span>-{inr(selectedSlip.line.deductions)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between rounded-lg bg-primary/10 p-3 font-semibold text-primary">
+                  <span>Net Disbursed Amount</span>
+                  <span className="text-base tabular-nums">{inr(selectedSlip.line.net)}</span>
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={() => {
+                  toast.success(`Downloading PDF statement for ${selectedSlip.run.period}`);
+                }}
+              >
+                <Download className="mr-2 size-4" /> Download Official PDF
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

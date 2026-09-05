@@ -74,7 +74,7 @@ function OffboardingPage() {
   const [revokeTarget, setRevokeTarget] = useState<OffboardingCase | null>(null);
   const [completeTarget, setCompleteTarget] = useState<OffboardingCase | null>(null);
 
-  const canManage = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
+  const canManage = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
 
   const eligible = employees.filter(
     (e) => e.status !== "exited" && !offboarding.some((o) => o.employeeId === e.id),

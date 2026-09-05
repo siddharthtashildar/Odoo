@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { api } from "./api";
 import * as seed from "./mock-data";
 import type {
   AllowanceRecord,
@@ -21,9 +22,19 @@ import type {
   SalaryStructure,
 } from "./mock-data";
 
+export interface CurrentUser {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  employeeId?: string | null;
+  employeeCode?: string | null;
+}
+
 interface State {
   signedIn: boolean;
   role: Role;
+  currentUser: CurrentUser | null;
   employees: Employee[];
   onboarding: OnboardingCase[];
   offboarding: OffboardingCase[];
@@ -46,6 +57,7 @@ interface State {
 const initial: State = {
   signedIn: false,
   role: "hr_manager",
+  currentUser: null,
   employees: seed.employees,
   onboarding: seed.onboardingCases,
   offboarding: seed.offboardingCases,
@@ -67,8 +79,8 @@ const initial: State = {
 
 interface Store extends State {
   hydrated: boolean;
-  persona: { employeeId: string; name: string };
-  signIn: (role: Role) => void;
+  persona: { employeeId: string; employeeCode: string; name: string; email: string };
+  signIn: (role: Role, user?: Partial<CurrentUser>) => void;
   signOut: () => void;
   setRole: (role: Role) => void;
   log: (action: string, module: string) => void;
@@ -77,11 +89,14 @@ interface Store extends State {
   addEmployee: (e: Employee) => void;
   addContract: (c: Contract) => void;
   updateContract: (id: string, patch: Partial<Contract>) => void;
-  punchAttendance: (employeeId: string, status?: AttendanceRecord["status"]) => void;
+  punchAttendance: (employeeId: string, status?: AttendanceRecord["status"]) => Promise<void>;
   correctAttendance: (id: string, patch: Partial<AttendanceRecord>) => void;
-  submitReimbursement: (r: ReimbursementClaim) => void;
+  applyLeave: (req: LeaveRequest) => Promise<void>;
+  updateLeave: (id: string, patch: Partial<LeaveRequest>) => Promise<void>;
+  generatePayslips: (employeeId?: string) => Promise<void>;
+  submitReimbursement: (r: ReimbursementClaim) => Promise<void>;
   updateReimbursement: (id: string, patch: Partial<ReimbursementClaim>) => void;
-  addAllowance: (a: AllowanceRecord) => void;
+  addAllowance: (a: AllowanceRecord) => Promise<void>;
   updateAllowance: (id: string, patch: Partial<AllowanceRecord>) => void;
   createTicket: (t: HelpdeskTicket) => void;
   updateTicket: (id: string, patch: Partial<HelpdeskTicket>) => void;
@@ -96,39 +111,84 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial);
   const [hydrated, setHydrated] = useState(false);
 
+  // Fetch all data from the API on mount, fall back to seed data if server is down
+  useEffect(() => {
+    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
+
+    async function fetchAll() {
+      try {
+        const [empRes, conRes, attRes, leaveRes, payrollRes, structRes, recordsRes, reimRes, allowRes, assetRes, helpdeskRes] =
+          await Promise.allSettled([
+            fetch(`${API}/api/employees`).then((r) => r.json()),
+            fetch(`${API}/api/contracts`).then((r) => r.json()),
+            fetch(`${API}/api/attendance`).then((r) => r.json()),
+            fetch(`${API}/api/leave`).then((r) => r.json()),
+            fetch(`${API}/api/payroll`).then((r) => r.json()),
+            fetch(`${API}/api/salary/structures`).then((r) => r.json()),
+            fetch(`${API}/api/salary/records`).then((r) => r.json()),
+            fetch(`${API}/api/reimbursements`).then((r) => r.json()),
+            fetch(`${API}/api/allowances`).then((r) => r.json()),
+            fetch(`${API}/api/assets`).then((r) => r.json()),
+            fetch(`${API}/api/helpdesk`).then((r) => r.json()),
+          ]);
+
+        const ok = <T,>(res: PromiseSettledResult<{ success: boolean; data: T }>, fallback: T): T =>
+          res.status === "fulfilled" && res.value?.success ? res.value.data : fallback;
+
+        setState((s) => ({
+          ...s,
+          employees: ok(empRes, seed.employees) as State["employees"],
+          contracts: ok(conRes, seed.contracts) as State["contracts"],
+          attendance: ok(attRes, seed.attendanceRecords) as State["attendance"],
+          leave: ok(leaveRes, seed.leaveRequests) as State["leave"],
+          payroll: ok(payrollRes, seed.payrollRuns) as State["payroll"],
+          salaryStructures: ok(structRes, seed.salaryStructures) as State["salaryStructures"],
+          salaryRecords: ok(recordsRes, seed.salaryRecords) as State["salaryRecords"],
+          reimbursements: ok(reimRes, seed.reimbursements) as State["reimbursements"],
+          allowances: ok(allowRes, seed.allowances) as State["allowances"],
+          assets: ok(assetRes, seed.assets) as State["assets"],
+          helpdesk: ok(helpdeskRes, seed.helpdeskTickets) as State["helpdesk"],
+        }));
+      } catch (err) {
+        console.warn("[store] API unreachable — using seed data", err);
+      } finally {
+        setHydrated(true);
+      }
+    }
+
+    void fetchAll();
+  }, []);
+
+  // Persist role + signed-in status + currentUser to localStorage
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      const slim = { role: state.role, signedIn: state.signedIn, currentUser: state.currentUser };
+      localStorage.setItem(KEY, JSON.stringify(slim));
+    } catch {
+      /* ignore */
+    }
+  }, [state.role, state.signedIn, state.currentUser, hydrated]);
+
+  // Restore role and currentUser from localStorage on boot
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
-        const parsed = JSON.parse(raw);
-        setState({
-          ...initial,
-          ...parsed,
-          // Ensure new arrays exist even if stored state was from an older version
-          contracts: parsed.contracts?.length ? parsed.contracts : seed.contracts,
-          attendance: parsed.attendance?.length ? parsed.attendance : seed.attendanceRecords,
-          reimbursements: parsed.reimbursements?.length ? parsed.reimbursements : seed.reimbursements,
-          allowances: parsed.allowances?.length ? parsed.allowances : seed.allowances,
-          helpdesk: parsed.helpdesk?.length ? parsed.helpdesk : seed.helpdeskTickets,
-          provisioning: parsed.provisioning?.length ? parsed.provisioning : seed.provisioningRecords,
-          salaryRecords: parsed.salaryRecords?.length ? parsed.salaryRecords : seed.salaryRecords,
-          salaryStructures: parsed.salaryStructures?.length ? parsed.salaryStructures : seed.salaryStructures,
-        });
+        const parsed = JSON.parse(raw) as { role?: State["role"]; signedIn?: boolean; currentUser?: CurrentUser | null };
+        if (parsed.role) {
+          setState((s) => ({
+            ...s,
+            role: parsed.role!,
+            signedIn: parsed.signedIn ?? false,
+            currentUser: parsed.currentUser ?? null,
+          }));
+        }
       }
     } catch {
       /* ignore */
     }
-    setHydrated(true);
   }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      localStorage.setItem(KEY, JSON.stringify(state));
-    } catch {
-      /* ignore */
-    }
-  }, [state, hydrated]);
 
   const log = useCallback((action: string, module: string) => {
     setState((s) => ({
@@ -148,6 +208,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addContract = useCallback((c: Contract) => {
     setState((s) => ({ ...s, contracts: [c, ...s.contracts] }));
+    api.contracts
+      .create({
+        employeeId: c.employeeId,
+        contractType: c.contractType,
+        salary: c.salary,
+        startDate: c.startDate,
+        endDate: c.endDate || undefined,
+      })
+      .catch((err) => console.warn("[store] addContract sync error:", err));
   }, []);
 
   const updateContract = useCallback((id: string, patch: Partial<Contract>) => {
@@ -155,10 +224,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...s,
       contracts: s.contracts.map((c) => (c.id === id ? { ...c, ...patch } : c)),
     }));
+    api.contracts
+      .patch(id, patch as Record<string, unknown>)
+      .catch((err) => console.warn("[store] updateContract sync error:", err));
   }, []);
 
   const punchAttendance = useCallback(
-    (employeeId: string, customStatus?: AttendanceRecord["status"]) => {
+    async (employeeId: string, customStatus?: AttendanceRecord["status"]) => {
       const today = new Date().toISOString().slice(0, 10);
       const now = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
       setState((s) => {
@@ -187,6 +259,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return { ...s, attendance: [newPunch, ...s.attendance] };
         }
       });
+
+      try {
+        const res = (await api.attendance.create({ employeeId, status: customStatus ?? "Present", date: today })) as {
+          id: string;
+          employeeId: string;
+          employeeName: string;
+          date: string;
+          checkIn: string;
+          checkOut: string;
+          workingHours: number;
+          status: AttendanceRecord["status"];
+          location: "Office - Ahmedabad";
+          action: string;
+        };
+        if (res?.id) {
+          setState((s) => {
+            const hasExisting = s.attendance.some((a) => a.id === res.id || (a.employeeId === employeeId && a.date === today));
+            const syncedRecord: AttendanceRecord = {
+              id: res.id,
+              employeeId: res.employeeId,
+              date: res.date,
+              checkIn: res.checkIn,
+              checkOut: res.checkOut,
+              workingHours: res.workingHours,
+              status: res.status,
+              location: res.location,
+            };
+            if (hasExisting) {
+              return {
+                ...s,
+                attendance: s.attendance.map((a) => (a.id === res.id || (a.employeeId === employeeId && a.date === today) ? syncedRecord : a)),
+              };
+            }
+            return { ...s, attendance: [syncedRecord, ...s.attendance] };
+          });
+        }
+      } catch (err) {
+        console.warn("[store] punchAttendance sync error:", err);
+      }
     },
     [],
   );
@@ -196,10 +307,76 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...s,
       attendance: s.attendance.map((a) => (a.id === id ? { ...a, ...patch } : a)),
     }));
+    api.attendance
+      .patch(id, patch as Record<string, unknown>)
+      .catch((err) => console.warn("[store] correctAttendance sync error:", err));
   }, []);
 
-  const submitReimbursement = useCallback((r: ReimbursementClaim) => {
+  const applyLeave = useCallback(async (req: LeaveRequest) => {
+    setState((s) => ({ ...s, leave: [req, ...s.leave] }));
+    try {
+      const res = (await api.leave.create({
+        employeeId: req.employeeId,
+        leaveType: req.type,
+        startDate: req.from,
+        endDate: req.to,
+        days: req.days,
+        reason: req.reason,
+      })) as LeaveRequest;
+      if (res?.id) {
+        setState((s) => ({
+          ...s,
+          leave: s.leave.map((l) => (l.id === req.id ? { ...l, ...res } : l)),
+        }));
+      }
+    } catch (err) {
+      console.warn("[store] applyLeave sync error:", err);
+    }
+  }, []);
+
+  const updateLeave = useCallback(async (id: string, patch: Partial<LeaveRequest>) => {
+    setState((s) => ({
+      ...s,
+      leave: s.leave.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    }));
+    try {
+      await api.leave.patch(id, { status: patch.status });
+    } catch (err) {
+      console.warn("[store] updateLeave sync error:", err);
+    }
+  }, []);
+
+  const generatePayslips = useCallback(async (employeeId?: string) => {
+    try {
+      await api.payroll.generate({ employeeId });
+      const runs = await api.payroll.list();
+      if (Array.isArray(runs)) {
+        setState((s) => ({ ...s, payroll: runs as PayrollRun[] }));
+      }
+    } catch (err) {
+      console.warn("[store] generatePayslips sync error:", err);
+    }
+  }, []);
+
+  const submitReimbursement = useCallback(async (r: ReimbursementClaim) => {
     setState((s) => ({ ...s, reimbursements: [r, ...s.reimbursements] }));
+    try {
+      const res = (await api.reimbursements.create({
+        employeeId: r.employeeId,
+        categoryName: r.category,
+        expenseDate: r.submittedDate,
+        amount: r.amount,
+        description: r.description,
+      })) as ReimbursementClaim;
+      if (res?.id) {
+        setState((s) => ({
+          ...s,
+          reimbursements: s.reimbursements.map((item) => (item.id === r.id ? { ...item, ...res } : item)),
+        }));
+      }
+    } catch (err) {
+      console.warn("[store] submitReimbursement sync error:", err);
+    }
   }, []);
 
   const updateReimbursement = useCallback((id: string, patch: Partial<ReimbursementClaim>) => {
@@ -207,10 +384,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...s,
       reimbursements: s.reimbursements.map((r) => (r.id === id ? { ...r, ...patch } : r)),
     }));
+    api.reimbursements
+      .patch(id, {
+        approvalStatus: patch.approvalStatus,
+        status: patch.approvalStatus,
+      })
+      .catch((err) => console.warn("[store] updateReimbursement sync error:", err));
   }, []);
 
-  const addAllowance = useCallback((a: AllowanceRecord) => {
+  const addAllowance = useCallback(async (a: AllowanceRecord) => {
     setState((s) => ({ ...s, allowances: [a, ...s.allowances] }));
+    try {
+      const res = (await api.allowances.create({
+        employeeId: a.employeeId,
+        allowanceType: a.type,
+        amount: a.amount,
+        effectiveFrom: a.effectiveDate,
+        status: a.status === "approved" ? "active" : a.status || "pending",
+      })) as AllowanceRecord;
+      if (res?.id) {
+        setState((s) => ({
+          ...s,
+          allowances: s.allowances.map((item) => (item.id === a.id ? { ...item, ...res } : item)),
+        }));
+      }
+    } catch (err) {
+      console.warn("[store] addAllowance sync error:", err);
+    }
   }, []);
 
   const updateAllowance = useCallback((id: string, patch: Partial<AllowanceRecord>) => {
@@ -218,10 +418,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...s,
       allowances: s.allowances.map((a) => (a.id === id ? { ...a, ...patch } : a)),
     }));
+    api.allowances
+      .patch(id, {
+        status: patch.status,
+        amount: patch.amount,
+      })
+      .catch((err) => console.warn("[store] updateAllowance sync error:", err));
   }, []);
 
   const createTicket = useCallback((t: HelpdeskTicket) => {
     setState((s) => ({ ...s, helpdesk: [t, ...s.helpdesk] }));
+    api.helpdesk
+      .create({
+        employeeId: t.requesterId,
+        category: t.category,
+        priority: t.priority,
+        subject: t.subject,
+        description: t.description,
+      })
+      .catch((err) => console.warn("[store] createTicket sync error:", err));
   }, []);
 
   const updateTicket = useCallback((id: string, patch: Partial<HelpdeskTicket>) => {
@@ -231,6 +446,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         t.id === id ? { ...t, ...patch, updatedDate: new Date().toISOString().slice(0, 10) } : t,
       ),
     }));
+    api.helpdesk
+      .patch(id, patch as Record<string, unknown>)
+      .catch((err) => console.warn("[store] updateTicket sync error:", err));
   }, []);
 
   const addTicketComment = useCallback((ticketId: string, author: string, text: string) => {
@@ -245,13 +463,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       helpdesk: s.helpdesk.map((t) =>
         t.id === ticketId
           ? {
-              ...t,
-              comments: [...t.comments, comment],
-              updatedDate: new Date().toISOString().slice(0, 10),
-            }
+            ...t,
+            comments: [...t.comments, comment],
+            updatedDate: new Date().toISOString().slice(0, 10),
+          }
           : t,
       ),
     }));
+    api.helpdesk
+      .addComment(ticketId, { userId: author, comment: text })
+      .catch((err) => console.warn("[store] addTicketComment sync error:", err));
   }, []);
 
   const retryProvisioning = useCallback((id: string) => {
@@ -260,37 +481,90 @@ export function AppProvider({ children }: { children: ReactNode }) {
       provisioning: s.provisioning.map((p) =>
         p.id === id
           ? {
-              ...p,
-              overallStatus: "Completed",
-              invitationStatus: "Sent",
-              accountActivated: true,
-              steps: p.steps.map((st) => ({ ...st, status: "completed" as const })),
-            }
+            ...p,
+            overallStatus: "Completed",
+            invitationStatus: "Sent",
+            accountActivated: true,
+            steps: p.steps.map((st) => ({ ...st, status: "completed" as const })),
+          }
           : p,
       ),
     }));
   }, []);
 
+  const persona = useMemo(() => {
+    if (state.currentUser) {
+      const match = state.employees.find(
+        (e) =>
+          (state.currentUser?.employeeId && e.id === state.currentUser.employeeId) ||
+          (state.currentUser?.employeeCode && e.code === state.currentUser.employeeCode) ||
+          (state.currentUser?.email && e.email.toLowerCase() === state.currentUser.email.toLowerCase()) ||
+          (state.currentUser?.name && e.name.toLowerCase() === state.currentUser.name.toLowerCase()),
+      );
+      return {
+        employeeId: match?.id || state.currentUser.employeeId || state.currentUser.id,
+        employeeCode: match?.code || state.currentUser.employeeCode || "",
+        name: match?.name || state.currentUser.name || state.currentUser.email,
+        email: match?.email || state.currentUser.email,
+      };
+    }
+    const staticP = seed.ROLE_PERSONA[state.role];
+    const match = state.employees.find(
+      (e) =>
+        e.id === staticP?.employeeId ||
+        e.code === staticP?.employeeId ||
+        (Boolean(staticP?.name) && e.name.toLowerCase().includes((staticP?.name ?? "").split(" ")[0]?.toLowerCase() ?? "")) ||
+        (state.role === "payroll_manager" && (e.code === "PP-1005" || e.code === "PP-1004" || e.email.includes("arjun"))) ||
+        (state.role === "payroll_user" && (e.code === "PP-1004" || e.code === "PP-1005" || e.email.includes("devika"))),
+    );
+    return {
+      employeeId: match?.id || staticP?.employeeId || "E1001",
+      employeeCode: match?.code || staticP?.employeeId || "PP-1001",
+      name: match?.name || staticP?.name || "User",
+      email: match?.email || "",
+    };
+  }, [state.currentUser, state.role, state.employees]);
+
   const value = useMemo<Store>(
     () => ({
       ...state,
       hydrated,
-      persona: seed.ROLE_PERSONA[state.role] ?? { employeeId: "E1001", name: "Charmi Patel" },
-      signIn: (role) => setState((s) => ({ ...s, signedIn: true, role })),
-      signOut: () => setState((s) => ({ ...s, signedIn: false })),
+      persona,
+      signIn: (role, user) => {
+        const newUser: CurrentUser = {
+          id: user?.id || user?.email || "USR",
+          email: user?.email || "",
+          name: user?.name || user?.email || "User",
+          role,
+          employeeId: user?.employeeId ?? null,
+          employeeCode: user?.employeeCode ?? null,
+        };
+        setState((s) => ({ ...s, signedIn: true, role, currentUser: newUser }));
+      },
+      signOut: () => {
+        setState((s) => ({ ...s, signedIn: false, currentUser: null }));
+        try {
+          localStorage.removeItem(KEY);
+        } catch {}
+      },
       setRole: (role) => setState((s) => ({ ...s, role })),
       log,
       update: (key, val) => setState((s) => ({ ...s, [key]: val })),
-      patchEmployee: (id, patch) =>
+      patchEmployee: (id, patch) => {
         setState((s) => ({
           ...s,
           employees: s.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-        })),
+        }));
+        api.employees.patch(id, patch as Record<string, unknown>).catch((err) => console.warn("[store] patchEmployee sync error:", err));
+      },
       addEmployee: (e) => setState((s) => ({ ...s, employees: [e, ...s.employees] })),
       addContract,
       updateContract,
       punchAttendance,
       correctAttendance,
+      applyLeave,
+      updateLeave,
+      generatePayslips,
       submitReimbursement,
       updateReimbursement,
       addAllowance,
@@ -303,11 +577,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [
       state,
       hydrated,
+      persona,
       log,
       addContract,
       updateContract,
       punchAttendance,
       correctAttendance,
+      applyLeave,
+      updateLeave,
+      generatePayslips,
       submitReimbursement,
       updateReimbursement,
       addAllowance,
@@ -344,22 +622,24 @@ export function useDelayed(ms = 350) {
 }
 
 export const ROLE_ACCESS: Record<string, Role[]> = {
-  "/app/dashboard": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/me": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/employees": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/onboarding": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/offboarding": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/contracts": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/attendance": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/leave": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/payroll": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/payslips": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/reimbursement": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/allowance": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "hr_user", "payroll_user", "payroll_manager"],
-  "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "hr_user", "payroll_user", "payroll_manager"],
-  "/app/helpdesk": ["employee", "it_asset_manager", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/reports": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
+  "/app/dashboard": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/me": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/employees": ["hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/onboarding": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/offboarding": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/contracts": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/attendance": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/leave": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/payroll": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/salary": ["payroll_user", "payroll_manager", "admin"],
+  "/app/salary-structure": ["payroll_user", "payroll_manager", "admin"],
+  "/app/payslips": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/reimbursement": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/allowance": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
+  "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
+  "/app/helpdesk": ["employee", "it_asset_manager", "hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/reports": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/admin": ["admin"],
-  "/app/settings": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/settings": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
 };
