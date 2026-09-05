@@ -145,6 +145,25 @@ export const api = {
       request<{ runId: string; period: string; generatedCount: number }>("POST", "/api/payroll/generate", data ?? {}),
     patch: (id: string, data: Record<string, unknown>) =>
       request<{ id: string }>("PATCH", `/api/payroll/${id}`, data),
+    sendSingleEmail: (data: {
+      employeeId: string;
+      period: string;
+      gross: number;
+      net: number;
+      basic: number;
+      allowances: number;
+      deductions: number;
+    }) =>
+      request<{ message: string; previewUrl?: string }>("POST", "/api/payroll/send-single-email", data),
+    sendEmails: (id: string) =>
+      request<{ runId: string; sentCount: number; message: string }>("POST", `/api/payroll/${id}/send-emails`),
+    getValidationWarnings: () =>
+      request<{ warnings: Array<{ employeeId: string; employeeName: string; type: string; message: string }>; count: number }>(
+        "GET",
+        "/api/payroll/validation/warnings",
+      ),
+    delete: (id: string) =>
+      request<{ message: string }>("DELETE", `/api/payroll/${id}`),
   },
 
   // ── Salary ────────────────────────────────────────────────────────────────

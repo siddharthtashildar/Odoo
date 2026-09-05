@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
+import { downloadPayslipPDF, emailPayslipToEmployee } from "@/lib/payslip-exporter";
 import {
   calculatePayrollLine,
   inr,
@@ -522,9 +523,28 @@ function PayrollList() {
                                 size="sm"
                                 variant="ghost"
                                 className="h-8 px-2"
-                                onClick={() =>
-                                  toast.success(`Downloading PDF Payslip for ${emp?.name ?? line.employeeId}`)
-                                }
+                                onClick={() => {
+                                  if (!currentRun) return;
+                                  downloadPayslipPDF({
+                                    employeeName: emp?.name ?? line.employeeId,
+                                    employeeCode: emp?.code ?? line.employeeId,
+                                    department: emp?.department ?? "—",
+                                    designation: emp?.designation ?? "—",
+                                    bankAccount: emp?.bankAccount ?? "—",
+                                    pan: emp?.pan ?? "—",
+                                    period: currentRun.period,
+                                    basic: line.basicSalary,
+                                    hra: line.hra,
+                                    specialAllowance: line.specialAllowance,
+                                    bonus: line.bonus,
+                                    gross: line.gross + line.bonus,
+                                    pf: line.providentFund,
+                                    pt: line.professionalTax,
+                                    tds: line.incomeTax,
+                                    deductions: line.deductions,
+                                    net: line.net,
+                                  });
+                                }}
                                 title="Download payslip"
                               >
                                 <Download className="size-3.5" />
@@ -689,14 +709,63 @@ function PayrollList() {
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="gap-2">
               <Button
                 variant="outline"
                 onClick={() => {
-                  toast.success("Downloaded formal PDF payslip receipt");
+                  const emp = employees.find((e) => e.id === payslipModalLine.line.employeeId);
+                  downloadPayslipPDF({
+                    employeeName: emp?.name ?? payslipModalLine.line.employeeId,
+                    employeeCode: emp?.code ?? payslipModalLine.line.employeeId,
+                    department: emp?.department ?? "—",
+                    designation: emp?.designation ?? "—",
+                    bankAccount: emp?.bankAccount ?? "—",
+                    pan: emp?.pan ?? "—",
+                    period: payslipModalLine.run.period,
+                    basic: payslipModalLine.line.basicSalary,
+                    hra: payslipModalLine.line.hra,
+                    specialAllowance: payslipModalLine.line.specialAllowance,
+                    bonus: payslipModalLine.line.bonus,
+                    gross: payslipModalLine.line.gross + payslipModalLine.line.bonus,
+                    pf: payslipModalLine.line.providentFund,
+                    pt: payslipModalLine.line.professionalTax,
+                    tds: payslipModalLine.line.incomeTax,
+                    deductions: payslipModalLine.line.deductions,
+                    net: payslipModalLine.line.net,
+                  });
                 }}
               >
                 <Download className="mr-1.5 size-4" /> Download PDF
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const emp = employees.find((e) => e.id === payslipModalLine.line.employeeId);
+                  emailPayslipToEmployee(
+                    {
+                      employeeName: emp?.name ?? payslipModalLine.line.employeeId,
+                      employeeCode: emp?.code ?? payslipModalLine.line.employeeId,
+                      department: emp?.department ?? "—",
+                      designation: emp?.designation ?? "—",
+                      bankAccount: emp?.bankAccount ?? "—",
+                      pan: emp?.pan ?? "—",
+                      period: payslipModalLine.run.period,
+                      basic: payslipModalLine.line.basicSalary,
+                      hra: payslipModalLine.line.hra,
+                      specialAllowance: payslipModalLine.line.specialAllowance,
+                      bonus: payslipModalLine.line.bonus,
+                      gross: payslipModalLine.line.gross + payslipModalLine.line.bonus,
+                      pf: payslipModalLine.line.providentFund,
+                      pt: payslipModalLine.line.professionalTax,
+                      tds: payslipModalLine.line.incomeTax,
+                      deductions: payslipModalLine.line.deductions,
+                      net: payslipModalLine.line.net,
+                    },
+                    payslipModalLine.line.employeeId,
+                  );
+                }}
+              >
+                Email Payslip
               </Button>
               <Button onClick={() => setPayslipModalLine(null)}>Close</Button>
             </DialogFooter>

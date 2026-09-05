@@ -75,7 +75,7 @@ const emptyForm = () => ({
   applicableTo: "All" as SalaryStructure["applicableTo"],
   status: "draft" as SalaryStructureStatus,
   effectiveFrom: "",
-  components: [],
+  components: [] as SalaryComponent[],
 });
 
 function SalaryStructurePage() {
@@ -408,16 +408,17 @@ function SalaryStructurePage() {
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "earning")
                         .map(({ origIdx }) => {
-                          const c = form.components[origIdx];
+                          const item = form.components[origIdx];
+                          if (!item) return null;
                           return (
                             <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
                               <Input
                                 placeholder="e.g. Basic Salary, HRA, Transport Allowance"
-                                value={c.name}
+                                value={item.name}
                                 onChange={(e) => patchComponent(origIdx, { name: e.target.value })}
                                 className="flex-1 min-w-0 h-8 text-sm"
                               />
-                              <Select value={c.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
+                              <Select value={item.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
                                 <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="percent_of_basic">% of Basic</SelectItem>
@@ -427,8 +428,8 @@ function SalaryStructurePage() {
                               <Input
                                 type="number"
                                 min={0}
-                                placeholder={c.basis === "fixed" ? "₹ amount" : "%"}
-                                value={c.value || ""}
+                                placeholder={item.basis === "fixed" ? "₹ amount" : "%"}
+                                value={item.value || ""}
                                 onChange={(e) => patchComponent(origIdx, { value: Number(e.target.value) })}
                                 className="w-20 h-8 text-sm text-right"
                               />
@@ -473,16 +474,17 @@ function SalaryStructurePage() {
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "deduction")
                         .map(({ origIdx }) => {
-                          const c = form.components[origIdx];
+                          const item = form.components[origIdx];
+                          if (!item) return null;
                           return (
                             <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
                               <Input
                                 placeholder="e.g. Income Tax, PF, Professional Tax"
-                                value={c.name}
+                                value={item.name}
                                 onChange={(e) => patchComponent(origIdx, { name: e.target.value })}
                                 className="flex-1 min-w-0 h-8 text-sm"
                               />
-                              <Select value={c.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
+                              <Select value={item.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
                                 <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="percent_of_basic">% of Basic</SelectItem>
@@ -492,8 +494,8 @@ function SalaryStructurePage() {
                               <Input
                                 type="number"
                                 min={0}
-                                placeholder={c.basis === "fixed" ? "₹ amount" : "%"}
-                                value={c.value || ""}
+                                placeholder={item.basis === "fixed" ? "₹ amount" : "%"}
+                                value={item.value || ""}
                                 onChange={(e) => patchComponent(origIdx, { value: Number(e.target.value) })}
                                 className="w-20 h-8 text-sm text-right"
                               />

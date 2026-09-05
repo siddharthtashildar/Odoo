@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { resolveEmployee } from "../lib/resolve-employee";
+import { sendPayslipEmail } from "../lib/email";
 
 const router = Router();
 
@@ -271,6 +272,181 @@ router.patch("/:id", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: "Failed to update payroll run" });
+  }
+});
+
+// GET /api/payroll/validation-warnings — check employees for payroll readiness
+router.get("/validation/warnings", async (_req, res) => {
+  try {
+    const activeEmployees = await prisma.employees.findMany({
+      where: { status: "active" },
+      include: {
+        contracts: { where: { status: "active" }, take: 1 },
+      },
+    });
+
+    const warnings: Array<{ employeeId: string; employeeName: string; type: string; message: string }> = [];
+
+    const pendingLeaves = await prisma.leave_requests.count({ where: { status: "pending" } });
+    if (pendingLeaves > 0) {
+      warnings.push({
+        employeeId: "ALL",
+        employeeName: "System",
+        type: "leave",
+        message: `${pendingLeaves} leave request(s) are pending approval. Unapproved leaves may affect deductions.`,
+      });
+    }
+
+    for (const emp of activeEmployees) {
+      if (!emp.bank_account_number || emp.bank_account_number.trim() === "") {
+        warnings.push({
+          employeeId: emp.id,
+          employeeName: emp.full_name,
+          type: "bank",
+          message: `Missing bank account number for direct deposit`,
+        });
+      }
+
+      if (emp.contracts.length === 0) {
+        warnings.push({
+          employeeId: emp.id,
+          employeeName: emp.full_name,
+          type: "contract",
+          message: `No active employment contract found (fallback ₹6,00,000 CTC used)`,
+        });
+      }
+    }
+
+    res.json({ success: true, data: { warnings, count: warnings.length } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "Failed to compute validation warnings" });
+  }
+});
+
+// POST /api/payroll/:id/send-emails — bulk email payslips to employees
+router.post("/:id/send-emails", async (req, res) => {
+  try {
+    const run = await prisma.payroll_runs.findUnique({
+      where: { id: req.params.id },
+      include: {
+        payslips: {
+          include: {
+            employees: true,
+          },
+        },
+      },
+    });
+
+    if (!run) return res.status(404).json({ success: false, error: "Payroll run not found" });
+
+    let sentCount = 0;
+    const periodStr = `${run.period_year}-${String(run.period_month).padStart(2, "0")}`;
+
+    for (const slip of run.payslips) {
+      const emp = slip.employees;
+      if (!emp || !emp.email) continue;
+
+      const basic = Number(slip.basic_salary);
+      const gross = Number(slip.gross_salary);
+      const net = Number(slip.net_salary);
+      const allowances = Number(slip.allowances_total);
+      const deductions = Number(slip.deductions_total);
+
+      await sendPayslipEmail({
+        to: emp.email,
+        employeeName: emp.full_name,
+        period: periodStr,
+        gross,
+        net,
+        basic,
+        allowances,
+        deductions,
+      });
+
+      sentCount++;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        runId: run.id,
+        sentCount,
+        message: `Successfully dispatched payslip emails to ${sentCount} employee(s).`,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "Failed to send payslip emails" });
+  }
+});
+
+// POST /api/payroll/send-single-email — email payslip to a single employee
+router.post("/send-single-email", async (req, res) => {
+  try {
+    const { employeeId, period, gross, net, basic, allowances, deductions } = req.body as {
+      employeeId: string;
+      period: string;
+      gross: number;
+      net: number;
+      basic: number;
+      allowances: number;
+      deductions: number;
+    };
+
+    let email = "";
+    let name = "Employee";
+
+    const emp = await resolveEmployee(employeeId);
+    if (emp) {
+      email = emp.email;
+      name = emp.full_name;
+    }
+
+    if (!email) {
+      return res.status(400).json({ success: false, error: "Employee email not found" });
+    }
+
+    const result = await sendPayslipEmail({
+      to: email,
+      employeeName: name,
+      period: period || "Current Cycle",
+      gross: Number(gross || 0),
+      net: Number(net || 0),
+      basic: Number(basic || 0),
+      allowances: Number(allowances || 0),
+      deductions: Number(deductions || 0),
+    });
+
+    res.json({
+      success: true,
+      data: {
+        message: `Payslip email sent to ${name} (${email})`,
+        previewUrl: result.previewUrl,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "Failed to send single payslip email" });
+  }
+});
+
+// DELETE /api/payroll/:id — delete draft run
+router.delete("/:id", async (req, res) => {
+  try {
+    const run = await prisma.payroll_runs.findUnique({ where: { id: req.params.id } });
+    if (!run) return res.status(404).json({ success: false, error: "Not found" });
+    if (run.status !== "draft") {
+      return res.status(400).json({ success: false, error: "Only draft payroll runs can be deleted" });
+    }
+
+    await prisma.payslips.deleteMany({ where: { payroll_run_id: req.params.id } });
+    await prisma.payroll_runs.delete({ where: { id: req.params.id } });
+
+    res.json({ success: true, message: "Draft payroll run deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: "Failed to delete payroll run" });
   }
 });
 
