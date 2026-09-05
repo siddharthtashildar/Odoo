@@ -31,7 +31,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState, Field, PageHeader, StatCard, StatusBadge } from "@/components/bits";
 import { useApp } from "@/lib/store";
-import { inr, ROLE_LABELS, ROLE_PERSONA } from "@/lib/mock-data";
+import { inr, ROLE_LABELS } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/me")({
   head: () => ({
@@ -63,21 +63,14 @@ function MyWorkspace() {
     log,
   } = useApp();
 
-  const staticP = ROLE_PERSONA[role];
   const me =
     employees.find((e) => e.id === persona.employeeId) ??
     (persona.employeeCode ? employees.find((e) => e.code === persona.employeeCode) : undefined) ??
     employees.find((e) => e.code === persona.employeeId) ??
     (persona.email ? employees.find((e) => e.email.toLowerCase() === persona.email.toLowerCase()) : undefined) ??
     (persona.name ? employees.find((e) => e.name.toLowerCase() === persona.name.toLowerCase()) : undefined) ??
-    employees.find(
-      (e) =>
-        staticP &&
-        (e.code === staticP.employeeId ||
-          (Boolean(staticP?.name) && e.name.toLowerCase().includes((staticP?.name ?? "").split(" ")[0]?.toLowerCase() ?? ""))),
-    ) ??
-    (role === "payroll_manager" ? employees.find((e) => e.email.includes("arjun") || e.code === "PP-1005" || e.code === "PP-1004") : undefined) ??
-    (role === "payroll_user" ? employees.find((e) => e.email.includes("devika") || e.code === "PP-1004" || e.code === "PP-1005") : undefined) ??
+    (role === "payroll_manager" ? employees.find((e) => e.email.includes("arjun") || e.code === "PP-1004" || e.code === "PP-1005") : undefined) ??
+    (role === "payroll_user" ? employees.find((e) => e.email.includes("devika") || e.code === "PP-1005" || e.code === "PP-1004") : undefined) ??
     employees[0];
 
   const canSwitch = role === "admin" || role === "hr_manager" || role === "payroll_manager";

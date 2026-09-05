@@ -18,6 +18,8 @@ import assetsRouter from "./routes/assets";
 import helpdeskRouter from "./routes/helpdesk";
 import schedulesRouter from "./routes/schedules";
 import authRouter from "./routes/auth";
+import lifecycleRouter from "./routes/lifecycle";
+import adminRouter from "./routes/admin";
 
 const app = express();
 
@@ -62,6 +64,8 @@ app.use("/api/allowances", allowancesRouter);
 app.use("/api/assets", assetsRouter);
 app.use("/api/helpdesk", helpdeskRouter);
 app.use("/api/schedules", schedulesRouter);
+app.use("/api", lifecycleRouter);
+app.use("/api", adminRouter);
 
 // 404 handler
 app.use((_req, res) => {

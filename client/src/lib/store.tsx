@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "./api";
-import * as seed from "./mock-data";
 import type {
   AllowanceRecord,
   Asset,
@@ -60,24 +59,24 @@ const initial: State = {
   signedIn: false,
   role: "hr_manager",
   currentUser: null,
-  employees: seed.employees,
-  onboarding: seed.onboardingCases,
-  offboarding: seed.offboardingCases,
-  contracts: seed.contracts,
-  attendance: seed.attendanceRecords,
-  leave: seed.leaveRequests,
-  payroll: seed.payrollRuns,
-  reimbursements: seed.reimbursements,
-  allowances: seed.allowances,
-  helpdesk: seed.helpdeskTickets,
-  provisioning: seed.provisioningRecords,
-  assets: seed.assets,
-  assetRequests: seed.assetRequests,
-  users: seed.orgUsers,
-  audit: seed.auditLog,
-  salaryRecords: seed.salaryRecords,
-  salaryStructures: seed.salaryStructures,
-  schedules: seed.defaultSchedules,
+  employees: [],
+  onboarding: [],
+  offboarding: [],
+  contracts: [],
+  attendance: [],
+  leave: [],
+  payroll: [],
+  reimbursements: [],
+  allowances: [],
+  helpdesk: [],
+  provisioning: [],
+  assets: [],
+  assetRequests: [],
+  users: [],
+  audit: [],
+  salaryRecords: [],
+  salaryStructures: [],
+  schedules: [],
 };
 
 interface Store extends State {
@@ -105,6 +104,10 @@ interface Store extends State {
   updateTicket: (id: string, patch: Partial<HelpdeskTicket>) => void;
   addTicketComment: (ticketId: string, author: string, text: string) => void;
   retryProvisioning: (id: string) => void;
+  addAsset: (a: Asset) => Promise<void>;
+  updateAsset: (id: string, patch: Partial<Asset>) => Promise<void>;
+  addAssetRequest: (req: AssetRequest) => Promise<void>;
+  updateAssetRequest: (id: string, patch: Partial<AssetRequest> & { fulfilledAssetId?: string }) => Promise<void>;
   addSchedule: (s: WorkSchedule) => Promise<void>;
   updateSchedule: (id: string, patch: Partial<WorkSchedule>) => Promise<void>;
   deleteSchedule: (id: string) => Promise<void>;
@@ -118,48 +121,78 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial);
   const [hydrated, setHydrated] = useState(false);
 
-  // Fetch all data from the API on mount, fall back to seed data if server is down
+  // Fetch all data from the database API on mount
   useEffect(() => {
     const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
 
     async function fetchAll() {
       try {
-        const [empRes, conRes, attRes, leaveRes, payrollRes, structRes, recordsRes, reimRes, allowRes, assetRes, helpdeskRes, schedRes] =
-          await Promise.allSettled([
-            fetch(`${API}/api/employees`).then((r) => r.json()),
-            fetch(`${API}/api/contracts`).then((r) => r.json()),
-            fetch(`${API}/api/attendance`).then((r) => r.json()),
-            fetch(`${API}/api/leave`).then((r) => r.json()),
-            fetch(`${API}/api/payroll`).then((r) => r.json()),
-            fetch(`${API}/api/salary/structures`).then((r) => r.json()),
-            fetch(`${API}/api/salary/records`).then((r) => r.json()),
-            fetch(`${API}/api/reimbursements`).then((r) => r.json()),
-            fetch(`${API}/api/allowances`).then((r) => r.json()),
-            fetch(`${API}/api/assets`).then((r) => r.json()),
-            fetch(`${API}/api/helpdesk`).then((r) => r.json()),
-            fetch(`${API}/api/schedules`).then((r) => r.json()),
-          ]);
+        const [
+          empRes,
+          conRes,
+          attRes,
+          leaveRes,
+          payrollRes,
+          structRes,
+          recordsRes,
+          reimRes,
+          allowRes,
+          assetRes,
+          assetReqRes,
+          helpdeskRes,
+          schedRes,
+          onbRes,
+          offRes,
+          prvRes,
+          usrRes,
+          audRes,
+        ] = await Promise.allSettled([
+          fetch(`${API}/api/employees`).then((r) => r.json()),
+          fetch(`${API}/api/contracts`).then((r) => r.json()),
+          fetch(`${API}/api/attendance`).then((r) => r.json()),
+          fetch(`${API}/api/leave`).then((r) => r.json()),
+          fetch(`${API}/api/payroll`).then((r) => r.json()),
+          fetch(`${API}/api/salary/structures`).then((r) => r.json()),
+          fetch(`${API}/api/salary/records`).then((r) => r.json()),
+          fetch(`${API}/api/reimbursements`).then((r) => r.json()),
+          fetch(`${API}/api/allowances`).then((r) => r.json()),
+          fetch(`${API}/api/assets`).then((r) => r.json()),
+          fetch(`${API}/api/assets/requests`).then((r) => r.json()),
+          fetch(`${API}/api/helpdesk`).then((r) => r.json()),
+          fetch(`${API}/api/schedules`).then((r) => r.json()),
+          fetch(`${API}/api/onboarding`).then((r) => r.json()),
+          fetch(`${API}/api/offboarding`).then((r) => r.json()),
+          fetch(`${API}/api/provisioning`).then((r) => r.json()),
+          fetch(`${API}/api/users`).then((r) => r.json()),
+          fetch(`${API}/api/audit`).then((r) => r.json()),
+        ]);
 
         const ok = <T,>(res: PromiseSettledResult<{ success: boolean; data: T }>, fallback: T): T =>
-          res.status === "fulfilled" && res.value?.success ? res.value.data : fallback;
+          res.status === "fulfilled" && res.value?.success && Array.isArray(res.value.data) ? res.value.data : fallback;
 
         setState((s) => ({
           ...s,
-          employees: ok(empRes, seed.employees) as State["employees"],
-          contracts: ok(conRes, seed.contracts) as State["contracts"],
-          attendance: ok(attRes, seed.attendanceRecords) as State["attendance"],
-          leave: ok(leaveRes, seed.leaveRequests) as State["leave"],
-          payroll: ok(payrollRes, seed.payrollRuns) as State["payroll"],
-          salaryStructures: ok(structRes, seed.salaryStructures) as State["salaryStructures"],
-          salaryRecords: ok(recordsRes, seed.salaryRecords) as State["salaryRecords"],
-          reimbursements: ok(reimRes, seed.reimbursements) as State["reimbursements"],
-          allowances: ok(allowRes, seed.allowances) as State["allowances"],
-          assets: ok(assetRes, seed.assets) as State["assets"],
-          helpdesk: ok(helpdeskRes, seed.helpdeskTickets) as State["helpdesk"],
-          schedules: ok(schedRes, seed.defaultSchedules) as State["schedules"],
+          employees: ok(empRes, []) as State["employees"],
+          contracts: ok(conRes, []) as State["contracts"],
+          attendance: ok(attRes, []) as State["attendance"],
+          leave: ok(leaveRes, []) as State["leave"],
+          payroll: ok(payrollRes, []) as State["payroll"],
+          salaryStructures: ok(structRes, []) as State["salaryStructures"],
+          salaryRecords: ok(recordsRes, []) as State["salaryRecords"],
+          reimbursements: ok(reimRes, []) as State["reimbursements"],
+          allowances: ok(allowRes, []) as State["allowances"],
+          assets: ok(assetRes, []) as State["assets"],
+          assetRequests: ok(assetReqRes, []) as State["assetRequests"],
+          helpdesk: ok(helpdeskRes, []) as State["helpdesk"],
+          schedules: ok(schedRes, []) as State["schedules"],
+          onboarding: ok(onbRes, []) as State["onboarding"],
+          offboarding: ok(offRes, []) as State["offboarding"],
+          provisioning: ok(prvRes, []) as State["provisioning"],
+          users: ok(usrRes, []) as State["users"],
+          audit: ok(audRes, []) as State["audit"],
         }));
       } catch (err) {
-        console.warn("[store] API unreachable — using seed data", err);
+        console.warn("[store] API unreachable", err);
       } finally {
         setHydrated(true);
       }
@@ -206,7 +239,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         {
           id: `L${Math.random().toString(36).slice(2, 8)}`,
           at: new Date().toISOString().slice(0, 16).replace("T", " "),
-          actor: seed.ROLE_PERSONA[s.role]?.name ?? "User",
+          actor: s.currentUser?.name ?? "User",
           action,
           module,
         },
@@ -435,37 +468,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .catch((err) => console.warn("[store] updateAllowance sync error:", err));
   }, []);
 
-  const createTicket = useCallback((t: HelpdeskTicket) => {
+  const createTicket = useCallback(async (t: HelpdeskTicket) => {
     setState((s) => ({ ...s, helpdesk: [t, ...s.helpdesk] }));
-    api.helpdesk
-      .create({
+    try {
+      await api.helpdesk.create({
         employeeId: t.requesterId,
         category: t.category,
         priority: t.priority,
         subject: t.subject,
         description: t.description,
-      })
-      .catch((err) => console.warn("[store] createTicket sync error:", err));
+      });
+      const res = await api.helpdesk.list();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, helpdesk: res as HelpdeskTicket[] }));
+      }
+    } catch (err) {
+      console.warn("[store] createTicket sync error:", err);
+    }
   }, []);
 
-  const updateTicket = useCallback((id: string, patch: Partial<HelpdeskTicket>) => {
+  const updateTicket = useCallback(async (id: string, patch: Partial<HelpdeskTicket>) => {
     setState((s) => ({
       ...s,
       helpdesk: s.helpdesk.map((t) =>
         t.id === id ? { ...t, ...patch, updatedDate: new Date().toISOString().slice(0, 10) } : t,
       ),
     }));
-    api.helpdesk
-      .patch(id, patch as Record<string, unknown>)
-      .catch((err) => console.warn("[store] updateTicket sync error:", err));
+    try {
+      await api.helpdesk.patch(id, patch as Record<string, unknown>);
+      const res = await api.helpdesk.list();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, helpdesk: res as HelpdeskTicket[] }));
+      }
+    } catch (err) {
+      console.warn("[store] updateTicket sync error:", err);
+    }
   }, []);
 
-  const addTicketComment = useCallback((ticketId: string, author: string, text: string) => {
+  const addTicketComment = useCallback(async (ticketId: string, author: string, text: string) => {
     const comment = {
       id: `c-${Date.now()}`,
       author,
       text,
-      at: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+      at: new Date().toISOString().slice(0, 16).replace("T", " "),
     };
     setState((s) => ({
       ...s,
@@ -479,9 +524,94 @@ export function AppProvider({ children }: { children: ReactNode }) {
           : t,
       ),
     }));
-    api.helpdesk
-      .addComment(ticketId, { userId: author, comment: text })
-      .catch((err) => console.warn("[store] addTicketComment sync error:", err));
+    try {
+      await api.helpdesk.addComment(ticketId, { userId: author, comment: text });
+      const res = await api.helpdesk.list();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, helpdesk: res as HelpdeskTicket[] }));
+      }
+    } catch (err) {
+      console.warn("[store] addTicketComment sync error:", err);
+    }
+  }, []);
+
+  const addAsset = useCallback(async (a: Asset) => {
+    setState((s) => ({ ...s, assets: [a, ...s.assets] }));
+    try {
+      await api.assets.create({
+        name: a.name,
+        tag: a.tag,
+        category: a.category,
+        serial: a.serial,
+        value: a.value,
+        location: a.location,
+        condition: a.condition,
+        status: a.status,
+        assignedTo: a.assignedTo,
+      });
+      const res = await api.assets.list();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, assets: res as Asset[] }));
+      }
+    } catch (err) {
+      console.warn("[store] addAsset sync error:", err);
+    }
+  }, []);
+
+  const updateAsset = useCallback(async (id: string, patch: Partial<Asset>) => {
+    setState((s) => ({
+      ...s,
+      assets: s.assets.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+    }));
+    try {
+      await api.assets.patch(id, patch as Record<string, unknown>);
+      const res = await api.assets.list();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, assets: res as Asset[] }));
+      }
+    } catch (err) {
+      console.warn("[store] updateAsset sync error:", err);
+    }
+  }, []);
+
+  const addAssetRequest = useCallback(async (req: AssetRequest) => {
+    setState((s) => ({ ...s, assetRequests: [req, ...s.assetRequests] }));
+    try {
+      await api.assets.createRequest({
+        employeeId: req.employeeId,
+        item: req.item,
+        category: req.category,
+        reason: req.justification,
+        requiredFrom: req.requiredFrom,
+        requiredUntil: req.requiredUntil,
+      });
+      const res = await api.assets.requests();
+      if (Array.isArray(res)) {
+        setState((prev) => ({ ...prev, assetRequests: res as AssetRequest[] }));
+      }
+    } catch (err) {
+      console.warn("[store] addAssetRequest sync error:", err);
+    }
+  }, []);
+
+  const updateAssetRequest = useCallback(async (id: string, patch: Partial<AssetRequest> & { fulfilledAssetId?: string }) => {
+    setState((s) => ({
+      ...s,
+      assetRequests: s.assetRequests.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+    try {
+      await api.assets.patchRequest(id, patch as Record<string, unknown>);
+      const [reqRes, astRes] = await Promise.all([api.assets.requests(), api.assets.list()]);
+      if (Array.isArray(reqRes)) {
+        setState((prev) => ({
+          ...prev,
+          assetRequests: reqRes as AssetRequest[],
+          ...(Array.isArray(astRes) ? { assets: astRes as Asset[] } : {}),
+        }));
+      }
+    } catch (err) {
+      console.warn("[store] updateAssetRequest sync error:", err);
+    }
   }, []);
 
   const retryProvisioning = useCallback((id: string) => {
@@ -578,20 +708,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         email: match?.email || state.currentUser.email,
       };
     }
-    const staticP = seed.ROLE_PERSONA[state.role];
-    const match = state.employees.find(
-      (e) =>
-        e.id === staticP?.employeeId ||
-        e.code === staticP?.employeeId ||
-        (Boolean(staticP?.name) && e.name.toLowerCase().includes((staticP?.name ?? "").split(" ")[0]?.toLowerCase() ?? "")) ||
-        (state.role === "payroll_manager" && (e.code === "PP-1005" || e.code === "PP-1004" || e.email.includes("arjun"))) ||
-        (state.role === "payroll_user" && (e.code === "PP-1004" || e.code === "PP-1005" || e.email.includes("devika"))),
-    );
+    const roleMatch = state.employees.find((e) => {
+      if (state.role === "hr_manager") return e.department?.toLowerCase().includes("people") || e.designation?.toLowerCase().includes("hr");
+      if (state.role === "payroll_manager") return e.designation?.toLowerCase().includes("payroll") || e.email.includes("arjun");
+      if (state.role === "payroll_user") return e.email.includes("devika") || e.department?.toLowerCase().includes("finance");
+      if (state.role === "it_asset_manager") return e.department?.toLowerCase().includes("it") || e.designation?.toLowerCase().includes("asset");
+      if (state.role === "admin") return e.email.includes("admin") || e.email.includes("siddharth");
+      return true;
+    }) || state.employees[0];
+
     return {
-      employeeId: match?.id || staticP?.employeeId || "E1001",
-      employeeCode: match?.code || staticP?.employeeId || "PP-1001",
-      name: match?.name || staticP?.name || "User",
-      email: match?.email || "",
+      employeeId: roleMatch?.id || "EMP-001",
+      employeeCode: roleMatch?.code || "PP-1001",
+      name: roleMatch?.name || (state.role === "admin" ? "Ops Admin" : "Employee"),
+      email: roleMatch?.email || "",
     };
   }, [state.currentUser, state.role, state.employees]);
 
@@ -643,6 +773,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateTicket,
       addTicketComment,
       retryProvisioning,
+      addAsset,
+      updateAsset,
+      addAssetRequest,
+      updateAssetRequest,
       addSchedule,
       updateSchedule,
       deleteSchedule,
@@ -668,6 +802,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateTicket,
       addTicketComment,
       retryProvisioning,
+      addAsset,
+      updateAsset,
+      addAssetRequest,
+      updateAssetRequest,
       addSchedule,
       updateSchedule,
       deleteSchedule,
@@ -686,7 +824,37 @@ export function useApp() {
 
 export function useEmployeeName() {
   const { employees } = useApp();
-  return useCallback((id: string) => employees.find((e) => e.id === id)?.name ?? "Unknown", [employees]);
+  return useCallback(
+    (id: string | undefined | null) => {
+      if (!id) return "Unassigned";
+      const str = String(id).trim();
+      if (!str) return "Unassigned";
+
+      // 1. Dual ID / code match in active store employees
+      const mappedCode = str.startsWith("E") ? str.replace(/^E/, "PP-") : str;
+      const mappedEId = str.startsWith("PP-") ? str.replace(/^PP-/, "E") : str;
+
+      const found = employees.find(
+        (e) =>
+          e.id === str ||
+          e.code === str ||
+          e.code === mappedCode ||
+          e.id === mappedEId ||
+          (e.id && str && e.id.toLowerCase() === str.toLowerCase()) ||
+          (e.email && e.email.toLowerCase() === str.toLowerCase()) ||
+          (e.name && e.name.toLowerCase() === str.toLowerCase()),
+      );
+      if (found?.name) return found.name;
+
+      // 3. If str is already a human name (contains space, not a UUID)
+      if (str.includes(" ") && !str.includes("-")) {
+        return str;
+      }
+
+      return str;
+    },
+    [employees],
+  );
 }
 
 /** Simulated async delay for loading states */

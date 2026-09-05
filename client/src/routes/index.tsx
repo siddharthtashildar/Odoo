@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Brand } from "@/components/app-shell";
 import { useApp } from "@/lib/store";
 import { api } from "@/lib/api";
-import { ROLE_LABELS, ROLE_PERSONA, type Role } from "@/lib/mock-data";
+import { ROLE_LABELS, type Role } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/")({
   head: () => ({

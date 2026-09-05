@@ -56,12 +56,12 @@ const emptyAssetForm = {
 };
 
 function AssetsPage() {
-  const { assets, employees, update, log, role, persona } = useApp();
+  const { assets, employees, addAsset, updateAsset, log, role, persona } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
 
   const isEmployeeOnly = role === "employee";
-  const canManage = role === "it_asset_manager" || role === "admin" || role === "hr_manager" || role === "payroll_manager" || role === "payroll_user";
+  const canManage = role === "it_asset_manager" || role === "admin" || role === "hr_manager";
 
   const me = employees.find(
     (e) =>
@@ -157,7 +157,7 @@ function AssetsPage() {
       ],
     };
 
-    update("assets", [newAsset, ...assets]);
+    addAsset(newAsset);
     log(`Added asset ${newAsset.tag} (${newAsset.name})`, "Assets");
     toast.success("Asset catalogued in AssetFlow", {
       description: `${newAsset.tag} · ${newAsset.name}`,
@@ -173,25 +173,10 @@ function AssetsPage() {
     }
     setAssignError(undefined);
 
-    const historyItem = {
-      date: new Date().toISOString().slice(0, 10),
-      action: `Assigned to ${nameOf(selectedAssignee)}`,
-      actor: persona.name,
-    };
-
-    update(
-      "assets",
-      assets.map((a) =>
-        a.id === assignTarget.id
-          ? {
-              ...a,
-              status: "Assigned",
-              assignedTo: selectedAssignee,
-              history: [...(a.history ?? []), historyItem],
-            }
-          : a,
-      ),
-    );
+    updateAsset(assignTarget.id, {
+      status: "Assigned",
+      assignedTo: selectedAssignee,
+    });
 
     log(`Assigned asset ${assignTarget.tag} to ${nameOf(selectedAssignee)}`, "Assets");
     toast.success("Asset assigned successfully", {
@@ -202,25 +187,10 @@ function AssetsPage() {
   };
 
   const handleReturnAsset = (asset: Asset) => {
-    const historyItem = {
-      date: new Date().toISOString().slice(0, 10),
-      action: `Returned by ${nameOf(asset.assignedTo ?? "")} to IT inventory`,
-      actor: persona.name,
-    };
-
-    update(
-      "assets",
-      assets.map((a) =>
-        a.id === asset.id
-          ? {
-              ...a,
-              status: "Available",
-              assignedTo: undefined,
-              history: [...(a.history ?? []), historyItem],
-            }
-          : a,
-      ),
-    );
+    updateAsset(asset.id, {
+      status: "Available",
+      assignedTo: undefined,
+    });
 
     log(`Checked in returned asset ${asset.tag}`, "Assets");
     toast.success("Asset checked into storage", {
@@ -234,25 +204,10 @@ function AssetsPage() {
       return;
     }
 
-    const historyItem = {
-      date: new Date().toISOString().slice(0, 10),
-      action: `Transferred from ${nameOf(transferTarget.assignedTo ?? "")} to ${nameOf(transferRecipient)}`,
-      actor: persona.name,
-    };
-
-    update(
-      "assets",
-      assets.map((a) =>
-        a.id === transferTarget.id
-          ? {
-              ...a,
-              status: "Assigned",
-              assignedTo: transferRecipient,
-              history: [...(a.history ?? []), historyItem],
-            }
-          : a,
-      ),
-    );
+    updateAsset(transferTarget.id, {
+      status: "Assigned",
+      assignedTo: transferRecipient,
+    });
 
     log(`Transferred asset ${transferTarget.tag} to ${nameOf(transferRecipient)}`, "Assets");
     toast.success("Asset transferred", {
@@ -263,25 +218,10 @@ function AssetsPage() {
   };
 
   const handleReportDamaged = (asset: Asset) => {
-    const historyItem = {
-      date: new Date().toISOString().slice(0, 10),
-      action: "Reported damaged / Sent for maintenance",
-      actor: persona.name,
-    };
-
-    update(
-      "assets",
-      assets.map((a) =>
-        a.id === asset.id
-          ? {
-              ...a,
-              status: "Under Maintenance",
-              condition: "Needs Service",
-              history: [...(a.history ?? []), historyItem],
-            }
-          : a,
-      ),
-    );
+    updateAsset(asset.id, {
+      status: "Under Maintenance",
+      condition: "Needs Service",
+    });
 
     log(`Marked asset ${asset.tag} under maintenance`, "Assets");
     toast.warning("Asset flagged for maintenance", {
@@ -311,37 +251,61 @@ function AssetsPage() {
         }
       />
 
-      {!isEmployeeOnly && (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Available in Stock"
-          value={availableCount}
-          hint="Ready for immediate allocation"
-          icon={<CheckCircle2 className="size-5" />}
-          tone="success"
-        />
-        <StatCard
-          label="Assigned to Staff"
-          value={assignedCount}
-          hint={`${assets.length} total items tracked`}
-          icon={<UserCheck className="size-5" />}
-          tone="default"
-        />
-        <StatCard
-          label="Under Maintenance"
-          value={maintenanceCount}
-          hint="Service / repair queue"
-          icon={<Wrench className="size-5" />}
-          tone="warning"
-        />
-        <StatCard
-          label="Total Portfolio Value"
-          value={inr(totalBookValue)}
-          hint="Book value on inventory"
-          icon={<Laptop className="size-5" />}
-          tone="accent"
-        />
-      </div>
+      {isEmployeeOnly ? (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard
+            label="My Issued Devices"
+            value={myAssets.length}
+            hint="Hardware currently in your custody"
+            icon={<Laptop className="size-5" />}
+            tone="default"
+          />
+          <StatCard
+            label="Equipment Value"
+            value={inr(totalBookValue)}
+            hint="Total assigned asset value"
+            icon={<CheckCircle2 className="size-5" />}
+            tone="accent"
+          />
+          <StatCard
+            label="Hardware Status"
+            value={myAssets.some((a) => a.status === "Under Maintenance") ? "Maintenance Active" : "Operational"}
+            hint="Active working condition"
+            icon={<UserCheck className="size-5" />}
+            tone="success"
+          />
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Available in Stock"
+            value={availableCount}
+            hint="Ready for immediate allocation"
+            icon={<CheckCircle2 className="size-5" />}
+            tone="success"
+          />
+          <StatCard
+            label="Assigned to Staff"
+            value={assignedCount}
+            hint={`${assets.length} total items tracked`}
+            icon={<UserCheck className="size-5" />}
+            tone="default"
+          />
+          <StatCard
+            label="Under Maintenance"
+            value={maintenanceCount}
+            hint="Service / repair queue"
+            icon={<Wrench className="size-5" />}
+            tone="warning"
+          />
+          <StatCard
+            label="Total Portfolio Value"
+            value={inr(totalBookValue)}
+            hint="Book value on inventory"
+            icon={<Laptop className="size-5" />}
+            tone="accent"
+          />
+        </div>
       )}
 
       <Card>
@@ -457,8 +421,10 @@ function AssetsPage() {
                         <TableCell>
                           {a.assignedTo ? (
                             <div>
-                              <p className="font-medium text-sm">{nameOf(a.assignedTo)}</p>
-                              <p className="text-xs text-muted-foreground">{a.assignedTo}</p>
+                              <p className="font-medium text-sm">
+                                {a.currentEmployeeName || nameOf(a.assignedTo)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{a.currentEmployeeCode || a.assignedTo}</p>
                             </div>
                           ) : (
                             <span className="text-xs text-muted-foreground italic">Unassigned (In Vault)</span>

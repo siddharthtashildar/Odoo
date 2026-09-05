@@ -69,7 +69,16 @@ const emptyComponent = (): SalaryComponent => ({
   value: 0,
 });
 
-const emptyForm = () => ({
+interface SalaryFormState {
+  name: string;
+  description: string;
+  applicableTo: SalaryStructure["applicableTo"];
+  status: SalaryStructureStatus;
+  effectiveFrom: string;
+  components: SalaryComponent[];
+}
+
+const emptyForm = (): SalaryFormState => ({
   name: "",
   description: "",
   applicableTo: "All" as SalaryStructure["applicableTo"],
@@ -83,7 +92,7 @@ function SalaryStructurePage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<SalaryStructure | null>(null);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState<SalaryFormState>(emptyForm());
   const [deleteTarget, setDeleteTarget] = useState<SalaryStructure | null>(null);
 
   const canAccess = role === "payroll_manager" || role === "payroll_user" || role === "admin";
@@ -407,8 +416,7 @@ function SalaryStructurePage() {
                       form.components
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "earning")
-                        .map(({ origIdx }) => {
-                          const c = form.components[origIdx];
+                        .map(({ c, origIdx }) => {
                           return (
                             <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
                               <Input
@@ -472,8 +480,7 @@ function SalaryStructurePage() {
                       form.components
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "deduction")
-                        .map(({ origIdx }) => {
-                          const c = form.components[origIdx];
+                        .map(({ c, origIdx }) => {
                           return (
                             <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
                               <Input

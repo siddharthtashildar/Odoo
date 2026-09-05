@@ -180,6 +180,10 @@ export const api = {
   // ── Assets ────────────────────────────────────────────────────────────────
   assets: {
     list: () => request<unknown[]>("GET", "/api/assets"),
+    create: (data: Record<string, unknown>) =>
+      request<{ id: string }>("POST", "/api/assets", data),
+    patch: (id: string, data: Record<string, unknown>) =>
+      request<{ id: string }>("PATCH", `/api/assets/${id}`, data),
     requests: (employeeId?: string) =>
       request<unknown[]>("GET", employeeId ? `/api/assets/requests?employeeId=${employeeId}` : "/api/assets/requests"),
     createRequest: (data: Record<string, unknown>) =>
