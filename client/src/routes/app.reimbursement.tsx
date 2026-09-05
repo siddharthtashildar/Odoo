@@ -122,7 +122,7 @@ function ReimbursementPage() {
     return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   }, [rows, page]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const next: Record<string, string | undefined> = {};
     if (!form.amount || Number(form.amount) <= 0) next["amount"] = "Enter a valid amount in ₹.";
     if (form.description.trim().length < 5) next["description"] = "Describe the business expense.";
@@ -143,7 +143,7 @@ function ReimbursementPage() {
       paymentMethod: form.paymentMethod,
     };
 
-    submitReimbursement(newClaim);
+    await submitReimbursement(newClaim);
     log(`Submitted expense claim ${newClaim.id} for ${inr(newClaim.amount)}`, "Reimbursements");
     toast.success("Expense claim submitted", {
       description: "Pending HR and Finance approval.",
@@ -153,24 +153,24 @@ function ReimbursementPage() {
     setSimulatedFile(null);
   };
 
-  const handleDecision = (
+  const handleDecision = async (
     claimId: string,
     approvalStatus: ReimbursementClaim["approvalStatus"],
   ) => {
-    updateReimbursement(claimId, { approvalStatus });
+    await updateReimbursement(claimId, { approvalStatus });
     log(`Updated claim ${claimId} status to ${approvalStatus}`, "Reimbursements");
     toast.success(`Claim status updated to ${approvalStatus}`);
     if (viewClaim?.id === claimId) {
-      setViewClaim({ ...viewClaim, approvalStatus });
+      setViewClaim((prev) => (prev ? { ...prev, approvalStatus } : null));
     }
   };
 
-  const handleMarkPaid = (claimId: string) => {
-    updateReimbursement(claimId, { paymentStatus: "paid" });
+  const handleMarkPaid = async (claimId: string) => {
+    await updateReimbursement(claimId, { paymentStatus: "paid" });
     log(`Marked claim ${claimId} as paid`, "Reimbursements");
     toast.success("Claim marked as disbursed / paid");
     if (viewClaim?.id === claimId) {
-      setViewClaim({ ...viewClaim, paymentStatus: "paid" });
+      setViewClaim((prev) => (prev ? { ...prev, paymentStatus: "paid" } : null));
     }
   };
 

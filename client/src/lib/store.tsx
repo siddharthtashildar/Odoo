@@ -403,35 +403,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const submitReimbursement = useCallback(async (r: ReimbursementClaim) => {
     setState((s) => ({ ...s, reimbursements: [r, ...s.reimbursements] }));
     try {
-      const res = (await api.reimbursements.create({
+      await api.reimbursements.create({
         employeeId: r.employeeId,
         categoryName: r.category,
         expenseDate: r.submittedDate,
         amount: r.amount,
         description: r.description,
-      })) as ReimbursementClaim;
-      if (res?.id) {
-        setState((s) => ({
-          ...s,
-          reimbursements: s.reimbursements.map((item) => (item.id === r.id ? { ...item, ...res } : item)),
-        }));
+      });
+      const list = await api.reimbursements.list();
+      if (Array.isArray(list)) {
+        setState((s) => ({ ...s, reimbursements: list as ReimbursementClaim[] }));
       }
     } catch (err) {
       console.warn("[store] submitReimbursement sync error:", err);
     }
   }, []);
 
-  const updateReimbursement = useCallback((id: string, patch: Partial<ReimbursementClaim>) => {
+  const updateReimbursement = useCallback(async (id: string, patch: Partial<ReimbursementClaim>) => {
     setState((s) => ({
       ...s,
       reimbursements: s.reimbursements.map((r) => (r.id === id ? { ...r, ...patch } : r)),
     }));
-    api.reimbursements
-      .patch(id, {
+    try {
+      await api.reimbursements.patch(id, {
         approvalStatus: patch.approvalStatus,
         status: patch.approvalStatus,
-      })
-      .catch((err) => console.warn("[store] updateReimbursement sync error:", err));
+        paymentStatus: patch.paymentStatus,
+      });
+      const list = await api.reimbursements.list();
+      if (Array.isArray(list)) {
+        setState((s) => ({ ...s, reimbursements: list as ReimbursementClaim[] }));
+      }
+    } catch (err) {
+      console.warn("[store] updateReimbursement sync error:", err);
+    }
   }, []);
 
   const addAllowance = useCallback(async (a: AllowanceRecord) => {
@@ -882,7 +887,6 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/salary-structure": ["payroll_user", "payroll_manager", "admin"],
   "/app/payslips": ["payroll_user", "payroll_manager", "admin"],
   "/app/reimbursement": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
-  "/app/allowance": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
   "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
   "/app/helpdesk": ["employee", "it_asset_manager", "hr_manager", "payroll_user", "payroll_manager", "admin"],
