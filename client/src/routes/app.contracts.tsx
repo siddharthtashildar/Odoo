@@ -67,11 +67,14 @@ function ContractsPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [viewContract, setViewContract] = useState<Contract | null>(null);
+  const [editContract, setEditContract] = useState<Contract | null>(null);
   const [renewContract, setRenewContract] = useState<Contract | null>(null);
   const [newEndDate, setNewEndDate] = useState("");
 
   const [form, setForm] = useState(emptyForm);
+  const [editForm, setEditForm] = useState<Partial<Contract>>({});
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  const [editErrors, setEditErrors] = useState<Record<string, string | undefined>>({});
 
   const canEdit = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user";
 
@@ -152,6 +155,33 @@ function ContractsPage() {
     });
     setRenewContract(null);
     setNewEndDate("");
+  };
+
+  const handleEditSave = () => {
+    if (!editContract) return;
+    const next: Record<string, string | undefined> = {};
+    if (!editForm.startDate) next["startDate"] = "Start date is required.";
+    if (!editForm.endDate) next["endDate"] = "End date is required.";
+    if (!editForm.salary || editForm.salary <= 0) next["salary"] = "Enter valid annual salary.";
+    if (editForm.startDate && editForm.endDate && editForm.endDate < editForm.startDate) {
+      next["endDate"] = "End date must be after start date.";
+    }
+    setEditErrors(next);
+    if (Object.keys(next).length) return;
+
+    updateContract(editContract.id, {
+      startDate: editForm.startDate || editContract.startDate,
+      endDate: editForm.endDate || editContract.endDate,
+      salary: editForm.salary || editContract.salary,
+      contractType: editForm.contractType || editContract.contractType,
+      department: editForm.department || editContract.department,
+      terms: editForm.terms || editContract.terms,
+      noticePeriodDays: editForm.noticePeriodDays || editContract.noticePeriodDays,
+    });
+    log(`Updated contract ${editContract.id}`, "Contracts");
+    toast.success("Contract updated successfully");
+    setEditContract(null);
+    setEditForm({});
   };
 
   const handleDownload = (c: Contract) => {
@@ -281,6 +311,86 @@ function ContractsPage() {
               icon={<FileSignature className="size-8" />}
             />
           ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Contract ID</TableHead>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Contract Type</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Start Date</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead className="text-right">Annual Salary</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((c) => {
+                    const isExpiring = c.status === "Expiring Soon";
+                    return (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-mono text-xs font-semibold text-primary">
+                          {c.id}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{nameOf(c.employeeId)}</div>
+                          <div className="text-xs text-muted-foreground">{c.employeeId}</div>
+                        </TableCell>
+                        <TableCell>{c.contractType}</TableCell>
+                        <TableCell>{c.department}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{c.startDate}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 text-xs">
+                            {c.endDate}
+                            {isExpiring && (
+                              <AlertTriangle className="size-3.5 text-warning" />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {inr(c.salary)}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={c.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {canEdit && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 px-2"
+                                onClick={() => {
+                                  setEditContract(c);
+                                  setEditForm({
+                                    startDate: c.startDate,
+                                    endDate: c.endDate,
+                                    salary: c.salary,
+                                    contractType: c.contractType,
+                                    department: c.department,
+                                    terms: c.terms,
+                                    noticePeriodDays: c.noticePeriodDays,
+                                  });
+                                  setEditErrors({});
+                                }}
+                                title="Edit contract"
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2"
+                              onClick={() => setViewContract(c)}
+                              title="View details"
+                            >
+                              <Eye className="size-3.5" />
+                            </Button>
+
+                            {canEdit && (
             <>
               {/* Pagination ON TOP of Employees' Staff Contracts */}
               <TablePagination
@@ -345,6 +455,9 @@ function ContractsPage() {
                               >
                                 <Eye className="size-3.5" />
                               </Button>
+                            )}
+
+                            {canEdit && (
 
                               {canEdit && (
                                 <Button
@@ -619,6 +732,98 @@ function ContractsPage() {
                 Cancel
               </Button>
               <Button onClick={handleRenew}>Confirm Renewal</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Contract Dialog */}
+      {editContract && (
+        <Dialog open={!!editContract} onOpenChange={(o) => !o && setEditContract(null)}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Edit Contract</DialogTitle>
+              <DialogDescription>
+                Update agreement details for {nameOf(editContract.employeeId)} ({editContract.id}).
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Contract Type">
+                  <Select
+                    value={editForm.contractType || editContract.contractType}
+                    onValueChange={(v) => setEditForm({ ...editForm, contractType: v as ContractType })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Full-time">Full-time Permanent</SelectItem>
+                      <SelectItem value="Executive">Executive Agreement</SelectItem>
+                      <SelectItem value="Fixed-term">Fixed-term Contract</SelectItem>
+                      <SelectItem value="Consultancy">Consultancy</SelectItem>
+                      <SelectItem value="Internship">Internship Agreement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field label="Annual Salary (₹ CTC)" error={editErrors["salary"]}>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 2400000"
+                    value={editForm.salary || editContract.salary}
+                    onChange={(e) => setEditForm({ ...editForm, salary: Number(e.target.value) })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Start Date" error={editErrors["startDate"]}>
+                  <Input
+                    type="date"
+                    value={editForm.startDate || editContract.startDate}
+                    onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                  />
+                </Field>
+                <Field label="End Date" error={editErrors["endDate"]}>
+                  <Input
+                    type="date"
+                    value={editForm.endDate || editContract.endDate}
+                    onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Department">
+                  <Input
+                    value={editForm.department || editContract.department}
+                    onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                  />
+                </Field>
+                <Field label="Notice Period (Days)">
+                  <Input
+                    type="number"
+                    value={editForm.noticePeriodDays || editContract.noticePeriodDays}
+                    onChange={(e) => setEditForm({ ...editForm, noticePeriodDays: Number(e.target.value) })}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Key Terms & Conditions">
+                <Input
+                  value={editForm.terms || editContract.terms}
+                  onChange={(e) => setEditForm({ ...editForm, terms: e.target.value })}
+                />
+              </Field>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditContract(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditSave}>Save Changes</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
