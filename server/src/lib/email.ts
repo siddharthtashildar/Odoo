@@ -243,3 +243,131 @@ export async function sendCredentialsEmail(payload: CredentialsEmailPayload): Pr
     temporaryPassword,
   };
 }
+
+export interface PayslipEmailPayload {
+  to: string;
+  employeeName: string;
+  period: string;
+  gross: number;
+  net: number;
+  basic: number;
+  allowances: number;
+  deductions: number;
+}
+
+export async function sendPayslipEmail(payload: PayslipEmailPayload): Promise<{
+  success: boolean;
+  messageId: string;
+  previewUrl?: string;
+}> {
+  const { to, employeeName, period, gross, net, basic, allowances, deductions } = payload;
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
+        .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; color: #ffffff; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .header p { margin: 4px 0 0; opacity: 0.8; font-size: 13px; }
+        .content { padding: 24px; }
+        .summary-card { background: #f1f5f9; border-radius: 8px; padding: 16px; margin: 16px 0; }
+        .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+        .total-net { border-top: 2px dashed #cbd5e1; padding-top: 10px; margin-top: 10px; font-weight: 700; color: #16a34a; font-size: 16px; }
+        .footer { padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>PeoplePay360 Payslip</h1>
+          <p>Official Pay Statement for ${period}</p>
+        </div>
+        <div class="content">
+          <p>Dear <strong>${employeeName}</strong>,</p>
+          <p>Your payslip for the pay period <strong>${period}</strong> has been generated and approved for disbursement.</p>
+
+          <div class="summary-card">
+            <div class="row"><span>Gross Earnings:</span> <strong>₹${gross.toLocaleString("en-IN")}</strong></div>
+            <div class="row"><span>Basic Salary:</span> <span>₹${basic.toLocaleString("en-IN")}</span></div>
+            <div class="row"><span>Allowances:</span> <span>₹${allowances.toLocaleString("en-IN")}</span></div>
+            <div class="row"><span>Total Deductions:</span> <span style="color: #dc2626;">- ₹${deductions.toLocaleString("en-IN")}</span></div>
+            <div class="row total-net"><span>Net Salary Disbursed:</span> <span>₹${net.toLocaleString("en-IN")}</span></div>
+          </div>
+
+          <p style="font-size: 13px; color: #64748b;">You can view and download your full itemized payslip breakdown by signing into your PeoplePay360 workspace.</p>
+        </div>
+        <div class="footer">
+          PeoplePay360 Finance & Payroll Team &bull; Confidential
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  let messageId = `slip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  let previewUrl: string | undefined = undefined;
+
+  const smtpHost = process.env.SMTP_HOST?.trim();
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASS?.trim();
+
+  if (smtpHost && smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: Number(process.env.SMTP_PORT || 465),
+        secure: true,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+      const info = await transporter.sendMail({
+        from: process.env.EMAIL_FROM || `"PeoplePay360 Payroll" <${smtpUser}>`,
+        to,
+        subject: `Payslip Statement for ${period} — ${employeeName}`,
+        html: htmlContent,
+      });
+      messageId = info.messageId;
+    } catch (err) {
+      console.warn("SMTP Payslip error:", err);
+    }
+  } else {
+    try {
+      const testAccount = await nodemailer.createTestAccount();
+      const transporter = nodemailer.createTransport({
+        host: "smtp.ethereal.email",
+        port: 587,
+        secure: false,
+        auth: { user: testAccount.user, pass: testAccount.pass },
+      });
+      const info = await transporter.sendMail({
+        from: '"PeoplePay360 Payroll" <payroll@peoplepay360.io>',
+        to,
+        subject: `Payslip Statement for ${period} — ${employeeName}`,
+        html: htmlContent,
+      });
+      messageId = info.messageId;
+      const testUrl = nodemailer.getTestMessageUrl(info);
+      if (testUrl) previewUrl = testUrl;
+    } catch (err) {
+      console.warn("Ethereal Payslip warning:", err);
+    }
+  }
+
+  const record: DispatchedEmailRecord = {
+    id: messageId,
+    to,
+    subject: `Payslip Statement for ${period} — ${employeeName}`,
+    employeeName,
+    role: "employee",
+    temporaryPassword: "N/A",
+    sentAt: new Date().toISOString(),
+    previewUrl,
+  };
+  emailAuditLog.unshift(record);
+  recordDispatchedEmail(record);
+
+  return { success: true, messageId, previewUrl };
+}

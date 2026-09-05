@@ -69,21 +69,44 @@ const emptyComponent = (): SalaryComponent => ({
   value: 0,
 });
 
-const emptyForm = () => ({
+interface SalaryFormState {
+  name: string;
+  description: string;
+  applicableTo: SalaryStructure["applicableTo"];
+  status: SalaryStructureStatus;
+  effectiveFrom: string;
+  components: SalaryComponent[];
+}
+
+const emptyForm = (): SalaryFormState => ({
   name: "",
   description: "",
   applicableTo: "All" as SalaryStructure["applicableTo"],
   status: "draft" as SalaryStructureStatus,
   effectiveFrom: "",
-  components: [],
+  components: [] as SalaryComponent[],
 });
+
+function getComponents(s: SalaryStructure): SalaryComponent[] {
+  if (s && Array.isArray(s.components)) return s.components;
+  const rules = (s as any)?.rules;
+  if (Array.isArray(rules)) {
+    return rules.map((r: any) => ({
+      name: r.name || r.code,
+      type: r.category === "DEDUCTION" || r.category === "TAX" || r.type === "deduction" ? "deduction" : "earning",
+      basis: r.calculationType === "fixed" ? "fixed" : "percent_of_basic",
+      value: r.calculationType === "fixed" ? Number(r.fixedAmount || 0) : Number(r.percentage || 0),
+    }));
+  }
+  return [];
+}
 
 function SalaryStructurePage() {
   const { salaryStructures: structures, update, role } = useApp();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<SalaryStructure | null>(null);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState<SalaryFormState>(emptyForm());
   const [deleteTarget, setDeleteTarget] = useState<SalaryStructure | null>(null);
 
   const canAccess = role === "payroll_manager" || role === "payroll_user" || role === "admin";
@@ -101,12 +124,12 @@ function SalaryStructurePage() {
   const openEdit = (s: SalaryStructure) => {
     setEditTarget(s);
     setForm({
-      name: s.name,
-      description: s.description,
-      applicableTo: s.applicableTo,
-      status: s.status,
-      effectiveFrom: s.effectiveFrom,
-      components: s.components.map((c) => ({ ...c })),
+      name: s.name || "",
+      description: s.description || "",
+      applicableTo: s.applicableTo || "All",
+      status: s.status || "draft",
+      effectiveFrom: s.effectiveFrom || (s as any).effectiveDate || new Date().toISOString().slice(0, 10),
+      components: getComponents(s).map((c) => ({ ...c })),
     });
     setFormOpen(true);
   };
@@ -249,63 +272,68 @@ function SalaryStructurePage() {
                 </div>
               </CardHeader>
 
-              {expandedId === s.id && (
-                <CardContent className="border-t border-border pt-4">
-                  <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
-                    <span>Effective from <strong>{s.effectiveFrom}</strong></span>
-                    <span>Created by <strong>{s.createdBy}</strong></span>
-                    <span>Last updated <strong>{s.updatedAt}</strong></span>
-                  </div>
-                  
-                  {/* Earnings/Allowances */}
-                  <div className="mb-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-success mb-2">Earnings / Allowances</div>
-                    {s.components.filter(c => c.type === "earning").length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">None configured</p>
-                    ) : (
-                      <div className="space-y-1">
-                        {s.components.filter(c => c.type === "earning").map((c, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center justify-between rounded-md px-3 py-1.5 bg-muted/30 text-sm"
-                          >
-                            <span>{c.name}</span>
-                            <span className="tabular-nums text-muted-foreground">
-                              {c.basis === "fixed"
-                                ? `₹${c.value.toLocaleString("en-IN")} / mo`
-                                : `${c.value}% of basic`}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+              {expandedId === s.id && (() => {
+                const comps = getComponents(s);
+                const earnings = comps.filter(c => c.type === "earning");
+                const deductions = comps.filter(c => c.type === "deduction");
+                return (
+                  <CardContent className="border-t border-border pt-4">
+                    <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                      <span>Effective from <strong>{s.effectiveFrom || (s as any).effectiveDate || "—"}</strong></span>
+                      <span>Created by <strong>{s.createdBy || "Admin"}</strong></span>
+                      <span>Last updated <strong>{s.updatedAt || "—"}</strong></span>
+                    </div>
 
-                  {/* Deductions */}
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-destructive mb-2">Deductions</div>
-                    {s.components.filter(c => c.type === "deduction").length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">None configured</p>
-                    ) : (
-                      <div className="space-y-1">
-                        {s.components.filter(c => c.type === "deduction").map((c, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center justify-between rounded-md px-3 py-1.5 bg-muted/30 text-sm"
-                          >
-                            <span>{c.name}</span>
-                            <span className="tabular-nums text-muted-foreground">
-                              {c.basis === "fixed"
-                                ? `₹${c.value.toLocaleString("en-IN")} / mo`
-                                : `${c.value}% of basic`}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              )}
+                    {/* Earnings/Allowances */}
+                    <div className="mb-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-success mb-2">Earnings / Allowances</div>
+                      {earnings.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">None configured</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {earnings.map((c, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between rounded-md px-3 py-1.5 bg-muted/30 text-sm"
+                            >
+                              <span>{c.name}</span>
+                              <span className="tabular-nums text-muted-foreground">
+                                {c.basis === "fixed"
+                                  ? `₹${(c.value || 0).toLocaleString("en-IN")} / mo`
+                                  : `${c.value}% of basic`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Deductions */}
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-destructive mb-2">Deductions</div>
+                      {deductions.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">None configured</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {deductions.map((c, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between rounded-md px-3 py-1.5 bg-muted/30 text-sm"
+                            >
+                              <span>{c.name}</span>
+                              <span className="tabular-nums text-muted-foreground">
+                                {c.basis === "fixed"
+                                  ? `₹${(c.value || 0).toLocaleString("en-IN")} / mo`
+                                  : `${c.value}% of basic`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                );
+              })()}
             </Card>
           ))
         )}
@@ -408,16 +436,17 @@ function SalaryStructurePage() {
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "earning")
                         .map(({ origIdx }) => {
-                          const c = form.components[origIdx];
+                          const item = form.components[origIdx];
+                          if (!item) return null;
                           return (
                             <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
                               <Input
                                 placeholder="e.g. Basic Salary, HRA, Transport Allowance"
-                                value={c.name}
+                                value={item.name}
                                 onChange={(e) => patchComponent(origIdx, { name: e.target.value })}
                                 className="flex-1 min-w-0 h-8 text-sm"
                               />
-                              <Select value={c.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
+                              <Select value={item.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
                                 <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="percent_of_basic">% of Basic</SelectItem>
@@ -427,8 +456,8 @@ function SalaryStructurePage() {
                               <Input
                                 type="number"
                                 min={0}
-                                placeholder={c.basis === "fixed" ? "₹ amount" : "%"}
-                                value={c.value || ""}
+                                placeholder={item.basis === "fixed" ? "₹ amount" : "%"}
+                                value={item.value || ""}
                                 onChange={(e) => patchComponent(origIdx, { value: Number(e.target.value) })}
                                 className="w-20 h-8 text-sm text-right"
                               />
@@ -473,16 +502,17 @@ function SalaryStructurePage() {
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "deduction")
                         .map(({ origIdx }) => {
-                          const c = form.components[origIdx];
+                          const item = form.components[origIdx];
+                          if (!item) return null;
                           return (
                             <div key={origIdx} className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
                               <Input
                                 placeholder="e.g. Income Tax, PF, Professional Tax"
-                                value={c.name}
+                                value={item.name}
                                 onChange={(e) => patchComponent(origIdx, { name: e.target.value })}
                                 className="flex-1 min-w-0 h-8 text-sm"
                               />
-                              <Select value={c.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
+                              <Select value={item.basis} onValueChange={(v) => patchComponent(origIdx, { basis: v as SalaryComponent["basis"] })}>
                                 <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="percent_of_basic">% of Basic</SelectItem>
@@ -492,8 +522,8 @@ function SalaryStructurePage() {
                               <Input
                                 type="number"
                                 min={0}
-                                placeholder={c.basis === "fixed" ? "₹ amount" : "%"}
-                                value={c.value || ""}
+                                placeholder={item.basis === "fixed" ? "₹ amount" : "%"}
+                                value={item.value || ""}
                                 onChange={(e) => patchComponent(origIdx, { value: Number(e.target.value) })}
                                 className="w-20 h-8 text-sm text-right"
                               />

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { EmptyState, PageHeader, StatCard, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed } from "@/lib/store";
 import { inr } from "@/lib/mock-data";
+import { downloadPayslipPDF, emailPayslipToEmployee } from "@/lib/payslip-exporter";
 
 export const Route = createFileRoute("/app/payslips")({
   head: () => ({
@@ -243,12 +244,65 @@ function Payslips() {
                   <span className="text-base tabular-nums">{inr(active.line.net)}</span>
                 </div>
               </div>
-              <Button
-                className="w-full"
-                onClick={() => toast.success("Payslip downloaded", { description: `${active.run.period} · demo PDF` })}
-              >
-                <Download className="mr-2 size-4" /> Download PDF
-              </Button>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    if (!active?.line || !employee) return;
+                    downloadPayslipPDF({
+                      employeeName: employee.name,
+                      employeeCode: employee.code,
+                      department: employee.department,
+                      designation: employee.designation,
+                      bankAccount: employee.bankAccount,
+                      pan: employee.pan,
+                      period: active.run.period,
+                      basic: active.line.basicSalary ?? Math.round(active.line.gross * 0.5),
+                      hra: active.line.hra ?? Math.round(active.line.gross * 0.25),
+                      specialAllowance: active.line.specialAllowance ?? Math.round(active.line.gross * 0.25),
+                      bonus: active.line.bonus,
+                      gross: active.line.gross + active.line.bonus,
+                      pf: active.line.providentFund ?? 1800,
+                      pt: active.line.professionalTax ?? 200,
+                      tds: active.line.incomeTax ?? 0,
+                      deductions: active.line.deductions,
+                      net: active.line.net,
+                    });
+                  }}
+                >
+                  <Download className="mr-2 size-4" /> Download / Print PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (!active?.line || !employee) return;
+                    emailPayslipToEmployee(
+                      {
+                        employeeName: employee.name,
+                        employeeCode: employee.code,
+                        department: employee.department,
+                        designation: employee.designation,
+                        bankAccount: employee.bankAccount,
+                        pan: employee.pan,
+                        period: active.run.period,
+                        basic: active.line.basicSalary ?? Math.round(active.line.gross * 0.5),
+                        hra: active.line.hra ?? Math.round(active.line.gross * 0.25),
+                        specialAllowance: active.line.specialAllowance ?? Math.round(active.line.gross * 0.25),
+                        bonus: active.line.bonus,
+                        gross: active.line.gross + active.line.bonus,
+                        pf: active.line.providentFund ?? 1800,
+                        pt: active.line.professionalTax ?? 200,
+                        tds: active.line.incomeTax ?? 0,
+                        deductions: active.line.deductions,
+                        net: active.line.net,
+                      },
+                      employee.id,
+                    );
+                  }}
+                >
+                  Email Payslip
+                </Button>
+              </div>
             </div>
           ) : null}
         </DialogContent>

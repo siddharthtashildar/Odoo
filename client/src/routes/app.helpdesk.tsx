@@ -69,7 +69,7 @@ function HelpdeskPage() {
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
   const isEmployeeOnly = role === "employee";
-  const canTriage = role === "it_asset_manager" || role === "admin" || role === "hr_manager" || role === "payroll_manager" || role === "payroll_user";
+  const canTriage = role === "it_asset_manager" || role === "admin" || role === "hr_manager";
 
   const me = employees.find(
     (e) =>

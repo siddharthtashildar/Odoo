@@ -1,6 +1,6 @@
 /**
- * PeoplePay360 — Database Seed Script
- * Populates the Neon PostgreSQL database with all demo data
+ * PeoplePay360 — Comprehensive Enterprise Database Seed Script
+ * Populates Neon PostgreSQL with 100% complete data for all domains
  * Run: npx tsx src/seed.ts
  */
 
@@ -11,7 +11,7 @@ import { hashPassword } from "better-auth/crypto";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding PeoplePay360 database...\n");
+  console.log("🌱 Seeding PeoplePay360 database with complete enterprise dataset...\n");
 
   // ── 1. Roles ────────────────────────────────────────────────────────────────
   console.log("Creating roles...");
@@ -45,6 +45,7 @@ async function main() {
     { name: "Sales", code: "SLS" },
     { name: "Marketing", code: "MKT" },
     { name: "IT", code: "IT" },
+    { name: "Support", code: "SUP" },
   ];
 
   const depts: Record<string, string> = {};
@@ -66,27 +67,31 @@ async function main() {
     { title: "Head of HR", deptName: "People Ops" },
     { title: "Product Manager", deptName: "Product" },
     { title: "Finance Manager", deptName: "Finance" },
-    { title: "Sales Executive", deptName: "Sales" },
+    { title: "Account Executive", deptName: "Sales" },
     { title: "Software Engineer", deptName: "Engineering" },
     { title: "IT Asset Manager", deptName: "IT" },
     { title: "HR Business Partner", deptName: "People Ops" },
+    { title: "HR Associate", deptName: "People Ops" },
     { title: "Payroll Specialist", deptName: "Finance" },
     { title: "Senior Payroll Manager", deptName: "Finance" },
+    { title: "QA Engineer", deptName: "Engineering" },
+    { title: "Support Lead", deptName: "Support" },
   ];
 
   const desigs: Record<string, string> = {};
   for (const d of desigData) {
-    const desig = await prisma.designations.upsert({
-      where: { id: (await prisma.designations.findFirst({ where: { title: d.title } }))?.id ?? "00000000-0000-0000-0000-000000000000" },
-      update: {},
-      create: { title: d.title, department_id: depts[d.deptName] },
-    });
+    let desig = await prisma.designations.findFirst({ where: { title: d.title } });
+    if (!desig) {
+      desig = await prisma.designations.create({
+        data: { title: d.title, department_id: depts[d.deptName] },
+      });
+    }
     desigs[d.title] = desig.id;
   }
   console.log(`  ✓ ${desigData.length} designations`);
 
-  // ── 4. Employees ────────────────────────────────────────────────────────────
-  console.log("Creating employees...");
+  // ── 4. Employees (All 10 Employees) ─────────────────────────────────────────
+  console.log("Creating employees (PP-1001 to PP-1010)...");
   const empData = [
     {
       code: "PP-1001", name: "Charmi Patel", email: "charmi.patel@peoplepay360.io",
@@ -108,97 +113,136 @@ async function main() {
     },
     {
       code: "PP-1004", name: "Arjun Nair", email: "arjun.nair@peoplepay360.io",
-      phone: "+91 87634 22190", dept: "Finance", desig: "Senior Payroll Manager",
-      type: "full_time" as const, status: "active" as const, joinedOn: "2020-03-15",
-      ctc: 3200000, bank: "AXIS0002341", gender: "male" as const,
+      phone: "+91 97401 55123", dept: "Finance", desig: "Senior Payroll Manager",
+      type: "full_time" as const, status: "active" as const, joinedOn: "2017-06-01",
+      ctc: 6100000, bank: "UTIB0002109", gender: "male" as const,
     },
     {
       code: "PP-1005", name: "Devika Rao", email: "devika.rao@peoplepay360.io",
-      phone: "+91 94512 88231", dept: "People Ops", desig: "HR Business Partner",
-      type: "full_time" as const, status: "active" as const, joinedOn: "2021-06-10",
-      ctc: 4800000, bank: "KOTAK0005512", gender: "female" as const,
+      phone: "+91 88670 22190", dept: "Finance", desig: "Payroll Specialist",
+      type: "full_time" as const, status: "active" as const, joinedOn: "2021-11-15",
+      ctc: 1800000, bank: "KKBK0001092", gender: "female" as const,
     },
     {
       code: "PP-1006", name: "Karan Shah", email: "karan.shah@peoplepay360.io",
-      phone: "+91 78923 44001", dept: "Engineering", desig: "Software Engineer",
-      type: "full_time" as const, status: "active" as const, joinedOn: "2023-01-03",
-      ctc: 2800000, bank: "HDFC0008832", gender: "male" as const,
+      phone: "+91 93761 09912", dept: "IT", desig: "IT Asset Manager",
+      type: "full_time" as const, status: "active" as const, joinedOn: "2020-02-17",
+      ctc: 2100000, bank: "BARB0INDAHM", gender: "male" as const,
     },
     {
       code: "PP-1007", name: "Priya Sharma", email: "priya.sharma@peoplepay360.io",
-      phone: "+91 99001 55432", dept: "Product", desig: "Product Manager",
-      type: "full_time" as const, status: "active" as const, joinedOn: "2021-09-20",
-      ctc: 1800000, bank: "HDFC0009921", gender: "female" as const,
+      phone: "+91 91340 66710", dept: "People Ops", desig: "HR Associate",
+      type: "full_time" as const, status: "onboarding" as const, joinedOn: "2026-09-01",
+      ctc: 1950000, bank: "HDFC0004128", gender: "female" as const,
+    },
+    {
+      code: "PP-1008", name: "Kabir Sethi", email: "kabir.sethi@peoplepay360.io",
+      phone: "+91 98110 33456", dept: "Sales", desig: "Account Executive",
+      type: "full_time" as const, status: "notice_period" as const, joinedOn: "2023-03-06",
+      ctc: 1650000, bank: "PUNB0182900", gender: "male" as const,
+    },
+    {
+      code: "PP-1009", name: "Meera Krishnan", email: "meera.krishnan@peoplepay360.io",
+      phone: "+91 90031 78812", dept: "Engineering", desig: "QA Engineer",
+      type: "contract" as const, status: "on_leave" as const, joinedOn: "2024-07-29",
+      ctc: 1250000, bank: "IOBA0001923", gender: "female" as const,
+    },
+    {
+      code: "PP-1010", name: "Vikram Bose", email: "vikram.bose@peoplepay360.io",
+      phone: "+91 87990 12234", dept: "Support", desig: "Support Lead",
+      type: "full_time" as const, status: "active" as const, joinedOn: "2021-05-10",
+      ctc: 1450000, bank: "CNRB0002100", gender: "male" as const,
     },
   ];
 
   const empIds: Record<string, string> = {};
   for (const e of empData) {
     const existing = await prisma.employees.findUnique({ where: { employee_code: e.code } });
-    const emp = existing ?? await prisma.employees.create({
-      data: {
-        employee_code: e.code,
-        full_name: e.name,
-        email: e.email,
-        phone: e.phone,
-        department_id: depts[e.dept],
-        designation_id: desigs[e.desig],
-        employment_type: e.type,
-        status: e.status,
-        joining_date: new Date(e.joinedOn),
-        bank_account_number: e.bank,
-        gender: e.gender,
-      },
-    });
-    empIds[e.code] = emp.id;
+    if (existing) {
+      const updated = await prisma.employees.update({
+        where: { id: existing.id },
+        data: {
+          full_name: e.name,
+          email: e.email,
+          phone: e.phone,
+          department_id: depts[e.dept],
+          designation_id: desigs[e.desig],
+          employment_type: e.type,
+          status: e.status,
+          joining_date: new Date(e.joinedOn),
+          bank_account_number: e.bank,
+          gender: e.gender,
+        },
+      });
+      empIds[e.code] = updated.id;
+    } else {
+      const created = await prisma.employees.create({
+        data: {
+          employee_code: e.code,
+          full_name: e.name,
+          email: e.email,
+          phone: e.phone,
+          department_id: depts[e.dept],
+          designation_id: desigs[e.desig],
+          employment_type: e.type,
+          status: e.status,
+          joining_date: new Date(e.joinedOn),
+          bank_account_number: e.bank,
+          gender: e.gender,
+        },
+      });
+      empIds[e.code] = created.id;
+    }
   }
-  // Set reporting manager for Charmi → Rohan, Rohan → Sana
-  await prisma.employees.update({ where: { id: empIds["PP-1001"] }, data: { reporting_manager_id: empIds["PP-1002"] } });
-  await prisma.employees.update({ where: { id: empIds["PP-1002"] }, data: { reporting_manager_id: empIds["PP-1003"] } });
-  await prisma.employees.update({ where: { id: empIds["PP-1006"] }, data: { reporting_manager_id: empIds["PP-1002"] } });
+
+  // Set reporting managers
+  if (empIds["PP-1001"] && empIds["PP-1002"]) {
+    await prisma.employees.update({ where: { id: empIds["PP-1001"] }, data: { reporting_manager_id: empIds["PP-1002"] } });
+  }
+  if (empIds["PP-1002"] && empIds["PP-1003"]) {
+    await prisma.employees.update({ where: { id: empIds["PP-1002"] }, data: { reporting_manager_id: empIds["PP-1003"] } });
+  }
+  if (empIds["PP-1006"] && empIds["PP-1003"]) {
+    await prisma.employees.update({ where: { id: empIds["PP-1006"] }, data: { reporting_manager_id: empIds["PP-1003"] } });
+  }
   console.log(`  ✓ ${empData.length} employees`);
 
-  // ── 5. Users (login accounts) ───────────────────────────────────────────────
-  console.log("Creating user accounts...");
+  // ── 5. Users & Better-Auth Accounts ─────────────────────────────────────────
+  console.log("Creating user accounts & Better-Auth logins...");
   const userData = [
-    { email: "admin@peoplepay360.io", role: "admin", empCode: null },
-    { email: "sana.iqbal@peoplepay360.io", role: "hr_manager", empCode: "PP-1003" },
-    { email: "devika.rao@peoplepay360.io", role: "payroll_user", empCode: "PP-1005" },
-    { email: "arjun.nair@peoplepay360.io", role: "payroll_manager", empCode: "PP-1004" },
-    { email: "charmi.patel@peoplepay360.io", role: "payroll_user", empCode: "PP-1001" },
-    { email: "karan.shah@peoplepay360.io", role: "it_asset_manager", empCode: "PP-1006" },
-    { email: "rohan.mehta@peoplepay360.io", role: "employee", empCode: "PP-1002" },
-    { email: "priya.sharma@peoplepay360.io", role: "employee", empCode: "PP-1007" },
+    { email: "admin@peoplepay360.io", role: "admin", empCode: null, name: "Ops Admin" },
+    { email: "siddharthtashildar17@gmail.com", role: "admin", empCode: null, name: "Siddharth (Admin)" },
+    { email: "sana.iqbal@peoplepay360.io", role: "hr_manager", empCode: "PP-1003", name: "Sana Iqbal" },
+    { email: "arjun.nair@peoplepay360.io", role: "payroll_manager", empCode: "PP-1004", name: "Arjun Nair" },
+    { email: "devika.rao@peoplepay360.io", role: "payroll_user", empCode: "PP-1005", name: "Devika Rao" },
+    { email: "charmi.patel@peoplepay360.io", role: "employee", empCode: "PP-1001", name: "Charmi Patel" },
+    { email: "neel.shah@peoplepay360.io", role: "it_asset_manager", empCode: "PP-1006", name: "Neel Shah" },
+    { email: "karan.shah@peoplepay360.io", role: "it_asset_manager", empCode: "PP-1006", name: "Karan Shah" },
+    { email: "rohan.mehta@peoplepay360.io", role: "employee", empCode: "PP-1002", name: "Rohan Mehta" },
+    { email: "priya.deshmukh@peoplepay360.io", role: "employee", empCode: "PP-1007", name: "Priya Deshmukh" },
+    { email: "priya.sharma@peoplepay360.io", role: "employee", empCode: "PP-1007", name: "Priya Sharma" },
+    { email: "kabir.sethi@peoplepay360.io", role: "employee", empCode: "PP-1008", name: "Kabir Sethi" },
+    { email: "meera.krishnan@peoplepay360.io", role: "employee", empCode: "PP-1009", name: "Meera Krishnan" },
+    { email: "vikram.bose@peoplepay360.io", role: "employee", empCode: "PP-1010", name: "Vikram Bose" },
+    { email: "code.sid17@gmail.com", role: "employee", empCode: "PP-1001", name: "Jeffrey Paul" },
   ];
 
   const demoPasswordHash = await hashPassword("demo1234");
 
   for (const u of userData) {
-    // Legacy users table
-    await prisma.users.upsert({
-      where: { email: u.email },
-      update: {},
-      create: {
-        email: u.email,
-        password_hash: "$2b$10$demo_hash_not_real_for_hackathon_only",
-        role_id: roles[u.role],
-        employee_id: u.empCode ? empIds[u.empCode] : null,
-        is_active: true,
-      },
-    });
+    const employeeId = u.empCode ? empIds[u.empCode] : null;
 
     // Better Auth User & Account
     let betterUser = await prisma.user.findUnique({ where: { email: u.email } });
     if (!betterUser) {
-      const empName = u.empCode ? empData.find((e) => e.code === u.empCode)?.name ?? u.email : "System Admin";
       betterUser = await prisma.user.create({
         data: {
           id: crypto.randomUUID(),
-          name: empName,
+          name: u.name,
           email: u.email,
           emailVerified: true,
           role: u.role,
-          employeeId: u.empCode ? empIds[u.empCode] : null,
+          employeeId,
         },
       });
 
@@ -211,6 +255,30 @@ async function main() {
           password: demoPasswordHash,
         },
       });
+    } else {
+      await prisma.user.update({
+        where: { id: betterUser.id },
+        data: {
+          name: u.name,
+          role: u.role,
+          employeeId: employeeId ?? betterUser.employeeId,
+        },
+      });
+
+      const acc = await prisma.account.findFirst({ where: { userId: betterUser.id, providerId: "credential" } });
+      if (acc) {
+        await prisma.account.update({ where: { id: acc.id }, data: { password: demoPasswordHash } });
+      } else {
+        await prisma.account.create({
+          data: {
+            id: crypto.randomUUID(),
+            userId: betterUser.id,
+            accountId: betterUser.id,
+            providerId: "credential",
+            password: demoPasswordHash,
+          },
+        });
+      }
     }
   }
   console.log(`  ✓ ${userData.length} users + Better Auth accounts`);
@@ -245,16 +313,19 @@ async function main() {
   }
   console.log(`  ✓ ${leaveTypes.length} leave types`);
 
-  // ── 7. Contracts ────────────────────────────────────────────────────────────
+  // ── 7. Contracts (For all 10 Employees) ─────────────────────────────────────
   console.log("Creating contracts...");
   const contractsData = [
-    { empCode: "PP-1001", type: "permanent" as const, salary: 200000, start: "2022-04-11", status: "active" as const },
-    { empCode: "PP-1002", type: "permanent" as const, salary: 341667, start: "2019-08-05", status: "active" as const },
-    { empCode: "PP-1003", type: "permanent" as const, salary: 433333, start: "2018-01-22", status: "active" as const },
-    { empCode: "PP-1004", type: "permanent" as const, salary: 266667, start: "2020-03-15", status: "active" as const },
-    { empCode: "PP-1005", type: "permanent" as const, salary: 400000, start: "2021-06-10", status: "active" as const },
-    { empCode: "PP-1006", type: "permanent" as const, salary: 233333, start: "2023-01-03", status: "active" as const },
-    { empCode: "PP-1007", type: "permanent" as const, salary: 150000, start: "2021-09-20", status: "active" as const },
+    { empCode: "PP-1001", type: "permanent" as const, salary: 2400000, start: "2022-04-11", status: "active" as const },
+    { empCode: "PP-1002", type: "permanent" as const, salary: 4100000, start: "2019-08-05", status: "active" as const },
+    { empCode: "PP-1003", type: "permanent" as const, salary: 5200000, start: "2018-01-22", status: "active" as const },
+    { empCode: "PP-1004", type: "permanent" as const, salary: 1800000, start: "2021-11-15", status: "active" as const },
+    { empCode: "PP-1005", type: "permanent" as const, salary: 6100000, start: "2017-06-01", status: "active" as const },
+    { empCode: "PP-1006", type: "permanent" as const, salary: 2100000, start: "2020-02-17", status: "active" as const },
+    { empCode: "PP-1007", type: "permanent" as const, salary: 1950000, start: "2026-09-01", status: "active" as const },
+    { empCode: "PP-1008", type: "permanent" as const, salary: 1650000, start: "2023-03-06", status: "terminated" as const },
+    { empCode: "PP-1009", type: "fixed_term" as const, salary: 1250000, start: "2024-07-29", status: "active" as const },
+    { empCode: "PP-1010", type: "permanent" as const, salary: 1450000, start: "2021-05-10", status: "active" as const },
   ];
 
   const contractIds: Record<string, string> = {};
@@ -262,30 +333,38 @@ async function main() {
     const cd = contractsData[i];
     const num = `CT-${String(i + 1).padStart(4, "0")}`;
     const existing = await prisma.contracts.findUnique({ where: { contract_number: num } });
-    const contract = existing ?? await prisma.contracts.create({
-      data: {
-        contract_number: num,
-        employee_id: empIds[cd.empCode],
-        department_id: depts["Engineering"],
-        contract_type: cd.type,
-        salary: cd.salary,
-        start_date: new Date(cd.start),
-        status: cd.status,
-        employee_accepted: true,
-        accepted_at: new Date(cd.start),
-      },
-    });
-    contractIds[cd.empCode] = contract.id;
+    if (existing) {
+      await prisma.contracts.update({
+        where: { id: existing.id },
+        data: { salary: cd.salary, status: cd.status },
+      });
+      contractIds[cd.empCode] = existing.id;
+    } else {
+      const contract = await prisma.contracts.create({
+        data: {
+          contract_number: num,
+          employee_id: empIds[cd.empCode],
+          department_id: depts["Engineering"],
+          contract_type: cd.type,
+          salary: cd.salary,
+          start_date: new Date(cd.start),
+          status: cd.status,
+          employee_accepted: true,
+          accepted_at: new Date(cd.start),
+        },
+      });
+      contractIds[cd.empCode] = contract.id;
+    }
   }
   console.log(`  ✓ ${contractsData.length} contracts`);
 
   // ── 8. Salary Structures ────────────────────────────────────────────────────
   console.log("Creating salary structures...");
   const structData = [
-    { name: "Standard Full-Time", description: "Default structure for permanent full-time employees", status: "active" as const, effectiveDate: "2026-04-01" },
-    { name: "Senior Leadership", description: "Applies to Director and VP level employees", status: "active" as const, effectiveDate: "2026-04-01" },
-    { name: "Internship / Stipend", description: "Simplified structure for interns", status: "active" as const, effectiveDate: "2026-07-01" },
-    { name: "Contractual Consultant", description: "For contract employees paid monthly retainer", status: "draft" as const, effectiveDate: "2026-10-01" },
+    { name: "Standard Full-Time", description: "Default structure for permanent full-time employees. Covers all statutory deductions.", status: "active" as const, effectiveDate: "2026-04-01" },
+    { name: "Senior Leadership", description: "Applies to Director and VP level employees. Higher HRA and variable component.", status: "active" as const, effectiveDate: "2026-04-01" },
+    { name: "Internship / Stipend", description: "Simplified structure for interns receiving fixed monthly stipend.", status: "active" as const, effectiveDate: "2026-07-01" },
+    { name: "Contractual Consultant", description: "For contract employees paid monthly retainer. TDS deducted at source.", status: "draft" as const, effectiveDate: "2026-10-01" },
   ];
 
   const structIds: string[] = [];
@@ -306,9 +385,9 @@ async function main() {
   // ── 9. Salary Rules ─────────────────────────────────────────────────────────
   console.log("Creating salary rules...");
   const ruleData = [
-    { name: "Basic Salary", code: "BASIC", type: "earning" as const, calcType: "percentage" as const, pct: 40.00 },
-    { name: "House Rent Allowance", code: "HRA", type: "earning" as const, calcType: "percentage" as const, pct: 16.00 },
-    { name: "Special Allowance", code: "SPEC_ALLOW", type: "earning" as const, calcType: "percentage" as const, pct: 5.33 },
+    { name: "Basic Salary", code: "BASIC", type: "earning" as const, calcType: "percentage" as const, pct: 50.00 },
+    { name: "House Rent Allowance", code: "HRA", type: "earning" as const, calcType: "percentage" as const, pct: 25.00 },
+    { name: "Special Allowance", code: "SPEC_ALLOW", type: "earning" as const, calcType: "percentage" as const, pct: 25.00 },
     { name: "Provident Fund (Employee)", code: "PF_EMP", type: "deduction" as const, calcType: "percentage" as const, pct: 12.00 },
     { name: "Professional Tax", code: "PT", type: "deduction" as const, calcType: "fixed" as const, fixed: 200 },
     { name: "Income Tax (TDS)", code: "TDS", type: "deduction" as const, calcType: "percentage" as const, pct: 10.00 },
@@ -343,16 +422,19 @@ async function main() {
   }
   console.log(`  ✓ ${ruleData.length} salary rules`);
 
-  // ── 10. Employee Salary Structure Assignments ───────────────────────────────
-  console.log("Assigning salary structures to employees...");
+  // ── 10. Employee Salary Structure Assignments (All 10 Employees) ────────────
+  console.log("Assigning salary structures to all employees...");
   const salaryAssignments = [
     { empCode: "PP-1001", structIdx: 0 },
-    { empCode: "PP-1002", structIdx: 0 },
+    { empCode: "PP-1002", structIdx: 1 },
     { empCode: "PP-1003", structIdx: 1 },
     { empCode: "PP-1004", structIdx: 0 },
     { empCode: "PP-1005", structIdx: 1 },
     { empCode: "PP-1006", structIdx: 0 },
     { empCode: "PP-1007", structIdx: 0 },
+    { empCode: "PP-1008", structIdx: 0 },
+    { empCode: "PP-1009", structIdx: 3 },
+    { empCode: "PP-1010", structIdx: 0 },
   ];
 
   for (const a of salaryAssignments) {
@@ -403,9 +485,11 @@ async function main() {
     { empCode: "PP-1002", typeCode: "PA", amount: 12000 },
     { empCode: "PP-1003", typeCode: "HRA", amount: 25000 },
     { empCode: "PP-1003", typeCode: "SA", amount: 10000 },
-    { empCode: "PP-1005", typeCode: "IA", amount: 1500 },
-    { empCode: "PP-1006", typeCode: "MA", amount: 3000 },
-    { empCode: "PP-1007", typeCode: "TA", amount: 2500 },
+    { empCode: "PP-1004", typeCode: "MA", amount: 3500 },
+    { empCode: "PP-1005", typeCode: "IA", amount: 2500 },
+    { empCode: "PP-1006", typeCode: "TA", amount: 4000 },
+    { empCode: "PP-1007", typeCode: "SA", amount: 12000 },
+    { empCode: "PP-1010", typeCode: "PA", amount: 8000 },
   ];
 
   for (const a of allowances) {
@@ -427,8 +511,8 @@ async function main() {
   }
   console.log(`  ✓ ${allowances.length} employee allowances`);
 
-  // ── 13. Reimbursement Categories ────────────────────────────────────────────
-  console.log("Creating reimbursement categories...");
+  // ── 13. Reimbursements ──────────────────────────────────────────────────────
+  console.log("Creating reimbursement categories & claims...");
   const reimCategories = ["Travel", "Food", "Medical", "Internet", "Office Supplies", "Training", "Other"];
   const reimCatIds: Record<string, string> = {};
   for (const c of reimCategories) {
@@ -439,48 +523,53 @@ async function main() {
     });
     reimCatIds[c] = cat.id;
   }
-  console.log(`  ✓ ${reimCategories.length} reimbursement categories`);
 
-  // ── 14. Reimbursements ──────────────────────────────────────────────────────
-  console.log("Creating reimbursements...");
   const reimbData = [
-    { empCode: "PP-1001", cat: "Travel", amount: 4500, date: "2026-08-10", desc: "Client visit — Pune", status: "submitted" as const },
-    { empCode: "PP-1002", cat: "Food", amount: 1200, date: "2026-08-12", desc: "Team lunch — Bengaluru", status: "manager_approved" as const },
-    { empCode: "PP-1003", cat: "Training", amount: 15000, date: "2026-07-20", desc: "SHRM certification", status: "finance_approved" as const },
-    { empCode: "PP-1004", cat: "Internet", amount: 1500, date: "2026-08-01", desc: "Broadband August", status: "paid" as const },
-    { empCode: "PP-1005", cat: "Medical", amount: 3200, date: "2026-08-15", desc: "Dental — Wisdom tooth", status: "submitted" as const },
+    { empCode: "PP-1001", cat: "Travel", amount: 4500, date: "2026-08-10", desc: "Client visit — Pune sprint", status: "submitted" as const },
+    { empCode: "PP-1002", cat: "Food", amount: 1200, date: "2026-08-12", desc: "Team lunch — Bengaluru engineering", status: "manager_approved" as const },
+    { empCode: "PP-1003", cat: "Training", amount: 15000, date: "2026-07-20", desc: "SHRM international certification", status: "finance_approved" as const },
+    { empCode: "PP-1004", cat: "Internet", amount: 1500, date: "2026-08-01", desc: "High-speed broadband August", status: "paid" as const },
+    { empCode: "PP-1005", cat: "Medical", amount: 3200, date: "2026-08-15", desc: "Dental optical checkup", status: "submitted" as const },
     { empCode: "PP-1006", cat: "Office Supplies", amount: 800, date: "2026-08-20", desc: "USB hub + cable organizer", status: "submitted" as const },
+    { empCode: "PP-1007", cat: "Travel", amount: 2200, date: "2026-09-02", desc: "Airport shuttle for team sync", status: "manager_approved" as const },
   ];
 
   for (const r of reimbData) {
-    await prisma.reimbursements.create({
-      data: {
-        employee_id: empIds[r.empCode],
-        category_id: reimCatIds[r.cat],
-        expense_date: new Date(r.date),
-        amount: r.amount,
-        description: r.desc,
-        status: r.status,
-        ...(r.status === "paid" && { paid_at: new Date(), paid_amount: r.amount }),
-        ...(r.status !== "submitted" && { manager_reviewed_at: new Date() }),
-      },
+    const existing = await prisma.reimbursements.findFirst({
+      where: { employee_id: empIds[r.empCode], description: r.desc },
     });
+    if (!existing) {
+      await prisma.reimbursements.create({
+        data: {
+          employee_id: empIds[r.empCode],
+          category_id: reimCatIds[r.cat],
+          expense_date: new Date(r.date),
+          amount: r.amount,
+          description: r.desc,
+          status: r.status,
+          ...(r.status === "paid" && { paid_at: new Date(), paid_amount: r.amount }),
+          ...(r.status !== "submitted" && { manager_reviewed_at: new Date() }),
+        },
+      });
+    }
   }
-  console.log(`  ✓ ${reimbData.length} reimbursements`);
+  console.log(`  ✓ Reimbursements created`);
 
-  // ── 15. Assets ──────────────────────────────────────────────────────────────
-  console.log("Creating assets...");
+  // ── 14. Assets ──────────────────────────────────────────────────────────────
+  console.log("Creating assets inventory...");
   const assetData = [
-    { code: "ASSET-001", type: "Laptop", serial: "APL-MBP-2024-001", cond: "good" as const, status: "assigned" as const, empCode: "PP-1001", cost: 145000 },
-    { code: "ASSET-002", type: "Laptop", serial: "DELL-XPS-2024-001", cond: "good" as const, status: "assigned" as const, empCode: "PP-1002", cost: 125000 },
-    { code: "ASSET-003", type: "Monitor", serial: "LG-27UK-2024-001", cond: "good" as const, status: "assigned" as const, empCode: "PP-1001", cost: 35000 },
-    { code: "ASSET-004", type: "Laptop", serial: "HP-ELITEBOOK-2023-001", cond: "good" as const, status: "assigned" as const, empCode: "PP-1003", cost: 95000 },
-    { code: "ASSET-005", type: "Mobile phone", serial: "SAMS-S24-2024-001", cond: "good" as const, status: "assigned" as const, empCode: "PP-1003", cost: 80000 },
-    { code: "ASSET-006", type: "Laptop", serial: "LENOVO-T14-2023-001", cond: "good" as const, status: "available" as const, empCode: null, cost: 85000 },
-    { code: "ASSET-007", type: "Laptop", serial: "APL-MBP-2023-002", cond: "under_repair" as const, status: "under_repair" as const, empCode: null, cost: 130000 },
-    { code: "ASSET-008", type: "Access card", serial: "CARD-2024-001", cond: "good" as const, status: "assigned" as const, empCode: "PP-1004", cost: 500 },
-    { code: "ASSET-009", type: "Software license", serial: "ADOBE-ENT-2024", cond: "good" as const, status: "assigned" as const, empCode: "PP-1005", cost: 45000 },
-    { code: "ASSET-010", type: "Laptop", serial: "APL-MBA-2024-001", cond: "good" as const, status: "assigned" as const, empCode: "PP-1006", cost: 110000 },
+    { code: "ASSET-001", type: "Laptop", serial: "C02XK9LMQ1", cond: "good" as const, status: "assigned" as const, empCode: "PP-1001", cost: 210000, loc: "Ahmedabad" },
+    { code: "ASSET-002", type: "Laptop", serial: "DL7450X118", cond: "good" as const, status: "assigned" as const, empCode: "PP-1004", cost: 128000, loc: "Pune" },
+    { code: "ASSET-003", type: "Laptop", serial: "TPX1C99201", cond: "good" as const, status: "available" as const, empCode: null, cost: 145000, loc: "Ahmedabad IT Vault" },
+    { code: "ASSET-004", type: "Monitor", serial: "LGUF27A882", cond: "good" as const, status: "assigned" as const, empCode: "PP-1002", cost: 42000, loc: "Bengaluru" },
+    { code: "ASSET-005", type: "Mobile phone", serial: "IP15X772210", cond: "good" as const, status: "assigned" as const, empCode: "PP-1008", cost: 79000, loc: "Delhi" },
+    { code: "ASSET-006", type: "Keyboard", serial: "LGMX772103", cond: "good" as const, status: "available" as const, empCode: null, cost: 14500, loc: "Ahmedabad Storage" },
+    { code: "ASSET-007", type: "Software license", serial: "FIG-ORG-0031", cond: "good" as const, status: "assigned" as const, empCode: "PP-1007", cost: 38000, loc: "Cloud" },
+    { code: "ASSET-008", type: "Laptop", serial: "MBA3M11290", cond: "under_repair" as const, status: "under_repair" as const, empCode: null, cost: 118000, loc: "Apple Authorized Service" },
+    { code: "ASSET-009", type: "Monitor", serial: "DLP2422H01", cond: "retired" as const, status: "retired" as const, empCode: null, cost: 18000, loc: "E-waste Buffer" },
+    { code: "ASSET-010", type: "Laptop", serial: "MBP16M4X77", cond: "good" as const, status: "assigned" as const, empCode: "PP-1002", cost: 320000, loc: "Bengaluru" },
+    { code: "ASSET-011", type: "Access card", serial: "HID-PROX-8821", cond: "good" as const, status: "assigned" as const, empCode: "PP-1001", cost: 1200, loc: "Ahmedabad" },
+    { code: "ASSET-012", type: "Other", serial: "YK5CNFC-9002", cond: "good" as const, status: "available" as const, empCode: null, cost: 5500, loc: "IT Safe" },
   ];
 
   for (const a of assetData) {
@@ -496,42 +585,48 @@ async function main() {
           purchase_date: new Date("2024-01-15"),
           purchase_cost: a.cost,
           current_employee_id: a.empCode ? empIds[a.empCode] : null,
-          location: "Office - Ahmedabad",
+          location: a.loc,
         },
       });
     }
   }
   console.log(`  ✓ ${assetData.length} assets`);
 
-  // ── 16. Asset Requests ──────────────────────────────────────────────────────
+  // ── 15. Asset Requests ──────────────────────────────────────────────────────
   console.log("Creating asset requests...");
   const assetReqs = [
-    { empCode: "PP-1007", type: "Laptop", reason: "MacBook for design work", status: "pending" as const },
-    { empCode: "PP-1006", type: "Monitor", reason: "Second monitor for productivity", status: "approved" as const },
-    { empCode: "PP-1002", type: "Mobile phone", reason: "Company phone for client calls", status: "fulfilled" as const },
+    { empCode: "PP-1007", type: "Laptop", reason: "MacBook Pro 14 + external monitor for new hire setup", status: "pending" as const },
+    { empCode: "PP-1001", type: "Other", reason: "Noise cancelling wireless headset for client sync calls", status: "approved" as const },
+    { empCode: "PP-1010", type: "Monitor", reason: "Second monitor for ticket queue triage management", status: "fulfilled" as const },
   ];
 
   for (const r of assetReqs) {
-    await prisma.asset_requests.create({
-      data: {
-        employee_id: empIds[r.empCode],
-        asset_type_requested: r.type,
-        reason: r.reason,
-        status: r.status,
-        ...(r.status !== "pending" && { resolved_at: new Date() }),
-      },
+    const existing = await prisma.asset_requests.findFirst({
+      where: { employee_id: empIds[r.empCode], reason: r.reason },
     });
+    if (!existing) {
+      await prisma.asset_requests.create({
+        data: {
+          employee_id: empIds[r.empCode],
+          asset_type_requested: r.type,
+          reason: r.reason,
+          status: r.status,
+          ...(r.status !== "pending" && { resolved_at: new Date() }),
+        },
+      });
+    }
   }
-  console.log(`  ✓ ${assetReqs.length} asset requests`);
+  console.log(`  ✓ Asset requests created`);
 
-  // ── 17. IT Helpdesk Tickets ─────────────────────────────────────────────────
-  console.log("Creating helpdesk tickets...");
+  // ── 16. IT Helpdesk Tickets ─────────────────────────────────────────────────
+  console.log("Creating IT helpdesk tickets & comments...");
   const ticketData = [
-    { empCode: "PP-1001", num: "TKT-0001", cat: "software" as const, pri: "high" as const, subj: "VS Code license not activating", status: "resolved" as const },
-    { empCode: "PP-1006", num: "TKT-0002", cat: "hardware" as const, pri: "medium" as const, subj: "Keyboard keys sticking", status: "in_progress" as const },
-    { empCode: "PP-1002", num: "TKT-0003", cat: "network" as const, pri: "critical" as const, subj: "VPN dropping frequently in Bengaluru office", status: "open" as const },
-    { empCode: "PP-1007", num: "TKT-0004", cat: "account_access" as const, pri: "medium" as const, subj: "Cannot access Figma enterprise account", status: "assigned" as const },
-    { empCode: "PP-1004", num: "TKT-0005", cat: "email" as const, pri: "low" as const, subj: "Email signature not saving", status: "closed" as const },
+    { empCode: "PP-1001", num: "TKT-301", cat: "software" as const, pri: "medium" as const, subj: "IntelliJ IDEA Ultimate license renewal required", status: "in_progress" as const, desc: "License expired on 31 August. Please renew enterprise key." },
+    { empCode: "PP-1004", num: "TKT-302", cat: "hardware" as const, pri: "high" as const, subj: "Laptop battery draining abnormally fast", status: "open" as const, desc: "Battery health indicator reports 42% remaining capacity. Needs replacement battery." },
+    { empCode: "PP-1007", num: "TKT-303", cat: "account_access" as const, pri: "critical" as const, subj: "VPN and Notion onboarding workspace permissions", status: "resolved" as const, desc: "Access requested for Design System workspace." },
+    { empCode: "PP-1010", num: "TKT-304", cat: "other" as const, pri: "low" as const, subj: "August statutory tax deduction slip question", status: "open" as const, desc: "Difference observed in TDS computation between portal payslip and old regime declaration." },
+    { empCode: "PP-1003", num: "TKT-305", cat: "network" as const, pri: "high" as const, subj: "Wi-Fi roaming dropouts on Ahmedabad 3rd Floor East Wing", status: "in_progress" as const, desc: "Packet loss observed during Zoom calls around Meeting Room B." },
+    { empCode: "PP-1008", num: "TKT-306", cat: "account_access" as const, pri: "medium" as const, subj: "Offboarding laptop and access card return courier", status: "open" as const, desc: "Requesting return shipping kit and pickup for company assets prior to LWD." },
   ];
 
   for (const t of ticketData) {
@@ -544,17 +639,17 @@ async function main() {
           category: t.cat,
           priority: t.pri,
           subject: t.subj,
+          description: t.desc,
           status: t.status,
           ...(t.status === "resolved" && { resolved_at: new Date() }),
-          ...(t.status === "closed" && { closed_at: new Date() }),
         },
       });
     }
   }
   console.log(`  ✓ ${ticketData.length} helpdesk tickets`);
 
-  // ── 18. Payroll Run + Payslips ──────────────────────────────────────────────
-  console.log("Creating payroll run for Aug 2026...");
+  // ── 17. Payroll Run + Payslips (August 2026) ────────────────────────────────
+  console.log("Creating payroll run & payslips...");
   const existingRun = await prisma.payroll_runs.findFirst({
     where: { period_month: 8, period_year: 2026 },
   });
@@ -571,13 +666,16 @@ async function main() {
   });
 
   const payslipCalcs = [
-    { empCode: "PP-1001", contractIdx: 0, gross: 200000, basic: 80000, hra: 32000, allow: 13333, ded: 29533, tax: 8000, net: 163800 },
-    { empCode: "PP-1002", contractIdx: 1, gross: 341667, basic: 136667, hra: 54667, allow: 22778, ded: 50511, tax: 13667, net: 269156 },
-    { empCode: "PP-1003", contractIdx: 2, gross: 433333, basic: 173333, hra: 86667, allow: 43333, ded: 55200, tax: 34667, net: 334467 },
-    { empCode: "PP-1004", contractIdx: 3, gross: 266667, basic: 106667, hra: 42667, allow: 17778, ded: 38844, tax: 10667, net: 215156 },
-    { empCode: "PP-1005", contractIdx: 4, gross: 400000, basic: 160000, hra: 80000, allow: 40000, ded: 52000, tax: 32000, net: 295800 },
-    { empCode: "PP-1006", contractIdx: 5, gross: 233333, basic: 93333, hra: 37333, allow: 15556, ded: 33756, tax: 9333, net: 176910 },
-    { empCode: "PP-1007", contractIdx: 6, gross: 150000, basic: 60000, hra: 24000, allow: 10000, ded: 21600, tax: 6000, net: 127800 },
+    { empCode: "PP-1001", gross: 200000, basic: 100000, hra: 50000, allow: 50000, ded: 25400, tax: 15000, net: 174600 },
+    { empCode: "PP-1002", gross: 341667, basic: 170833, hra: 85417, allow: 85417, ded: 43200, tax: 28000, net: 298467 },
+    { empCode: "PP-1003", gross: 433333, basic: 216667, hra: 108333, allow: 108333, ded: 55200, tax: 43333, net: 378133 },
+    { empCode: "PP-1004", gross: 150000, basic: 75000, hra: 37500, allow: 37500, ded: 19200, tax: 10000, net: 130800 },
+    { empCode: "PP-1005", gross: 508333, basic: 254167, hra: 127083, allow: 127083, ded: 64600, tax: 50000, net: 443733 },
+    { empCode: "PP-1006", gross: 175000, basic: 87500, hra: 43750, allow: 43750, ded: 22400, tax: 12000, net: 152600 },
+    { empCode: "PP-1007", gross: 162500, basic: 81250, hra: 40625, allow: 40625, ded: 20800, tax: 11000, net: 141700 },
+    { empCode: "PP-1008", gross: 137500, basic: 68750, hra: 34375, allow: 34375, ded: 17600, tax: 9000, net: 119900 },
+    { empCode: "PP-1009", gross: 104167, basic: 52083, hra: 26042, allow: 26042, ded: 13400, tax: 6000, net: 90767 },
+    { empCode: "PP-1010", gross: 120833, basic: 60417, hra: 30208, allow: 30208, ded: 15600, tax: 8000, net: 105233 },
   ];
 
   for (const p of payslipCalcs) {
@@ -609,38 +707,44 @@ async function main() {
       });
     }
   }
-  console.log(`  ✓ Payroll run Aug 2026 + ${payslipCalcs.length} payslips`);
+  console.log(`  ✓ Payslips created for all 10 employees`);
 
-  // ── 19. Leave Requests ──────────────────────────────────────────────────────
+  // ── 18. Leave Requests ──────────────────────────────────────────────────────
   console.log("Creating leave requests...");
   const leaveReqs = [
     { empCode: "PP-1001", typeCode: "CL", start: "2026-08-05", end: "2026-08-06", days: 2, reason: "Family function", status: "approved" as const },
-    { empCode: "PP-1006", typeCode: "SL", start: "2026-08-12", end: "2026-08-12", days: 1, reason: "Fever", status: "approved" as const },
-    { empCode: "PP-1007", typeCode: "EL", start: "2026-09-01", end: "2026-09-05", days: 5, reason: "Vacation", status: "pending" as const },
-    { empCode: "PP-1002", typeCode: "CL", start: "2026-09-10", end: "2026-09-10", days: 1, reason: "Personal work", status: "pending" as const },
+    { empCode: "PP-1006", typeCode: "SL", start: "2026-08-12", end: "2026-08-12", days: 1, reason: "Viral fever", status: "approved" as const },
+    { empCode: "PP-1007", typeCode: "EL", start: "2026-09-01", end: "2026-09-05", days: 5, reason: "Family vacation", status: "pending" as const },
+    { empCode: "PP-1002", typeCode: "CL", start: "2026-09-10", end: "2026-09-10", days: 1, reason: "Personal bank appointment", status: "pending" as const },
     { empCode: "PP-1003", typeCode: "EL", start: "2026-10-15", end: "2026-10-20", days: 6, reason: "Annual leave", status: "pending" as const },
+    { empCode: "PP-1009", typeCode: "SL", start: "2026-09-04", end: "2026-09-08", days: 4, reason: "Medical recovery", status: "approved" as const },
   ];
 
   for (const r of leaveReqs) {
-    await prisma.leave_requests.create({
-      data: {
-        employee_id: empIds[r.empCode],
-        leave_type_id: leaveTypeIds[r.typeCode],
-        start_date: new Date(r.start),
-        end_date: new Date(r.end),
-        days: r.days,
-        reason: r.reason,
-        status: r.status,
-      },
+    const existing = await prisma.leave_requests.findFirst({
+      where: { employee_id: empIds[r.empCode], reason: r.reason },
     });
+    if (!existing) {
+      await prisma.leave_requests.create({
+        data: {
+          employee_id: empIds[r.empCode],
+          leave_type_id: leaveTypeIds[r.typeCode],
+          start_date: new Date(r.start),
+          end_date: new Date(r.end),
+          days: r.days,
+          reason: r.reason,
+          status: r.status,
+        },
+      });
+    }
   }
-  console.log(`  ✓ ${leaveReqs.length} leave requests`);
+  console.log(`  ✓ Leave requests created`);
 
-  // ── 20. Attendance (last 7 days) ────────────────────────────────────────────
-  console.log("Creating attendance records...");
-  const today = new Date();
+  // ── 19. Attendance Records (Last 10 Days) ────────────────────────────────────
+  console.log("Creating live attendance records...");
+  const today = new Date("2026-09-05T00:00:00Z");
   let attCount = 0;
-  for (let i = 6; i >= 0; i--) {
+  for (let i = 9; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().slice(0, 10);
@@ -650,24 +754,30 @@ async function main() {
         where: { employee_id_attendance_date: { employee_id: empIds[empCode], attendance_date: date } },
       });
       if (!existing) {
-        const checkIn = new Date(`${dateStr}T09:00:00Z`);
-        const checkOut = new Date(`${dateStr}T18:00:00Z`);
+        const isLate = empCode === "PP-1004" && i === 0;
+        const isOnLeave = empCode === "PP-1009";
+        const isHalfDay = empCode === "PP-1008" && i === 0;
+
+        const checkIn = isOnLeave ? null : new Date(`${dateStr}T${isLate ? "09:48:00" : isHalfDay ? "10:15:00" : "09:05:00"}Z`);
+        const checkOut = isOnLeave ? null : new Date(`${dateStr}T${isHalfDay ? "15:30:00" : "18:15:00"}Z`);
+        const status = isOnLeave ? "on_leave" : isLate ? "late" : isHalfDay ? "half_day" : "present";
+
         await prisma.attendance.create({
           data: {
             employee_id: empIds[empCode],
             attendance_date: date,
             check_in: checkIn,
             check_out: checkOut,
-            status: "present",
+            status,
           },
         });
         attCount++;
       }
     }
   }
-  console.log(`  ✓ ${attCount} attendance records`);
+  console.log(`  ✓ ${attCount} attendance records populated in database`);
 
-  // ── 21. Work Schedules ──────────────────────────────────────────────────────
+  // ── 20. Work Schedules ──────────────────────────────────────────────────────
   console.log("Creating work schedules...");
   const seedSchedules = [
     {
@@ -795,11 +905,122 @@ async function main() {
       );
     }
   }
-  console.log(`  ✓ ${seedSchedules.length} work schedules in database`);
+  console.log(`  ✓ Work schedules assigned`);
 
-  console.log("\n✅ Database seeded successfully!");
-  console.log("\nDemo login emails:");
-  userData.forEach((u) => console.log(`  ${u.email.padEnd(40)} → ${u.role}`));
+  // ── 21. Onboarding Processes & Tasks ────────────────────────────────────────
+  console.log("Creating onboarding processes & checklists...");
+  const onboardingEmps = ["PP-1001", "PP-1007"];
+  for (const code of onboardingEmps) {
+    const empId = empIds[code];
+    if (!empId) continue;
+    let proc = await prisma.onboarding_processes.findUnique({ where: { employee_id: empId } });
+    if (!proc) {
+      proc = await prisma.onboarding_processes.create({
+        data: {
+          employee_id: empId,
+          started_at: new Date("2026-08-15"),
+          status: "in_progress",
+        },
+      });
+
+      const tasks = [
+        { name: "Complete personal profile", dept: "Employee", done: true, seq: 1 },
+        { name: "Add emergency contact", dept: "Employee", done: true, seq: 2 },
+        { name: "Accept company policies & code of conduct", dept: "HR", done: true, seq: 3 },
+        { name: "Submit bank salary account details", dept: "Finance", done: true, seq: 4 },
+        { name: "Declare tax regime & PAN verification", dept: "Finance", done: true, seq: 5 },
+        { name: "Sign employment contract & NDA", dept: "HR", done: true, seq: 6 },
+        { name: "Attend tech team orientation", dept: "HR", done: true, seq: 7 },
+        { name: "Acknowledge IT laptop & security token receipt", dept: "IT", done: false, seq: 8 },
+      ];
+
+      for (const t of tasks) {
+        await prisma.onboarding_tasks.create({
+          data: {
+            onboarding_process_id: proc.id,
+            task_name: t.name,
+            responsible_department: t.dept,
+            sequence: t.seq,
+            status: t.done ? "completed" : "not_started",
+            ...(t.done && { completed_at: new Date() }),
+          },
+        });
+      }
+    }
+  }
+  console.log(`  ✓ Onboarding processes & tasks created`);
+
+  // ── 22. Offboarding Processes & Clearance Tasks ─────────────────────────────
+  console.log("Creating offboarding process & clearance tasks...");
+  const offboardingCode = "PP-1008";
+  const offboardingEmpId = empIds[offboardingCode];
+  if (offboardingEmpId) {
+    let offProc = await prisma.offboarding_processes.findFirst({ where: { employee_id: offboardingEmpId } });
+    if (!offProc) {
+      offProc = await prisma.offboarding_processes.create({
+        data: {
+          employee_id: offboardingEmpId,
+          resignation_date: new Date("2026-08-15"),
+          last_working_date: new Date("2026-09-30"),
+          reason: "Voluntary separation — pursuing higher education",
+          notice_period_days: 30,
+          status: "in_progress",
+          final_settlement_status: "pending",
+        },
+      });
+
+      const clearanceItems = [
+        { name: "Return company laptop & monitor", dept: "IT", cleared: false },
+        { name: "Revoke SSO and GitHub repository access", dept: "IT", cleared: true },
+        { name: "Settle outstanding travel claims", dept: "Finance", cleared: true },
+        { name: "Surrender corporate credit card", dept: "Finance", cleared: false },
+        { name: "Exit interview & knowledge handover sign-off", dept: "HR", cleared: false },
+        { name: "Surrender RFID access card & pedestal keys", dept: "Admin", cleared: false },
+      ];
+
+      for (const item of clearanceItems) {
+        await prisma.offboarding_clearance_tasks.create({
+          data: {
+            offboarding_process_id: offProc.id,
+            task_name: item.name,
+            department: item.dept,
+            status: item.cleared ? "completed" : "pending",
+            ...(item.cleared && { completed_at: new Date() }),
+          },
+        });
+      }
+    }
+  }
+  console.log(`  ✓ Offboarding processes & clearance tasks created`);
+
+  // ── 23. Audit Log ───────────────────────────────────────────────────────────
+  console.log("Creating audit trail logs...");
+  const auditEntries = [
+    { action: "Initiated September 2026 draft payroll run PR-2609", module: "Payroll", actor: "Devika Rao" },
+    { action: "Assigned Figma Organization seat to Priya Deshmukh", module: "Assets", actor: "Neel Shah" },
+    { action: "Approved leave request LV-502 for Meera Krishnan", module: "Time Off", actor: "Sana Iqbal" },
+    { action: "Approved August travel reimbursement CLM-902", module: "Reimbursements", actor: "Arjun Nair" },
+    { action: "Scheduled offboarding and exit interview for Kabir Sethi", module: "Lifecycle", actor: "Sana Iqbal" },
+    { action: "Provisioned employee account and company email for Priya Deshmukh", module: "Provisioning", actor: "Ops Admin" },
+  ];
+
+  for (const entry of auditEntries) {
+    await prisma.audit_log.create({
+      data: {
+        table_name: entry.module,
+        record_id: crypto.randomUUID(),
+        action: "insert",
+        new_data: entry,
+      },
+    });
+  }
+  console.log(`  ✓ ${auditEntries.length} audit trail logs created`);
+
+  console.log("\n=======================================================");
+  console.log("🎉 SUCCESS: Entire database is fully populated with live data!");
+  console.log("=======================================================");
+  console.log("\nQuick Login Accounts (password: demo1234):");
+  userData.forEach((u) => console.log(`  • ${u.email.padEnd(38)} [${u.role}]`));
 }
 
 main()

@@ -29,7 +29,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { EmptyState, PageHeader, StatCard, TablePagination } from "@/components/bits";
 import { useApp, useEmployeeName } from "@/lib/store";
-import { inr, salaryStructures, type SalaryRecord } from "@/lib/mock-data";
+import { inr, type SalaryRecord } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/salary")({
   head: () => ({
@@ -49,7 +49,7 @@ const STATUS_COLORS: Record<SalaryRecord["status"], string> = {
 };
 
 function SalaryPage() {
-  const { salaryRecords: records, update, role, employees } = useApp();
+  const { salaryRecords: records, salaryStructures, update, role, employees } = useApp();
   const nameOf = useEmployeeName();
   const [q, setQ] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
@@ -74,9 +74,9 @@ function SalaryPage() {
   const enriched = useMemo(() => {
     return records
       .map((r) => {
-        const emp = employees.find((e) => e.id === r.employeeId);
-        const struct = salaryStructures.find((s) => s.id === r.structureId);
-        return { ...r, empName: emp?.name ?? "Unknown", dept: emp?.department ?? "—", struct: struct?.name ?? "—" };
+        const emp = employees.find((e) => e.id === r.employeeId || e.code === (r as any).employeeCode);
+        const struct = salaryStructures.find((s) => s.id === r.structureId || s.name === (r as any).structureName);
+        return { ...r, empName: emp?.name ?? (r as any).employeeName ?? "Unknown", dept: emp?.department ?? "—", struct: struct?.name ?? (r as any).structureName ?? "—" };
       })
       .filter((r) => {
         const matchQ =

@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppAdminRouteImport } from './routes/app.admin'
-import { Route as AppAllowanceRouteImport } from './routes/app.allowance'
 import { Route as AppAssetRequestsRouteImport } from './routes/app.asset-requests'
 import { Route as AppAssetsRouteImport } from './routes/app.assets'
 import { Route as AppAttendanceRouteImport } from './routes/app.attendance'
@@ -48,11 +47,6 @@ const AppRoute = AppRouteImport.update({
 const AppAdminRoute = AppAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAllowanceRoute = AppAllowanceRouteImport.update({
-  id: '/allowance',
-  path: '/allowance',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAssetRequestsRoute = AppAssetRequestsRouteImport.update({
@@ -165,7 +159,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/admin': typeof AppAdminRoute
-  '/app/allowance': typeof AppAllowanceRoute
   '/app/asset-requests': typeof AppAssetRequestsRoute
   '/app/assets': typeof AppAssetsRoute
   '/app/attendance': typeof AppAttendanceRoute
@@ -192,7 +185,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/admin': typeof AppAdminRoute
-  '/app/allowance': typeof AppAllowanceRoute
   '/app/asset-requests': typeof AppAssetRequestsRoute
   '/app/assets': typeof AppAssetsRoute
   '/app/attendance': typeof AppAttendanceRoute
@@ -220,7 +212,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/admin': typeof AppAdminRoute
-  '/app/allowance': typeof AppAllowanceRoute
   '/app/asset-requests': typeof AppAssetRequestsRoute
   '/app/assets': typeof AppAssetsRoute
   '/app/attendance': typeof AppAttendanceRoute
@@ -249,7 +240,6 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/admin'
-    | '/app/allowance'
     | '/app/asset-requests'
     | '/app/assets'
     | '/app/attendance'
@@ -276,7 +266,6 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/admin'
-    | '/app/allowance'
     | '/app/asset-requests'
     | '/app/assets'
     | '/app/attendance'
@@ -303,7 +292,6 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/admin'
-    | '/app/allowance'
     | '/app/asset-requests'
     | '/app/assets'
     | '/app/attendance'
@@ -353,13 +341,6 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/app/admin'
       preLoaderRoute: typeof AppAdminRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/allowance': {
-      id: '/app/allowance'
-      path: '/allowance'
-      fullPath: '/app/allowance'
-      preLoaderRoute: typeof AppAllowanceRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/asset-requests': {
@@ -514,7 +495,6 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAdminRoute: typeof AppAdminRoute
-  AppAllowanceRoute: typeof AppAllowanceRoute
   AppAssetRequestsRoute: typeof AppAssetRequestsRoute
   AppAssetsRoute: typeof AppAssetsRoute
   AppAttendanceRoute: typeof AppAttendanceRoute
@@ -540,7 +520,6 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRoute,
-  AppAllowanceRoute: AppAllowanceRoute,
   AppAssetRequestsRoute: AppAssetRequestsRoute,
   AppAssetsRoute: AppAssetsRoute,
   AppAttendanceRoute: AppAttendanceRoute,

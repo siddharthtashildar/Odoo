@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { EmptyState, PageHeader, StatCard, StatusBadge, TablePagination } from "@/components/bits";
 import { useApp, useEmployeeName } from "@/lib/store";
+import { api } from "@/lib/api";
 import { inr } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/payroll/$runId")({
@@ -104,6 +105,24 @@ function PayrollDetail() {
         actions={
           <>
             <StatusBadge status={run.status} />
+            {(run.status === "approved" || run.status === "paid") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  toast.info("Sending payslip emails to all employees...");
+                  try {
+                    const res = await api.payroll.sendEmails(run.id);
+                    toast.success("Payslip emails sent!", { description: res.message });
+                  } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : "Failed to send emails";
+                    toast.error(msg);
+                  }
+                }}
+              >
+                <SendHorizonal className="mr-2 size-4" /> Email Payslips to All
+              </Button>
+            )}
             {canEditLines && (
               <Button onClick={submit}>
                 <SendHorizonal className="mr-2 size-4" /> Submit for approval

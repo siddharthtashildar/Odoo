@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "./api";
-import * as seed from "./mock-data";
 import type {
   AllowanceRecord,
   Asset,
@@ -60,24 +59,24 @@ const initial: State = {
   signedIn: false,
   role: "hr_manager",
   currentUser: null,
-  employees: seed.employees,
-  onboarding: seed.onboardingCases,
-  offboarding: seed.offboardingCases,
-  contracts: seed.contracts,
-  attendance: seed.attendanceRecords,
-  leave: seed.leaveRequests,
-  payroll: seed.payrollRuns,
-  reimbursements: seed.reimbursements,
-  allowances: seed.allowances,
-  helpdesk: seed.helpdeskTickets,
-  provisioning: seed.provisioningRecords,
-  assets: seed.assets,
-  assetRequests: seed.assetRequests,
-  users: seed.orgUsers,
-  audit: seed.auditLog,
-  salaryRecords: seed.salaryRecords,
-  salaryStructures: seed.salaryStructures,
-  schedules: seed.defaultSchedules,
+  employees: [],
+  onboarding: [],
+  offboarding: [],
+  contracts: [],
+  attendance: [],
+  leave: [],
+  payroll: [],
+  reimbursements: [],
+  allowances: [],
+  helpdesk: [],
+  provisioning: [],
+  assets: [],
+  assetRequests: [],
+  users: [],
+  audit: [],
+  salaryRecords: [],
+  salaryStructures: [],
+  schedules: [],
 };
 
 interface Store extends State {
@@ -105,6 +104,10 @@ interface Store extends State {
   updateTicket: (id: string, patch: Partial<HelpdeskTicket>) => void;
   addTicketComment: (ticketId: string, author: string, text: string) => void;
   retryProvisioning: (id: string) => void;
+  addAsset: (a: Asset) => Promise<void>;
+  updateAsset: (id: string, patch: Partial<Asset>) => Promise<void>;
+  addAssetRequest: (req: AssetRequest) => Promise<void>;
+  updateAssetRequest: (id: string, patch: Partial<AssetRequest> & { fulfilledAssetId?: string }) => Promise<void>;
   addSchedule: (s: WorkSchedule) => Promise<void>;
   updateSchedule: (id: string, patch: Partial<WorkSchedule>) => Promise<void>;
   deleteSchedule: (id: string) => Promise<void>;
@@ -118,27 +121,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial);
   const [hydrated, setHydrated] = useState(false);
 
-  // Fetch all data from the API on mount, fall back to seed data if server is down
+  // Fetch all data from the database API on mount
   useEffect(() => {
     const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
 
     async function fetchAll() {
       try {
-        const [empRes, conRes, attRes, leaveRes, payrollRes, structRes, recordsRes, reimRes, allowRes, assetRes, helpdeskRes, schedRes] =
-          await Promise.allSettled([
-            fetch(`${API}/api/employees`).then((r) => r.json()),
-            fetch(`${API}/api/contracts`).then((r) => r.json()),
-            fetch(`${API}/api/attendance`).then((r) => r.json()),
-            fetch(`${API}/api/leave`).then((r) => r.json()),
-            fetch(`${API}/api/payroll`).then((r) => r.json()),
-            fetch(`${API}/api/salary/structures`).then((r) => r.json()),
-            fetch(`${API}/api/salary/records`).then((r) => r.json()),
-            fetch(`${API}/api/reimbursements`).then((r) => r.json()),
-            fetch(`${API}/api/allowances`).then((r) => r.json()),
-            fetch(`${API}/api/assets`).then((r) => r.json()),
-            fetch(`${API}/api/helpdesk`).then((r) => r.json()),
-            fetch(`${API}/api/schedules`).then((r) => r.json()),
-          ]);
+        const [
+          empRes,
+          conRes,
+          attRes,
+          leaveRes,
+          payrollRes,
+          structRes,
+          recordsRes,
+          reimRes,
+          allowRes,
+          assetRes,
+          assetReqRes,
+          helpdeskRes,
+          schedRes,
+          onbRes,
+          offRes,
+          prvRes,
+          usrRes,
+          audRes,
+        ] = await Promise.allSettled([
+          fetch(`${API}/api/employees`).then((r) => r.json()),
+          fetch(`${API}/api/contracts`).then((r) => r.json()),
+          fetch(`${API}/api/attendance`).then((r) => r.json()),
+          fetch(`${API}/api/leave`).then((r) => r.json()),
+          fetch(`${API}/api/payroll`).then((r) => r.json()),
+          fetch(`${API}/api/salary/structures`).then((r) => r.json()),
+          fetch(`${API}/api/salary/records`).then((r) => r.json()),
+          fetch(`${API}/api/reimbursements`).then((r) => r.json()),
+          fetch(`${API}/api/allowances`).then((r) => r.json()),
+          fetch(`${API}/api/assets`).then((r) => r.json()),
+          fetch(`${API}/api/assets/requests`).then((r) => r.json()),
+          fetch(`${API}/api/helpdesk`).then((r) => r.json()),
+          fetch(`${API}/api/schedules`).then((r) => r.json()),
+          fetch(`${API}/api/onboarding`).then((r) => r.json()),
+          fetch(`${API}/api/offboarding`).then((r) => r.json()),
+          fetch(`${API}/api/provisioning`).then((r) => r.json()),
+          fetch(`${API}/api/users`).then((r) => r.json()),
+          fetch(`${API}/api/audit`).then((r) => r.json()),
+        ]);
 
           // Preserve existing state on failed fetches instead of falling back to seed data
           setState((s) => ({
@@ -157,7 +184,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             schedules: schedRes.status === "fulfilled" && schedRes.value?.success ? schedRes.value.data : s.schedules,
           }));
       } catch (err) {
-        console.warn("[store] API unreachable — using seed data", err);
+        console.warn("[store] API unreachable", err);
       } finally {
         setHydrated(true);
       }
@@ -240,7 +267,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         {
           id: `L${Math.random().toString(36).slice(2, 8)}`,
           at: new Date().toISOString().slice(0, 16).replace("T", " "),
-          actor: seed.ROLE_PERSONA[s.role]?.name ?? "User",
+          actor: s.currentUser?.name ?? "User",
           action,
           module,
         },
@@ -530,7 +557,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       id: `c-${Date.now()}`,
       author,
       text,
-      at: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+      at: new Date().toISOString().slice(0, 16).replace("T", " "),
     };
     setState((s) => ({
       ...s,
@@ -646,20 +673,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         email: match?.email || state.currentUser.email,
       };
     }
-    const staticP = seed.ROLE_PERSONA[state.role];
-    const match = state.employees.find(
-      (e) =>
-        e.id === staticP?.employeeId ||
-        e.code === staticP?.employeeId ||
-        (Boolean(staticP?.name) && e.name.toLowerCase().includes((staticP?.name ?? "").split(" ")[0]?.toLowerCase() ?? "")) ||
-        (state.role === "payroll_manager" && (e.code === "PP-1005" || e.code === "PP-1004" || e.email.includes("arjun"))) ||
-        (state.role === "payroll_user" && (e.code === "PP-1004" || e.code === "PP-1005" || e.email.includes("devika"))),
-    );
+    const roleMatch = state.employees.find((e) => {
+      if (state.role === "hr_manager") return e.department?.toLowerCase().includes("people") || e.designation?.toLowerCase().includes("hr");
+      if (state.role === "payroll_manager") return e.designation?.toLowerCase().includes("payroll") || e.email.includes("arjun");
+      if (state.role === "payroll_user") return e.email.includes("devika") || e.department?.toLowerCase().includes("finance");
+      if (state.role === "it_asset_manager") return e.department?.toLowerCase().includes("it") || e.designation?.toLowerCase().includes("asset");
+      if (state.role === "admin") return e.email.includes("admin") || e.email.includes("siddharth");
+      return true;
+    }) || state.employees[0];
+
     return {
-      employeeId: match?.id || staticP?.employeeId || "E1001",
-      employeeCode: match?.code || staticP?.employeeId || "PP-1001",
-      name: match?.name || staticP?.name || "User",
-      email: match?.email || "",
+      employeeId: roleMatch?.id || "EMP-001",
+      employeeCode: roleMatch?.code || "PP-1001",
+      name: roleMatch?.name || (state.role === "admin" ? "Ops Admin" : "Employee"),
+      email: roleMatch?.email || "",
     };
   }, [state.currentUser, state.role, state.employees]);
 
@@ -711,6 +738,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateTicket,
       addTicketComment,
       retryProvisioning,
+      addAsset,
+      updateAsset,
+      addAssetRequest,
+      updateAssetRequest,
       addSchedule,
       updateSchedule,
       deleteSchedule,
@@ -736,6 +767,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateTicket,
       addTicketComment,
       retryProvisioning,
+      addAsset,
+      updateAsset,
+      addAssetRequest,
+      updateAssetRequest,
       addSchedule,
       updateSchedule,
       deleteSchedule,
@@ -754,7 +789,37 @@ export function useApp() {
 
 export function useEmployeeName() {
   const { employees } = useApp();
-  return useCallback((id: string) => employees.find((e) => e.id === id)?.name ?? "Unknown", [employees]);
+  return useCallback(
+    (id: string | undefined | null) => {
+      if (!id) return "Unassigned";
+      const str = String(id).trim();
+      if (!str) return "Unassigned";
+
+      // 1. Dual ID / code match in active store employees
+      const mappedCode = str.startsWith("E") ? str.replace(/^E/, "PP-") : str;
+      const mappedEId = str.startsWith("PP-") ? str.replace(/^PP-/, "E") : str;
+
+      const found = employees.find(
+        (e) =>
+          e.id === str ||
+          e.code === str ||
+          e.code === mappedCode ||
+          e.id === mappedEId ||
+          (e.id && str && e.id.toLowerCase() === str.toLowerCase()) ||
+          (e.email && e.email.toLowerCase() === str.toLowerCase()) ||
+          (e.name && e.name.toLowerCase() === str.toLowerCase()),
+      );
+      if (found?.name) return found.name;
+
+      // 3. If str is already a human name (contains space, not a UUID)
+      if (str.includes(" ") && !str.includes("-")) {
+        return str;
+      }
+
+      return str;
+    },
+    [employees],
+  );
 }
 
 /** Simulated async delay for loading states */
@@ -777,12 +842,11 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/attendance": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
   "/app/schedule": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
   "/app/leave": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
-  "/app/payroll": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/payroll": ["payroll_user", "payroll_manager", "admin"],
   "/app/salary": ["payroll_user", "payroll_manager", "admin"],
   "/app/salary-structure": ["payroll_user", "payroll_manager", "admin"],
-  "/app/payslips": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
+  "/app/payslips": ["payroll_user", "payroll_manager", "admin"],
   "/app/reimbursement": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
-  "/app/allowance": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
   "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
   "/app/helpdesk": ["employee", "it_asset_manager", "hr_manager", "payroll_user", "payroll_manager", "admin"],
