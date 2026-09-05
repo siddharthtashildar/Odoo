@@ -84,7 +84,7 @@ export async function generatePayslipsForRun(runId: string, employeeIdsFilter?: 
           rule_id: line.ruleId || undefined,
           code: line.code,
           name: line.name,
-          category: line.category,
+          rule_type: (line.category === "DEDUCTION" || line.category === "TAX" ? "deduction" : "allowance") as any,
           amount: line.amount,
         })),
       });

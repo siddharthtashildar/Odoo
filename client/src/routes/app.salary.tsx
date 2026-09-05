@@ -170,18 +170,8 @@ function SalaryPage() {
       <PageHeader
         title="Salary"
         description="Employee salary records, CTC breakdowns and structure assignments."
-        actions={
-          canEdit ? (
-            <Badge variant="outline" className="gap-1.5 text-xs">
-              <Edit2 className="size-3" /> Edit mode active
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="gap-1.5 text-xs text-muted-foreground">
-              <Lock className="size-3" /> Read-only
-            </Badge>
-          )
-        }
       />
+
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-3">

@@ -625,8 +625,8 @@ const halfDayCount = dateRecords.filter((a) => a.status === "Half Day").length;
                       <TableRow key={r.id}>
                         <TableCell>
                           <div className="font-medium">{nameOf(r.employeeId)}</div>
-                          <div className="text-xs text-muted-foreground">{r.employeeId}</div>
                         </TableCell>
+
                         <TableCell className="text-xs text-muted-foreground">{r.date}</TableCell>
                         <TableCell className="font-mono text-xs">{r.checkIn}</TableCell>
                         <TableCell className="font-mono text-xs">{r.checkOut}</TableCell>
