@@ -52,7 +52,7 @@ export interface OnboardingTask {
   label: string;
   owner: "HR" | "IT" | "Payroll" | "Manager" | "Employee";
   done: boolean;
-  category?: string;
+  category?: string | undefined;
 }
 
 export interface OnboardingCase {
@@ -63,9 +63,9 @@ export interface OnboardingCase {
   buddy: string;
   assignedHr: string;
   status: OnboardingStatus;
-  invitationSentDate?: string;
-  accountCreatedDate?: string;
-  completedDate?: string;
+  invitationSentDate?: string | undefined;
+  accountCreatedDate?: string | undefined;
+  completedDate?: string | undefined;
   tasks: OnboardingTask[];
 }
 
@@ -151,7 +151,7 @@ export interface ReimbursementClaim {
   approvalStatus: ReimbursementApprovalStatus;
   paymentStatus: ReimbursementPaymentStatus;
   description: string;
-  receiptFileName?: string;
+  receiptFileName?: string | undefined;
   paymentMethod: "Bank Transfer" | "Payroll Cycle" | "UPI";
 }
 
@@ -173,7 +173,7 @@ export interface AllowanceRecord {
   effectiveDate: string;
   expiryDate: string;
   status: AllowanceStatus;
-  notes?: string;
+  notes?: string | undefined;
 }
 
 export type AssetCategory =
@@ -337,6 +337,235 @@ export interface OrgUser {
   role: Role;
   active: boolean;
 }
+
+// ─── Salary Structure ─────────────────────────────────────────────────────────
+
+export type SalaryStructureStatus = "active" | "inactive" | "draft";
+
+export interface SalaryComponent {
+  name: string;
+  type: "earning" | "deduction" | "employer";
+  /** Percentage of basic salary, or a fixed monthly amount */
+  basis: "percent_of_basic" | "fixed";
+  value: number; // percent (0–100) or INR/month
+}
+
+export interface SalaryStructure {
+  id: string;
+  name: string;
+  description: string;
+  applicableTo: "All" | "Senior" | "Executive" | "Intern" | "Contract";
+  status: SalaryStructureStatus;
+  effectiveFrom: string;
+  components: SalaryComponent[];
+  createdBy: string;
+  updatedAt: string;
+}
+
+export interface SalaryRecord {
+  id: string;
+  employeeId: string;
+  structureId: string;
+  effectiveFrom: string;
+  annualCTC: number;
+  monthlyCTC: number;
+  basic: number;
+  hra: number;
+  specialAllowance: number;
+  providentFund: number;
+  professionalTax: number;
+  incomeTax: number;
+  netMonthly: number;
+  status: "active" | "revised" | "pending";
+  revisedBy?: string | undefined;
+  remarks?: string | undefined;
+}
+
+export const salaryStructures: SalaryStructure[] = [
+  {
+    id: "SS-001",
+    name: "Standard Full-Time",
+    description: "Default structure for permanent full-time employees. Covers all statutory deductions.",
+    applicableTo: "All",
+    status: "active",
+    effectiveFrom: "2026-04-01",
+    createdBy: "Devika Rao",
+    updatedAt: "2026-04-01",
+    components: [
+      { name: "Basic Salary", type: "earning", basis: "percent_of_basic", value: 100 },
+      { name: "House Rent Allowance (HRA)", type: "earning", basis: "percent_of_basic", value: 40 },
+      { name: "Special Allowance", type: "earning", basis: "percent_of_basic", value: 10 },
+      { name: "Provident Fund (Employee)", type: "deduction", basis: "percent_of_basic", value: 12 },
+      { name: "Professional Tax", type: "deduction", basis: "fixed", value: 200 },
+      { name: "Income Tax (TDS)", type: "deduction", basis: "percent_of_basic", value: 10 },
+      { name: "Provident Fund (Employer)", type: "employer", basis: "percent_of_basic", value: 12 },
+    ],
+  },
+  {
+    id: "SS-002",
+    name: "Senior Leadership",
+    description: "Applies to Director and VP level employees. Higher HRA and variable component.",
+    applicableTo: "Executive",
+    status: "active",
+    effectiveFrom: "2026-04-01",
+    createdBy: "Arjun Nair",
+    updatedAt: "2026-06-15",
+    components: [
+      { name: "Basic Salary", type: "earning", basis: "percent_of_basic", value: 100 },
+      { name: "House Rent Allowance (HRA)", type: "earning", basis: "percent_of_basic", value: 50 },
+      { name: "Special Allowance", type: "earning", basis: "percent_of_basic", value: 20 },
+      { name: "Provident Fund (Employee)", type: "deduction", basis: "percent_of_basic", value: 12 },
+      { name: "Professional Tax", type: "deduction", basis: "fixed", value: 200 },
+      { name: "Income Tax (TDS)", type: "deduction", basis: "percent_of_basic", value: 20 },
+      { name: "Provident Fund (Employer)", type: "employer", basis: "percent_of_basic", value: 12 },
+    ],
+  },
+  {
+    id: "SS-003",
+    name: "Internship / Stipend",
+    description: "Simplified structure for interns receiving fixed monthly stipend. No PF/PT applicable.",
+    applicableTo: "Intern",
+    status: "active",
+    effectiveFrom: "2026-07-01",
+    createdBy: "Devika Rao",
+    updatedAt: "2026-07-01",
+    components: [
+      { name: "Monthly Stipend", type: "earning", basis: "fixed", value: 20000 },
+      { name: "Meal Allowance", type: "earning", basis: "fixed", value: 2000 },
+    ],
+  },
+  {
+    id: "SS-004",
+    name: "Contractual Consultant",
+    description: "For contract employees paid monthly retainer. TDS deducted at source.",
+    applicableTo: "Contract",
+    status: "draft",
+    effectiveFrom: "2026-10-01",
+    createdBy: "Arjun Nair",
+    updatedAt: "2026-09-01",
+    components: [
+      { name: "Retainer Fee", type: "earning", basis: "fixed", value: 80000 },
+      { name: "TDS (10%)", type: "deduction", basis: "percent_of_basic", value: 10 },
+    ],
+  },
+];
+
+export const salaryRecords: SalaryRecord[] = [
+  {
+    id: "SR-1001",
+    employeeId: "E1001",
+    structureId: "SS-001",
+    effectiveFrom: "2026-04-01",
+    annualCTC: 2400000,
+    monthlyCTC: 200000,
+    basic: 133333,
+    hra: 53333,
+    specialAllowance: 13333,
+    providentFund: 16000,
+    professionalTax: 200,
+    incomeTax: 13333,
+    netMonthly: 163800,
+    status: "active",
+  },
+  {
+    id: "SR-1002",
+    employeeId: "E1002",
+    structureId: "SS-001",
+    effectiveFrom: "2026-04-01",
+    annualCTC: 4100000,
+    monthlyCTC: 341667,
+    basic: 227778,
+    hra: 91111,
+    specialAllowance: 22778,
+    providentFund: 27333,
+    professionalTax: 200,
+    incomeTax: 22778,
+    netMonthly: 269156,
+    status: "active",
+  },
+  {
+    id: "SR-1003",
+    employeeId: "E1003",
+    structureId: "SS-002",
+    effectiveFrom: "2026-04-01",
+    annualCTC: 5200000,
+    monthlyCTC: 433333,
+    basic: 216667,
+    hra: 108333,
+    specialAllowance: 43333,
+    providentFund: 26000,
+    professionalTax: 200,
+    incomeTax: 43333,
+    netMonthly: 334467,
+    status: "active",
+  },
+  {
+    id: "SR-1004",
+    employeeId: "E1004",
+    structureId: "SS-001",
+    effectiveFrom: "2026-04-01",
+    annualCTC: 3200000,
+    monthlyCTC: 266667,
+    basic: 177778,
+    hra: 71111,
+    specialAllowance: 17778,
+    providentFund: 21333,
+    professionalTax: 200,
+    incomeTax: 17778,
+    netMonthly: 215156,
+    status: "active",
+  },
+  {
+    id: "SR-1005",
+    employeeId: "E1005",
+    structureId: "SS-002",
+    effectiveFrom: "2026-04-01",
+    annualCTC: 4800000,
+    monthlyCTC: 400000,
+    basic: 200000,
+    hra: 100000,
+    specialAllowance: 40000,
+    providentFund: 24000,
+    professionalTax: 200,
+    incomeTax: 40000,
+    netMonthly: 295800,
+    status: "active",
+  },
+  {
+    id: "SR-1006",
+    employeeId: "E1006",
+    structureId: "SS-001",
+    effectiveFrom: "2026-04-01",
+    annualCTC: 2800000,
+    monthlyCTC: 233333,
+    basic: 155556,
+    hra: 62222,
+    specialAllowance: 15556,
+    providentFund: 18667,
+    professionalTax: 200,
+    incomeTax: 15556,
+    netMonthly: 176910,
+    status: "active",
+  },
+  {
+    id: "SR-1007",
+    employeeId: "E1007",
+    structureId: "SS-001",
+    effectiveFrom: "2026-04-01",
+    annualCTC: 1800000,
+    monthlyCTC: 150000,
+    basic: 100000,
+    hra: 40000,
+    specialAllowance: 10000,
+    providentFund: 12000,
+    professionalTax: 200,
+    incomeTax: 10000,
+    netMonthly: 127800,
+    status: "revised",
+    revisedBy: "Devika Rao",
+    remarks: "Annual increment applied — effective April 2026",
+  },
+];
 
 const d = (s: string) => s;
 
@@ -832,6 +1061,27 @@ export const attendanceRecords: AttendanceRecord[] = [
 ];
 
 export const onboardingCases: OnboardingCase[] = [
+  {
+    id: "ON-200",
+    employeeId: "E1001",
+    startDate: "2026-08-15",
+    dueDate: "2026-09-15",
+    buddy: "Rohan Mehta",
+    assignedHr: "Sana Iqbal",
+    status: "In Progress",
+    invitationSentDate: "2026-08-10",
+    accountCreatedDate: "2026-08-11",
+    tasks: [
+      { id: "t1", label: "Complete personal profile", owner: "Employee", done: true, category: "Personal" },
+      { id: "t2", label: "Add emergency contact", owner: "Employee", done: true, category: "Personal" },
+      { id: "t3", label: "Accept company policies & code of conduct", owner: "Employee", done: true, category: "Compliance" },
+      { id: "t4", label: "Submit bank salary account details", owner: "Payroll", done: true, category: "Finance" },
+      { id: "t5", label: "Declare tax regime & PAN verification", owner: "Payroll", done: true, category: "Finance" },
+      { id: "t6", label: "Sign employment contract & NDA", owner: "HR", done: true, category: "Legal" },
+      { id: "t7", label: "Attend tech team orientation", owner: "HR", done: true, category: "Orientation" },
+      { id: "t8", label: "Acknowledge IT laptop & security token receipt", owner: "IT", done: false, category: "IT" },
+    ],
+  },
   {
     id: "ON-201",
     employeeId: "E1007",

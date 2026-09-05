@@ -55,7 +55,7 @@ function LeavePage() {
   const nameOf = useEmployeeName();
   const ready = useDelayed();
 
-  const isApprover = role === "hr_manager" || role === "admin" || role === "hr_user";
+  const isApprover = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
   const isEmployeeOnly = role === "employee";
   const me = employees.find((e) => e.id === persona.employeeId);
 
@@ -391,7 +391,7 @@ function LeavePage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-            <Field label="Leave Type" error={errors.type}>
+            <Field label="Leave Type" error={errors["type"]}>
               <Select
                 value={form.type}
                 onValueChange={(v) => setForm({ ...form, type: v as LeaveType })}
@@ -411,14 +411,14 @@ function LeavePage() {
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="From" error={errors.from}>
+              <Field label="From" error={errors["from"]}>
                 <Input
                   type="date"
                   value={form.from}
                   onChange={(e) => setForm({ ...form, from: e.target.value })}
                 />
               </Field>
-              <Field label="To" error={errors.to}>
+              <Field label="To" error={errors["to"]}>
                 <Input
                   type="date"
                   value={form.to}
@@ -433,7 +433,7 @@ function LeavePage() {
               </p>
             )}
 
-            <Field label="Reason" error={errors.reason}>
+            <Field label="Reason" error={errors["reason"]}>
               <Textarea
                 rows={3}
                 placeholder="Describe reason for leave..."

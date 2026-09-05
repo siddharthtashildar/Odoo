@@ -17,6 +17,8 @@ import type {
   ProvisioningRecord,
   ReimbursementClaim,
   Role,
+  SalaryRecord,
+  SalaryStructure,
 } from "./mock-data";
 
 interface State {
@@ -37,6 +39,8 @@ interface State {
   assetRequests: AssetRequest[];
   users: OrgUser[];
   audit: AuditEntry[];
+  salaryRecords: SalaryRecord[];
+  salaryStructures: SalaryStructure[];
 }
 
 const initial: State = {
@@ -57,6 +61,8 @@ const initial: State = {
   assetRequests: seed.assetRequests,
   users: seed.orgUsers,
   audit: seed.auditLog,
+  salaryRecords: seed.salaryRecords,
+  salaryStructures: seed.salaryStructures,
 };
 
 interface Store extends State {
@@ -105,6 +111,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           allowances: parsed.allowances?.length ? parsed.allowances : seed.allowances,
           helpdesk: parsed.helpdesk?.length ? parsed.helpdesk : seed.helpdeskTickets,
           provisioning: parsed.provisioning?.length ? parsed.provisioning : seed.provisioningRecords,
+          salaryRecords: parsed.salaryRecords?.length ? parsed.salaryRecords : seed.salaryRecords,
+          salaryStructures: parsed.salaryStructures?.length ? parsed.salaryStructures : seed.salaryStructures,
         });
       }
     } catch {
@@ -339,19 +347,19 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/dashboard": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
   "/app/me": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
   "/app/employees": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/onboarding": ["hr_manager", "hr_user", "admin"],
-  "/app/offboarding": ["hr_manager", "hr_user", "admin"],
-  "/app/contracts": ["hr_manager", "hr_user", "payroll_manager", "admin"],
+  "/app/onboarding": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
+  "/app/offboarding": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
+  "/app/contracts": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
   "/app/attendance": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/leave": ["employee", "hr_manager", "hr_user", "admin"],
+  "/app/leave": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
   "/app/payroll": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
   "/app/payslips": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
-  "/app/reimbursement": ["employee", "hr_manager", "hr_user", "payroll_manager", "admin"],
-  "/app/allowance": ["employee", "hr_manager", "hr_user", "payroll_manager", "admin"],
-  "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "hr_user"],
-  "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "hr_user"],
+  "/app/reimbursement": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
+  "/app/allowance": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
+  "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "hr_user", "payroll_user", "payroll_manager"],
+  "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "hr_user", "payroll_user", "payroll_manager"],
   "/app/helpdesk": ["employee", "it_asset_manager", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
-  "/app/reports": ["hr_manager", "hr_user", "payroll_manager", "admin"],
+  "/app/reports": ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"],
   "/app/admin": ["admin"],
   "/app/settings": ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
 };

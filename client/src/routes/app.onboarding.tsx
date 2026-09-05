@@ -77,7 +77,8 @@ export function OnboardingPage() {
   const [hireForm, setHireForm] = useState(emptyHireForm);
   const [hireErrors, setHireErrors] = useState<Record<string, string | undefined>>({});
 
-  const [activeChecklistCase, setActiveChecklistCase] = useState<OnboardingCase | null>(null);
+  const [activeChecklistCaseId, setActiveChecklistCaseId] = useState<string | null>(null);
+  const activeChecklistCase = onboarding.find((c) => c.id === activeChecklistCaseId) ?? null;
   const [inviteSimCase, setInviteSimCase] = useState<OnboardingCase | null>(null);
   const [simPassword, setSimPassword] = useState("");
   const [simPasswordError, setSimPasswordError] = useState("");
@@ -85,7 +86,7 @@ export function OnboardingPage() {
 
   const [showProvisioningDetails, setShowProvisioningDetails] = useState<ProvisioningRecord | null>(null);
 
-  const canManage = role === "hr_manager" || role === "admin" || role === "hr_user";
+  const canManage = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
 
   const totalCases = onboarding.length;
   const inProgressCases = onboarding.filter((c) => c.status === "In Progress" || c.status === "Account Created").length;
@@ -206,9 +207,6 @@ export function OnboardingPage() {
     });
 
     update("onboarding", updated);
-    if (activeChecklistCase?.id === caseId) {
-      setActiveChecklistCase(updated.find((c) => c.id === caseId) ?? null);
-    }
   };
 
   const handleResendInvite = (c: OnboardingCase) => {
@@ -437,7 +435,7 @@ export function OnboardingPage() {
                               size="sm"
                               variant="ghost"
                               className="h-8 px-2"
-                              onClick={() => setActiveChecklistCase(c)}
+                              onClick={() => setActiveChecklistCaseId(c.id)}
                               title="View checklist tasks"
                             >
                               <Eye className="size-3.5 mr-1" /> Checklist
@@ -488,7 +486,7 @@ export function OnboardingPage() {
 
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Full Name" error={hireErrors.name}>
+              <Field label="Full Name" error={hireErrors["name"]}>
                 <Input
                   placeholder="e.g. Tanvi Joshi"
                   value={hireForm.name}
@@ -496,7 +494,7 @@ export function OnboardingPage() {
                 />
               </Field>
 
-              <Field label="Work Email" error={hireErrors.email}>
+              <Field label="Work Email" error={hireErrors["email"]}>
                 <Input
                   type="email"
                   placeholder="tanvi.joshi@peoplepay360.io"
@@ -527,7 +525,7 @@ export function OnboardingPage() {
                 </Select>
               </Field>
 
-              <Field label="Job Title" error={hireErrors.designation}>
+              <Field label="Job Title" error={hireErrors["designation"]}>
                 <Input
                   placeholder="e.g. Cloud Architect"
                   value={hireForm.designation}
@@ -537,7 +535,7 @@ export function OnboardingPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Joining Date" error={hireErrors.joiningDate}>
+              <Field label="Joining Date" error={hireErrors["joiningDate"]}>
                 <Input
                   type="date"
                   value={hireForm.joiningDate}
@@ -604,7 +602,7 @@ export function OnboardingPage() {
 
       {/* Checklist Drawer Modal */}
       {activeChecklistCase && (
-        <Dialog open={!!activeChecklistCase} onOpenChange={(o) => !o && setActiveChecklistCase(null)}>
+        <Dialog open={!!activeChecklistCase} onOpenChange={(o) => !o && setActiveChecklistCaseId(null)}>
           <DialogContent className="max-w-xl">
             <DialogHeader>
               <div className="flex items-center justify-between">
@@ -651,7 +649,7 @@ export function OnboardingPage() {
             </div>
 
             <DialogFooter>
-              <Button onClick={() => setActiveChecklistCase(null)}>Close</Button>
+              <Button onClick={() => setActiveChecklistCaseId(null)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -737,7 +735,7 @@ export function OnboardingPage() {
                   onClick={() => {
                     const c = inviteSimCase;
                     setInviteSimCase(null);
-                    if (c) setActiveChecklistCase(c);
+                    if (c) setActiveChecklistCaseId(c.id);
                   }}
                 >
                   Open Onboarding Checklist

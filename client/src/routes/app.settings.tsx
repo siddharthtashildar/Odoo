@@ -48,7 +48,7 @@ function SettingsPage() {
   const save = () => toast.success("Preferences saved");
 
   const reset = () => {
-    localStorage.removeItem("pp360-state-v1");
+    localStorage.removeItem("pp360-state-v3");
     toast.success("Demo data reset", { description: "Reloading the seeded workspace…" });
     setTimeout(() => window.location.assign("/"), 600);
   };

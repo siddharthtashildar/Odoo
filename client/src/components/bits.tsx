@@ -32,7 +32,7 @@ export function StatCard({
   tone = "default",
 }: {
   label: string;
-  value: string | number;
+  value: ReactNode;
   hint?: string | undefined;
   icon?: ReactNode | undefined;
   tone?: "default" | "accent" | "success" | "warning" | undefined;

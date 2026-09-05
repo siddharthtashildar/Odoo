@@ -49,7 +49,7 @@ function PayrollDetail() {
     );
   }
 
-  const canEditLines = (role === "payroll_user" || role === "admin") && run.status === "draft";
+  const canEditLines = (role === "payroll_manager" || role === "admin") && run.status === "draft";
   const canApprove = (role === "payroll_manager" || role === "admin") && run.status === "pending_approval";
   const canPay = (role === "payroll_manager" || role === "admin") && run.status === "approved";
 

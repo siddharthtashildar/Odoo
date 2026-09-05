@@ -73,7 +73,7 @@ function ContractsPage() {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
-  const canEdit = role === "hr_manager" || role === "admin";
+  const canEdit = role === "hr_manager" || role === "admin" || role === "payroll_manager" || role === "payroll_user" || role === "hr_user";
 
   const activeCount = contracts.filter((c) => c.status === "Active").length;
   const expiringCount = contracts.filter((c) => c.status === "Expiring Soon").length;
@@ -380,7 +380,7 @@ function ContractsPage() {
           </DialogHeader>
 
           <div className="grid gap-4 py-2">
-            <Field label="Employee" error={errors.employeeId}>
+            <Field label="Employee" error={errors["employeeId"]}>
               <Select
                 value={form.employeeId}
                 onValueChange={(v) => {
@@ -425,7 +425,7 @@ function ContractsPage() {
                 </Select>
               </Field>
 
-              <Field label="Annual Salary (₹ CTC)" error={errors.salary}>
+              <Field label="Annual Salary (₹ CTC)" error={errors["salary"]}>
                 <Input
                   type="number"
                   placeholder="e.g. 2400000"
@@ -436,14 +436,14 @@ function ContractsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Start Date" error={errors.startDate}>
+              <Field label="Start Date" error={errors["startDate"]}>
                 <Input
                   type="date"
                   value={form.startDate}
                   onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                 />
               </Field>
-              <Field label="End Date" error={errors.endDate}>
+              <Field label="End Date" error={errors["endDate"]}>
                 <Input
                   type="date"
                   value={form.endDate}

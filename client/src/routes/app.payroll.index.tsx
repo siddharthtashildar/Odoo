@@ -81,7 +81,7 @@ function PayrollList() {
   const [q, setQ] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
 
-  const canManage = role === "payroll_user" || role === "payroll_manager" || role === "admin" || role === "hr_manager";
+  const canManage = role === "payroll_manager" || role === "admin";
   const canApprove = role === "payroll_manager" || role === "admin";
 
   const currentRun = payroll.find((p) => p.id === selectedRunId) ?? payroll[0];
@@ -485,10 +485,10 @@ function PayrollList() {
                           {inr(line.net)}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {currentRun.period}
+                          {currentRun?.period ?? "—"}
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={currentRun.status} />
+                          <StatusBadge status={currentRun?.status ?? "draft"} />
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -496,7 +496,7 @@ function PayrollList() {
                               size="sm"
                               variant="ghost"
                               className="h-8 px-2"
-                              onClick={() => setPayslipModalLine({ run: currentRun, line })}
+                              onClick={() => currentRun && setPayslipModalLine({ run: currentRun, line })}
                               title="View payslip"
                             >
                               <Eye className="size-3.5" />

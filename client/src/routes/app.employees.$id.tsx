@@ -74,7 +74,7 @@ function EmployeeProfile() {
 
   const employee = employees.find((e) => e.id === id);
   const [open, setOpen] = useState(false);
-  const canEdit = role === "hr_manager" || role === "admin" || role === "hr_user";
+  const canEdit = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
 
   const [draft, setDraft] = useState<Partial<Employee>>({});
   const [error, setError] = useState<string | undefined>();
@@ -635,7 +635,7 @@ function EmployeeProfile() {
                 </Field>
                 <Field label="Status">
                   <Select
-                    value={draft.status}
+                    value={draft.status ?? "active"}
                     onValueChange={(v) => setDraft({ ...draft, status: v as EmployeeStatus })}
                   >
                     <SelectTrigger>

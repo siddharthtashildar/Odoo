@@ -27,14 +27,19 @@ export const Route = createFileRoute("/app/admin")({
 });
 
 const MODULES = [
-  { key: "People records", roles: ["hr_manager", "admin"] },
-  { key: "Lifecycle (on/offboarding)", roles: ["hr_manager", "admin"] },
-  { key: "Leave approvals", roles: ["hr_manager", "admin"] },
-  { key: "Payroll preparation", roles: ["payroll_user", "admin"] },
-  { key: "Payroll approval & payout", roles: ["payroll_manager", "admin"] },
-  { key: "Asset inventory", roles: ["it_asset_manager", "admin"] },
-  { key: "Reports", roles: ["hr_manager", "payroll_manager", "admin"] },
+  { key: "People records", roles: ["hr_manager", "payroll_manager", "payroll_user", "admin"] },
+  { key: "Lifecycle (on/offboarding)", roles: ["hr_manager", "payroll_manager", "payroll_user", "admin"] },
+  { key: "Leave approvals", roles: ["hr_manager", "payroll_manager", "payroll_user", "admin"] },
+  { key: "Payroll (read-only)", roles: ["payroll_user", "admin"] },
+  { key: "Payroll CRUD & approval", roles: ["payroll_manager", "admin"] },
+  { key: "Salary records (read-only)", roles: ["payroll_user", "admin"] },
+  { key: "Salary records (edit)", roles: ["payroll_manager", "admin"] },
+  { key: "Salary structures (read-only)", roles: ["payroll_user", "admin"] },
+  { key: "Salary structures CRUD", roles: ["payroll_manager", "admin"] },
+  { key: "Asset inventory", roles: ["it_asset_manager", "hr_manager", "payroll_manager", "payroll_user", "admin"] },
+  { key: "Reports", roles: ["hr_manager", "payroll_manager", "payroll_user", "admin"] },
 ];
+
 
 function AdminPage() {
   const { users, update, log, audit } = useApp();

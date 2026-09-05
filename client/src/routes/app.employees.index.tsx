@@ -89,7 +89,7 @@ function EmployeesPage() {
 
   const [deactivateTarget, setDeactivateTarget] = useState<Employee | null>(null);
 
-  const canEdit = role === "hr_manager" || role === "admin" || role === "hr_user";
+  const canEdit = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
 
   const departments = useMemo(() => Array.from(new Set(employees.map((e) => e.department))).sort(), [employees]);
 
@@ -388,7 +388,7 @@ function EmployeesPage() {
                             className="h-8 px-2"
                             title="View employee profile"
                           >
-                            <Link to={`/app/employees/${e.id}`}>
+                            <Link to="/app/employees/$id" params={{ id: e.id }}>
                               <Eye className="size-3.5" />
                             </Link>
                           </Button>
@@ -407,11 +407,15 @@ function EmployeesPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 px-2 text-destructive hover:text-destructive"
+                                className={`h-8 px-2 ${e.status === "exited" ? "text-success hover:text-success" : "text-destructive hover:text-destructive"}`}
                                 onClick={() => setDeactivateTarget(e)}
                                 title={e.status === "exited" ? "Reactivate" : "Deactivate"}
                               >
-                                <UserMinus className="size-3.5" />
+                                {e.status === "exited" ? (
+                                  <UserCheck className="size-3.5" />
+                                ) : (
+                                  <UserMinus className="size-3.5" />
+                                )}
                               </Button>
                             </>
                           )}
@@ -438,7 +442,7 @@ function EmployeesPage() {
 
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Full Name" error={errors.name}>
+              <Field label="Full Name" error={errors["name"]}>
                 <Input
                   placeholder="e.g. Aditi Sharma"
                   value={form.name}
@@ -446,7 +450,7 @@ function EmployeesPage() {
                 />
               </Field>
 
-              <Field label="Work Email" error={errors.email}>
+              <Field label="Work Email" error={errors["email"]}>
                 <Input
                   type="email"
                   placeholder="aditi.sharma@peoplepay360.io"
@@ -477,7 +481,7 @@ function EmployeesPage() {
                 </Select>
               </Field>
 
-              <Field label="Job Title / Designation" error={errors.designation}>
+              <Field label="Job Title / Designation" error={errors["designation"]}>
                 <Input
                   placeholder="e.g. Frontend Developer"
                   value={form.designation}
@@ -487,7 +491,7 @@ function EmployeesPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Joining Date" error={errors.joinedOn}>
+              <Field label="Joining Date" error={errors["joinedOn"]}>
                 <Input
                   type="date"
                   value={form.joinedOn}
@@ -532,7 +536,7 @@ function EmployeesPage() {
                 </Select>
               </Field>
 
-              <Field label="Annual Base CTC (₹)" error={errors.ctc}>
+              <Field label="Annual Base CTC (₹)" error={errors["ctc"]}>
                 <Input
                   type="number"
                   placeholder="e.g. 1800000"

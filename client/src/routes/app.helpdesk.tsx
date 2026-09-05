@@ -69,7 +69,7 @@ function HelpdeskPage() {
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
   const isEmployeeOnly = role === "employee";
-  const canTriage = role === "it_asset_manager" || role === "admin" || role === "hr_manager";
+  const canTriage = role === "it_asset_manager" || role === "admin" || role === "hr_manager" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
 
   // Summaries
   const openTickets = helpdesk.filter((t) => t.status === "Open" || t.status === "In Progress");
@@ -351,7 +351,7 @@ function HelpdeskPage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-            <Field label="Subject / Summary" error={errors.subject}>
+            <Field label="Subject / Summary" error={errors["subject"]}>
               <Input
                 placeholder="Brief summary of the issue..."
                 value={form.subject}
@@ -398,7 +398,7 @@ function HelpdeskPage() {
               </Field>
             </div>
 
-            <Field label="Detailed Description" error={errors.description}>
+            <Field label="Detailed Description" error={errors["description"]}>
               <Textarea
                 rows={4}
                 placeholder="Describe what happened, steps to reproduce, device tag if applicable..."

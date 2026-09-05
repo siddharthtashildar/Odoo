@@ -26,6 +26,8 @@ import { Route as AppOnboardingRouteImport } from './routes/app.onboarding'
 import { Route as AppPayslipsRouteImport } from './routes/app.payslips'
 import { Route as AppReimbursementRouteImport } from './routes/app.reimbursement'
 import { Route as AppReportsRouteImport } from './routes/app.reports'
+import { Route as AppSalaryRouteImport } from './routes/app.salary'
+import { Route as AppSalaryStructureRouteImport } from './routes/app.salary-structure'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppEmployeesIndexRouteImport } from './routes/app.employees.index'
 import { Route as AppEmployeesIdRouteImport } from './routes/app.employees.$id'
@@ -117,6 +119,16 @@ const AppReportsRoute = AppReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSalaryRoute = AppSalaryRouteImport.update({
+  id: '/salary',
+  path: '/salary',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSalaryStructureRoute = AppSalaryStructureRouteImport.update({
+  id: '/salary-structure',
+  path: '/salary-structure',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -161,6 +173,8 @@ export interface FileRoutesByFullPath {
   '/app/payslips': typeof AppPayslipsRoute
   '/app/reimbursement': typeof AppReimbursementRoute
   '/app/reports': typeof AppReportsRoute
+  '/app/salary': typeof AppSalaryRoute
+  '/app/salary-structure': typeof AppSalaryStructureRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/employees/$id': typeof AppEmployeesIdRoute
   '/app/payroll/$runId': typeof AppPayrollRunIdRoute
@@ -185,6 +199,8 @@ export interface FileRoutesByTo {
   '/app/payslips': typeof AppPayslipsRoute
   '/app/reimbursement': typeof AppReimbursementRoute
   '/app/reports': typeof AppReportsRoute
+  '/app/salary': typeof AppSalaryRoute
+  '/app/salary-structure': typeof AppSalaryStructureRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/employees/$id': typeof AppEmployeesIdRoute
   '/app/payroll/$runId': typeof AppPayrollRunIdRoute
@@ -210,6 +226,8 @@ export interface FileRoutesById {
   '/app/payslips': typeof AppPayslipsRoute
   '/app/reimbursement': typeof AppReimbursementRoute
   '/app/reports': typeof AppReportsRoute
+  '/app/salary': typeof AppSalaryRoute
+  '/app/salary-structure': typeof AppSalaryStructureRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/employees/$id': typeof AppEmployeesIdRoute
   '/app/payroll/$runId': typeof AppPayrollRunIdRoute
@@ -236,6 +254,8 @@ export interface FileRouteTypes {
     | '/app/payslips'
     | '/app/reimbursement'
     | '/app/reports'
+    | '/app/salary'
+    | '/app/salary-structure'
     | '/app/settings'
     | '/app/employees/$id'
     | '/app/payroll/$runId'
@@ -260,6 +280,8 @@ export interface FileRouteTypes {
     | '/app/payslips'
     | '/app/reimbursement'
     | '/app/reports'
+    | '/app/salary'
+    | '/app/salary-structure'
     | '/app/settings'
     | '/app/employees/$id'
     | '/app/payroll/$runId'
@@ -284,6 +306,8 @@ export interface FileRouteTypes {
     | '/app/payslips'
     | '/app/reimbursement'
     | '/app/reports'
+    | '/app/salary'
+    | '/app/salary-structure'
     | '/app/settings'
     | '/app/employees/$id'
     | '/app/payroll/$runId'
@@ -417,6 +441,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReportsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/salary': {
+      id: '/app/salary'
+      path: '/salary'
+      fullPath: '/app/salary'
+      preLoaderRoute: typeof AppSalaryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/salary-structure': {
+      id: '/app/salary-structure'
+      path: '/salary-structure'
+      fullPath: '/app/salary-structure'
+      preLoaderRoute: typeof AppSalaryStructureRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/settings': {
       id: '/app/settings'
       path: '/settings'
@@ -471,6 +509,8 @@ interface AppRouteChildren {
   AppPayslipsRoute: typeof AppPayslipsRoute
   AppReimbursementRoute: typeof AppReimbursementRoute
   AppReportsRoute: typeof AppReportsRoute
+  AppSalaryRoute: typeof AppSalaryRoute
+  AppSalaryStructureRoute: typeof AppSalaryStructureRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppEmployeesIdRoute: typeof AppEmployeesIdRoute
   AppPayrollRunIdRoute: typeof AppPayrollRunIdRoute
@@ -494,6 +534,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppPayslipsRoute: AppPayslipsRoute,
   AppReimbursementRoute: AppReimbursementRoute,
   AppReportsRoute: AppReportsRoute,
+  AppSalaryRoute: AppSalaryRoute,
+  AppSalaryStructureRoute: AppSalaryStructureRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppEmployeesIdRoute: AppEmployeesIdRoute,
   AppPayrollRunIdRoute: AppPayrollRunIdRoute,

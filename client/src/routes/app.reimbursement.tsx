@@ -72,7 +72,7 @@ function ReimbursementPage() {
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [simulatedFile, setSimulatedFile] = useState<string | null>(null);
 
-  const canApprove = role === "hr_manager" || role === "payroll_manager" || role === "admin";
+  const canApprove = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin" || role === "hr_user";
   const isEmployeeOnly = role === "employee";
 
   // Compute metrics
@@ -377,7 +377,7 @@ function ReimbursementPage() {
                 </Select>
               </Field>
 
-              <Field label="Amount (₹)" error={errors.amount}>
+              <Field label="Amount (₹)" error={errors["amount"]}>
                 <Input
                   type="number"
                   placeholder="e.g. 2500"
@@ -415,7 +415,7 @@ function ReimbursementPage() {
               </Field>
             </div>
 
-            <Field label="Description & Justification" error={errors.description}>
+            <Field label="Description & Justification" error={errors["description"]}>
               <Textarea
                 rows={3}
                 placeholder="Reason for expenditure and attendees if food/travel..."

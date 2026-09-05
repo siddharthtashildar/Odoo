@@ -67,7 +67,7 @@ function AttendancePage() {
   const [editStatus, setEditStatus] = useState<AttendanceStatus>("Present");
   const [editRemarks, setEditRemarks] = useState("");
 
-  const canManage = role === "hr_manager" || role === "admin" || role === "hr_user";
+  const canManage = role === "hr_manager" || role === "admin" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
 
   // Check if current persona is punched in today
   const myTodayRecord = attendance.find(
@@ -87,6 +87,7 @@ function AttendancePage() {
   // Filtered rows
   const filteredRows = useMemo(() => {
     return attendance.filter((a) => {
+      if (role === "employee" && a.employeeId !== persona.employeeId) return false;
       const emp = employees.find((e) => e.id === a.employeeId);
       const empName = emp ? emp.name.toLowerCase() : "";
       const matchQ = empName.includes(q.toLowerCase()) || a.employeeId.toLowerCase().includes(q.toLowerCase());
@@ -95,7 +96,7 @@ function AttendancePage() {
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       return matchQ && matchDate && matchDept && matchStatus;
     });
-  }, [attendance, employees, q, selectedDate, deptFilter, statusFilter]);
+  }, [attendance, employees, q, selectedDate, deptFilter, statusFilter, role, persona.employeeId]);
 
   // Chart data: attendance by status
   const chartData = [

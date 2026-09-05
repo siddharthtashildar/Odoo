@@ -61,7 +61,7 @@ function AssetsPage() {
   const ready = useDelayed();
 
   const isEmployeeOnly = role === "employee";
-  const canManage = role === "it_asset_manager" || role === "admin" || role === "hr_manager";
+  const canManage = role === "it_asset_manager" || role === "admin" || role === "hr_manager" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
 
   const [q, setQ] = useState("");
   const [catFilter, setCatFilter] = useState("all");
@@ -514,7 +514,7 @@ function AssetsPage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-            <Field label="Asset Name" error={errors.name}>
+            <Field label="Asset Name" error={errors["name"]}>
               <Input
                 placeholder='e.g. MacBook Pro 14" M4'
                 value={form.name}
@@ -523,7 +523,7 @@ function AssetsPage() {
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Asset Tag ID" error={errors.tag}>
+              <Field label="Asset Tag ID" error={errors["tag"]}>
                 <Input
                   placeholder="LAP-2295"
                   value={form.tag}
@@ -556,7 +556,7 @@ function AssetsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Serial Number" error={errors.serial}>
+              <Field label="Serial Number" error={errors["serial"]}>
                 <Input
                   placeholder="e.g. C02XK9LMQ1"
                   value={form.serial}
@@ -564,7 +564,7 @@ function AssetsPage() {
                 />
               </Field>
 
-              <Field label="Purchase Cost (₹)" error={errors.value}>
+              <Field label="Purchase Cost (₹)" error={errors["value"]}>
                 <Input
                   type="number"
                   placeholder="e.g. 185000"

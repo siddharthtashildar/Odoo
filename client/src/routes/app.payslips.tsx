@@ -28,7 +28,7 @@ function Payslips() {
   const ready = useDelayed();
   const [who, setWho] = useState(persona.employeeId);
   const [openSlip, setOpenSlip] = useState<string | null>(null);
-  const canSwitch = role === "hr_manager" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user" || role === "admin";
+  const canSwitch = role === "hr_user" || role === "payroll_manager" || role === "payroll_user" || role === "admin";
   const target = canSwitch ? who : persona.employeeId;
   const employee = employees.find((e) => e.id === target);
 

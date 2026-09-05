@@ -31,10 +31,10 @@ export const Route = createFileRoute("/")({
 
 const ROLE_BLURB: Record<Role, string> = {
   employee: "Payslips, leave, asset requests and personal profile.",
-  hr_manager: "Directory, onboarding, offboarding and leave approvals.",
+  hr_manager: "Directory, onboarding, offboarding and leave approvals. No payroll access.",
   hr_user: "Directory, onboarding workflows, leave tracking (approval restricted).",
-  payroll_user: "Build payroll runs, edit lines and submit for approval.",
-  payroll_manager: "Approve runs, release payouts and read cost reports.",
+  payroll_user: "View payroll runs and payslips (read-only). No edit or approval actions.",
+  payroll_manager: "Full payroll CRUD — create runs, edit lines, approve and release payouts.",
   it_asset_manager: "Inventory, allocations, returns and asset requests.",
   admin: "Everything, plus user roles and the audit trail.",
 };

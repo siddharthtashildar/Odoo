@@ -66,7 +66,7 @@ function AllowancePage() {
   const [form, setForm] = useState(emptyAllowance);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
-  const canManage = role === "hr_manager" || role === "payroll_manager" || role === "admin";
+  const canManage = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin" || role === "hr_user";
   const isEmployeeOnly = role === "employee";
 
   // Summaries
@@ -350,7 +350,7 @@ function AllowancePage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-            <Field label="Employee" error={errors.employeeId}>
+            <Field label="Employee" error={errors["employeeId"]}>
               <Select
                 value={form.employeeId}
                 onValueChange={(v) => setForm({ ...form, employeeId: v })}
@@ -387,7 +387,7 @@ function AllowancePage() {
               </Select>
             </Field>
 
-            <Field label="Monthly Amount (₹)" error={errors.amount}>
+            <Field label="Monthly Amount (₹)" error={errors["amount"]}>
               <Input
                 type="number"
                 placeholder="e.g. 15000"
@@ -397,7 +397,7 @@ function AllowancePage() {
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Effective From" error={errors.effectiveDate}>
+              <Field label="Effective From" error={errors["effectiveDate"]}>
                 <Input
                   type="date"
                   value={form.effectiveDate}
