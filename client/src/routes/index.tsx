@@ -30,13 +30,12 @@ export const Route = createFileRoute("/")({
 });
 
 const QUICK_ACCOUNTS: Array<{ label: string; email: string; role: Role }> = [
-  { label: "HR Manager", email: "sana.iqbal@peoplepay360.io", role: "hr_manager" },
+  { label: "Admin (Siddharth)", email: "siddharthtashildar17@gmail.com", role: "admin" },
+  { label: "HR Manager (Sana)", email: "sana.iqbal@peoplepay360.io", role: "hr_manager" },
   { label: "Payroll Manager", email: "arjun.nair@peoplepay360.io", role: "payroll_manager" },
-  { label: "Payroll User", email: "charmi.patel@peoplepay360.io", role: "payroll_user" },
-  { label: "HR User", email: "devika.rao@peoplepay360.io", role: "hr_user" },
   { label: "IT Asset Manager", email: "karan.shah@peoplepay360.io", role: "it_asset_manager" },
-  { label: "Employee", email: "rohan.mehta@peoplepay360.io", role: "employee" },
-  { label: "Administrator", email: "admin@peoplepay360.io", role: "admin" },
+  { label: "Employee (Jeffrey)", email: "code.sid17@gmail.com", role: "employee" },
+  { label: "Employee (Rohan)", email: "rohan.mehta@peoplepay360.io", role: "employee" },
 ];
 
 function LoginPage() {
@@ -68,9 +67,16 @@ function LoginPage() {
     try {
       const userRes = await api.auth.login(email, password);
       const matchedRole = (userRes.role as Role) || "employee";
-      signIn(matchedRole);
+      signIn(matchedRole, {
+        id: userRes.userId,
+        email: userRes.email,
+        name: userRes.employeeName || userRes.email,
+        role: matchedRole,
+        employeeId: userRes.employeeId,
+        employeeCode: (userRes as any).employeeCode || null,
+      });
       log(`Signed in as ${userRes.employeeName || userRes.email}`, "Auth");
-      toast.success(`Welcome back, ${userRes.employeeName || ROLE_PERSONA[matchedRole].name}`, {
+      toast.success(`Welcome back, ${userRes.employeeName || userRes.email}`, {
         description: ROLE_LABELS[matchedRole] || matchedRole,
       });
       navigate({ to: "/app/dashboard" });

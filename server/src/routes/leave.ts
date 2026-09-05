@@ -23,19 +23,26 @@ router.get("/", async (req, res) => {
       },
     });
 
-    const mapped = requests.map((r) => ({
-      id: r.id,
-      employeeId: r.employee_id,
-      employeeName: r.employees_leave_requests_employee_idToemployees.full_name,
-      leaveType: r.leave_types.name,
-      leaveTypeCode: r.leave_types.code,
-      startDate: r.start_date.toISOString().slice(0, 10),
-      endDate: r.end_date.toISOString().slice(0, 10),
-      days: Number(r.days),
-      reason: r.reason ?? "",
-      status: r.status,
-      createdAt: r.created_at.toISOString(),
-    }));
+    const mapped = requests.map((r) => {
+      const typeName = r.leave_types.name.replace(/ Leave/i, "");
+      return {
+        id: r.id,
+        employeeId: r.employee_id,
+        employeeName: r.employees_leave_requests_employee_idToemployees.full_name,
+        type: (typeName || "Casual") as any,
+        leaveType: r.leave_types.name,
+        leaveTypeCode: r.leave_types.code,
+        from: r.start_date.toISOString().slice(0, 10),
+        to: r.end_date.toISOString().slice(0, 10),
+        startDate: r.start_date.toISOString().slice(0, 10),
+        endDate: r.end_date.toISOString().slice(0, 10),
+        days: Number(r.days),
+        reason: r.reason ?? "",
+        status: r.status,
+        submittedAt: r.created_at.toISOString().slice(0, 10),
+        createdAt: r.created_at.toISOString(),
+      };
+    });
 
     res.json({ success: true, data: mapped });
   } catch (err) {
@@ -85,9 +92,33 @@ router.post("/", async (req, res) => {
         reason: reason ?? null,
         status: "pending",
       },
+      include: {
+        employees_leave_requests_employee_idToemployees: { select: { full_name: true } },
+        leave_types: { select: { name: true, code: true } },
+      },
     });
 
-    res.status(201).json({ success: true, data: { id: request.id } });
+    const typeName = request.leave_types.name.replace(/ Leave/i, "");
+    res.status(201).json({
+      success: true,
+      data: {
+        id: request.id,
+        employeeId: request.employee_id,
+        employeeName: request.employees_leave_requests_employee_idToemployees.full_name,
+        type: (typeName || "Casual") as any,
+        leaveType: request.leave_types.name,
+        leaveTypeCode: request.leave_types.code,
+        from: request.start_date.toISOString().slice(0, 10),
+        to: request.end_date.toISOString().slice(0, 10),
+        startDate: request.start_date.toISOString().slice(0, 10),
+        endDate: request.end_date.toISOString().slice(0, 10),
+        days: Number(request.days),
+        reason: request.reason ?? "",
+        status: request.status,
+        submittedAt: request.created_at.toISOString().slice(0, 10),
+        createdAt: request.created_at.toISOString(),
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: "Failed to submit leave request" });
@@ -98,11 +129,26 @@ router.post("/", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   try {
     const { status } = req.body as { status: string };
+    const normStatus = status.toLowerCase() === "approved" ? "approved" : status.toLowerCase() === "rejected" ? "rejected" : status.toLowerCase() === "cancelled" ? "cancelled" : "pending";
     const updated = await prisma.leave_requests.update({
       where: { id: req.params.id },
-      data: { status: status as any, updated_at: new Date() },
+      data: { status: normStatus as any, updated_at: new Date() },
+      include: {
+        employees_leave_requests_employee_idToemployees: { select: { full_name: true } },
+        leave_types: { select: { name: true, code: true } },
+      },
     });
-    res.json({ success: true, data: { id: updated.id } });
+    const typeName = updated.leave_types.name.replace(/ Leave/i, "");
+    res.json({
+      success: true,
+      data: {
+        id: updated.id,
+        employeeId: updated.employee_id,
+        employeeName: updated.employees_leave_requests_employee_idToemployees.full_name,
+        type: (typeName || "Casual") as any,
+        status: updated.status,
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: "Failed to update leave request" });

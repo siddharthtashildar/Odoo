@@ -56,29 +56,54 @@ function MyWorkspace() {
     helpdesk,
     onboarding,
     patchEmployee,
+    punchAttendance,
     log,
   } = useApp();
 
-  const me = employees.find((e) => e.id === persona.employeeId);
+  const me = employees.find(
+    (e) =>
+      e.id === persona.employeeId ||
+      e.code === persona.employeeCode ||
+      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+  );
   const [phone, setPhone] = useState(me?.phone ?? "");
   const [error, setError] = useState<string | undefined>();
 
   if (!me) {
-    return <EmptyState title="Profile unavailable" description="This demo persona has no employee record." />;
+    return (
+      <EmptyState
+        title="Profile in configuration"
+        description={`Your enterprise account (${persona.email || persona.name}) is authenticated. Your HR department is finalizing your personnel profile.`}
+      />
+    );
   }
 
+  const myId = me.id;
+  const myCode = me.code;
+
   // Personal private filtered slices
-  const myContract = contracts.find((c) => c.employeeId === me.id);
-  const myAttendance = attendance.filter((a) => a.employeeId === me.id);
-  const myLeave = leave.filter((l) => l.employeeId === me.id);
-  const myPaidSlips = payroll.filter((r) => r.status === "paid" && r.lines.some((l) => l.employeeId === me.id));
+  const myContract = contracts.find((c) => c.employeeId === myId || (myCode && c.employeeId === myCode));
+  const myAttendance = attendance.filter((a) => a.employeeId === myId || (myCode && a.employeeId === myCode));
+  const myLeave = leave.filter((l) => l.employeeId === myId || (myCode && l.employeeId === myCode));
+  const myPaidSlips = payroll.filter(
+    (r) => r.status === "paid" && r.lines.some((l) => l.employeeId === myId || (myCode && l.employeeId === myCode)),
+  );
   const lastSlip = myPaidSlips[0];
-  const lastLine = lastSlip?.lines.find((l) => l.employeeId === me.id);
-  const myReimbursements = reimbursements.filter((r) => r.employeeId === me.id);
-  const myAllowances = allowances.filter((a) => a.employeeId === me.id);
-  const myAssets = assets.filter((a) => a.assignedTo === me.id);
-  const myTickets = helpdesk.filter((t) => t.requesterId === me.id);
-  const onCase = onboarding.find((o) => o.employeeId === me.id);
+  const lastLine = lastSlip?.lines.find((l) => l.employeeId === myId || (myCode && l.employeeId === myCode));
+  const myReimbursements = reimbursements.filter((r) => r.employeeId === myId || (myCode && r.employeeId === myCode));
+  const myAllowances = allowances.filter((a) => a.employeeId === myId || (myCode && a.employeeId === myCode));
+  const myAssets = assets.filter((a) => a.assignedTo === myId || (myCode && a.assignedTo === myCode));
+  const myTickets = helpdesk.filter((t) => t.requesterId === myId || (myCode && t.requesterId === myCode));
+  const onCase = onboarding.find((o) => o.employeeId === myId || (myCode && o.employeeId === myCode));
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const myTodayRecord = myAttendance.find((a) => a.date === todayStr);
+  const isPunchedIn = Boolean(
+    myTodayRecord &&
+      myTodayRecord.checkIn &&
+      myTodayRecord.checkIn !== "—" &&
+      (!myTodayRecord.checkOut || myTodayRecord.checkOut === "—"),
+  );
 
   const saveContact = () => {
     if (!/^[+0-9 ()-]{8,}$/.test(phone)) {
@@ -88,7 +113,7 @@ function MyWorkspace() {
     setError(undefined);
     patchEmployee(me.id, { phone });
     log("Updated personal phone number", "Profile");
-    toast.success("Contact details updated");
+    toast.success("Contact details updated in HRIS database");
   };
 
   return (
@@ -283,9 +308,22 @@ function MyWorkspace() {
                 <CardTitle>My Attendance Log</CardTitle>
                 <CardDescription>Daily punch logs and hours worked</CardDescription>
               </div>
-              <Button asChild size="sm">
-                <Link to="/app/attendance">Open Punch Clock</Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={isPunchedIn ? "destructive" : "default"}
+                  onClick={() => {
+                    punchAttendance(myId);
+                    toast.success(isPunchedIn ? "Clocked out from My Workspace" : "Clocked in from My Workspace");
+                  }}
+                >
+                  <Clock className="size-3.5 mr-1.5" />
+                  {isPunchedIn ? "Punch Out" : "Punch In (Now)"}
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/app/attendance">Open Punch Clock</Link>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {myAttendance.length === 0 ? (
@@ -364,9 +402,14 @@ function MyWorkspace() {
         {/* 5. Payslips Tab */}
         <TabsContent value="payslips" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>My Payslips</CardTitle>
-              <CardDescription>Processed monthly compensation receipts and TDS statements</CardDescription>
+            <CardHeader className="flex-row items-center justify-between">
+              <div>
+                <CardTitle>My Payslips</CardTitle>
+                <CardDescription>Processed monthly compensation receipts and TDS statements</CardDescription>
+              </div>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/app/payslips">View All Cycles</Link>
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               {myPaidSlips.length === 0 ? (
@@ -384,11 +427,12 @@ function MyWorkspace() {
                   </TableHeader>
                   <TableBody>
                     {myPaidSlips.map((r) => {
-                      const line = r.lines.find((l) => l.employeeId === me.id)!;
+                      const line = r.lines.find((l) => l.employeeId === myId || (myCode && l.employeeId === myCode));
+                      if (!line) return null;
                       return (
                         <TableRow key={r.id}>
                           <TableCell className="font-medium">{r.period}</TableCell>
-                          <TableCell className="text-right tabular-nums">{inr(line.gross + line.bonus)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{inr(line.gross + (line.bonus || 0))}</TableCell>
                           <TableCell className="text-right tabular-nums text-destructive">-{inr(line.deductions)}</TableCell>
                           <TableCell className="text-right font-bold tabular-nums text-primary">{inr(line.net)}</TableCell>
                           <TableCell className="text-right">

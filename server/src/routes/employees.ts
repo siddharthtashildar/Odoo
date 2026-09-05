@@ -167,14 +167,14 @@ router.post("/", async (req, res) => {
     }
 
     // 4. Generate Employee Code
-    const empCount = await prisma.employees.count();
-    const employeeCode = `PP-${1001 + empCount + Math.floor(Math.random() * 10)}`;
+    const employeeCode = `PP-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
 
     // 5. Create Employee in PostgreSQL
     const empTypeNorm =
       employmentType.toLowerCase().includes("part") ? "part_time" :
       employmentType.toLowerCase().includes("contract") ? "contract" :
-      employmentType.toLowerCase().includes("intern") ? "intern" : "full_time";
+      employmentType.toLowerCase().includes("intern") ? "intern" :
+      employmentType.toLowerCase().includes("consultant") ? "consultant" : "full_time";
 
     const employee = await prisma.employees.create({
       data: {
@@ -194,8 +194,7 @@ router.post("/", async (req, res) => {
     });
 
     // 6. Create Initial Employment Contract
-    const contractCount = await prisma.contracts.count();
-    const contractNumber = `CT-${String(contractCount + 1).padStart(4, "0")}`;
+    const contractNumber = `CT-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
     const contractType =
       empTypeNorm === "intern" ? "intern" :
       empTypeNorm === "contract" ? "fixed_term" :

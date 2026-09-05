@@ -219,9 +219,22 @@ router.post("/login", async (req, res) => {
       // Fetch employee info if linked
       let employeeName = betterUser.name;
       let employeeId = betterUser.employeeId ?? null;
+      let employeeCode: string | null = null;
       if (betterUser.employeeId) {
         const emp = await prisma.employees.findUnique({ where: { id: betterUser.employeeId } });
-        if (emp) employeeName = emp.full_name;
+        if (emp) {
+          employeeName = emp.full_name;
+          employeeCode = emp.employee_code;
+        }
+      } else {
+        // Auto-link by email if employee record exists
+        const emp = await prisma.employees.findFirst({ where: { email } });
+        if (emp) {
+          employeeId = emp.id;
+          employeeName = emp.full_name;
+          employeeCode = emp.employee_code;
+          await prisma.user.update({ where: { id: betterUser.id }, data: { employeeId: emp.id } }).catch(() => {});
+        }
       }
 
       return res.json({
@@ -231,6 +244,7 @@ router.post("/login", async (req, res) => {
           email: betterUser.email,
           role: betterUser.role || "employee",
           employeeId,
+          employeeCode,
           employeeName,
         },
       });
@@ -241,7 +255,7 @@ router.post("/login", async (req, res) => {
       where: { email },
       include: {
         roles: { select: { name: true } },
-        employees: { select: { id: true, full_name: true } },
+        employees: { select: { id: true, full_name: true, employee_code: true } },
       },
     });
 
@@ -256,6 +270,7 @@ router.post("/login", async (req, res) => {
         email: legacyUser.email,
         role: legacyUser.roles.name,
         employeeId: legacyUser.employees?.id ?? null,
+        employeeCode: legacyUser.employees?.employee_code ?? null,
         employeeName: legacyUser.employees?.full_name ?? legacyUser.email,
       },
     });

@@ -16,21 +16,31 @@ router.get("/", async (_req, res) => {
       },
     });
 
-    const mapped = contracts.map((c) => ({
-      id: c.id,
-      contractNumber: c.contract_number,
-      employeeId: c.employee_id,
-      employeeName: c.employees.full_name,
-      employeeCode: c.employees.employee_code,
-      contractType: c.contract_type,
-      department: c.departments?.name ?? "",
-      designation: c.designations?.title ?? "",
-      salary: Number(c.salary),
-      startDate: c.start_date.toISOString().slice(0, 10),
-      endDate: c.end_date?.toISOString().slice(0, 10) ?? null,
-      status: c.status,
-      employeeAccepted: c.employee_accepted,
-    }));
+    const mapped = contracts.map((c) => {
+      const typeMap: Record<string, any> = {
+        permanent: "Full-time",
+        fixed_term: "Fixed-term",
+        intern: "Internship",
+        consultant: "Consultancy",
+      };
+      return {
+        id: c.id,
+        contractNumber: c.contract_number,
+        employeeId: c.employee_id,
+        employeeName: c.employees.full_name,
+        employeeCode: c.employees.employee_code,
+        contractType: typeMap[c.contract_type] ?? "Full-time",
+        department: c.departments?.name ?? "Engineering",
+        designation: c.designations?.title ?? "Staff",
+        salary: Number(c.salary),
+        startDate: c.start_date.toISOString().slice(0, 10),
+        endDate: c.end_date?.toISOString().slice(0, 10) ?? "2027-12-31",
+        status: (c.status === "active" ? "Active" : c.status === "draft" ? "Draft" : "Expired") as any,
+        employeeAccepted: c.employee_accepted,
+        terms: "Standard enterprise employment terms and conditions.",
+        noticePeriodDays: 30,
+      };
+    });
 
     res.json({ success: true, data: mapped });
   } catch (err) {

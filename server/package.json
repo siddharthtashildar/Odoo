@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
     "seed": "tsx src/seed.ts",
     "prisma:generate": "node node_modules/.bin/prisma generate",
     "test": "echo \"Error: no test specified\" && exit 1"

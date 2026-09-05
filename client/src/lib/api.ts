@@ -141,6 +141,8 @@ export const api = {
     get: (id: string) => request<unknown>("GET", `/api/payroll/${id}`),
     create: (data: Record<string, unknown>) =>
       request<{ id: string }>("POST", "/api/payroll", data),
+    generate: (data?: { employeeId?: string | undefined; periodMonth?: number | undefined; periodYear?: number | undefined }) =>
+      request<{ runId: string; period: string; generatedCount: number }>("POST", "/api/payroll/generate", data ?? {}),
     patch: (id: string, data: Record<string, unknown>) =>
       request<{ id: string }>("PATCH", `/api/payroll/${id}`, data),
   },

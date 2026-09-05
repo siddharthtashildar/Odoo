@@ -61,10 +61,12 @@ router.get("/", async (req, res) => {
       employeeId: r.employee_id,
       employeeName: r.employees.full_name,
       date: r.attendance_date.toISOString().slice(0, 10),
-      checkIn: r.check_in?.toISOString() ?? null,
-      checkOut: r.check_out?.toISOString() ?? null,
+      checkIn: r.check_in ? r.check_in.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "—",
+      checkOut: r.check_out ? r.check_out.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "—",
       workingHours: Number(r.working_hours ?? 0),
       status: formatAttendanceStatus(r.status),
+      location: "Office - Ahmedabad" as const,
+      remarks: r.is_manually_corrected ? "Manually corrected" : undefined,
       isManuallyCorrected: r.is_manually_corrected,
     }));
 
@@ -99,9 +101,29 @@ router.post("/", async (req, res) => {
       // Punch out
       const updated = await prisma.attendance.update({
         where: { id: existing.id },
-        data: { check_out: now, status: normStatus as any, updated_at: now },
+        data: {
+          check_out: now,
+          status: normStatus as any,
+          updated_at: now,
+        },
+        include: { employees: { select: { full_name: true, employee_code: true } } },
       });
-      return res.json({ success: true, data: { id: updated.id, action: "punch_out" } });
+
+      return res.json({
+        success: true,
+        data: {
+          id: updated.id,
+          employeeId: updated.employee_id,
+          employeeName: updated.employees.full_name,
+          date: updated.attendance_date.toISOString().slice(0, 10),
+          checkIn: updated.check_in ? updated.check_in.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "—",
+          checkOut: updated.check_out ? updated.check_out.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "—",
+          workingHours: Number(updated.working_hours ?? 0),
+          status: formatAttendanceStatus(updated.status),
+          location: "Office - Ahmedabad",
+          action: "punch_out",
+        },
+      });
     }
 
     // Punch in
@@ -112,9 +134,24 @@ router.post("/", async (req, res) => {
         check_in: now,
         status: normStatus as any,
       },
+      include: { employees: { select: { full_name: true, employee_code: true } } },
     });
 
-    res.status(201).json({ success: true, data: { id: created.id, action: "punch_in" } });
+    res.status(201).json({
+      success: true,
+      data: {
+        id: created.id,
+        employeeId: created.employee_id,
+        employeeName: created.employees.full_name,
+        date: created.attendance_date.toISOString().slice(0, 10),
+        checkIn: created.check_in ? created.check_in.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "—",
+        checkOut: "—",
+        workingHours: 0,
+        status: formatAttendanceStatus(created.status),
+        location: "Office - Ahmedabad",
+        action: "punch_in",
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: "Failed to record attendance" });

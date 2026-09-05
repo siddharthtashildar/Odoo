@@ -71,15 +71,29 @@ function HelpdeskPage() {
   const isEmployeeOnly = role === "employee";
   const canTriage = role === "it_asset_manager" || role === "admin" || role === "hr_manager" || role === "hr_user" || role === "payroll_manager" || role === "payroll_user";
 
+  const me = employees.find(
+    (e) =>
+      e.id === persona.employeeId ||
+      e.code === persona.employeeCode ||
+      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+  );
+  const myId = me?.id || persona.employeeId;
+  const myCode = me?.code || persona.employeeCode;
+
   // Summaries
-  const openTickets = helpdesk.filter((t) => t.status === "Open" || t.status === "In Progress");
-  const criticalCount = helpdesk.filter((t) => t.priority === "Critical" && t.status !== "Closed").length;
-  const resolvedCount = helpdesk.filter((t) => t.status === "Resolved" || t.status === "Closed").length;
-  const myAssignedCount = helpdesk.filter((t) => t.assignedTechnician === persona.name).length;
+  const myTickets = helpdesk.filter((t) => t.requesterId === myId || (myCode && t.requesterId === myCode));
+  const activeTicketSet = isEmployeeOnly ? myTickets : helpdesk;
+  const openTickets = activeTicketSet.filter((t) => t.status === "Open" || t.status === "In Progress");
+  const criticalCount = activeTicketSet.filter((t) => (t.priority === "Critical" || t.priority === "High") && t.status !== "Closed").length;
+  const resolvedCount = activeTicketSet.filter((t) => t.status === "Resolved" || t.status === "Closed").length;
+  const myAssignedCount = isEmployeeOnly ? myTickets.length : helpdesk.filter((t) => t.assignedTechnician === persona.name).length;
 
   const rows = useMemo(() => {
     return helpdesk.filter((t) => {
-      if (isEmployeeOnly && t.requesterId !== persona.employeeId) return false;
+      if (isEmployeeOnly) {
+        const isMine = t.requesterId === myId || (myCode && t.requesterId === myCode);
+        if (!isMine) return false;
+      }
 
       const requesterName = nameOf(t.requesterId).toLowerCase();
       const matchQ =
@@ -91,7 +105,7 @@ function HelpdeskPage() {
       const matchStatus = statusFilter === "all" || t.status === statusFilter;
       return matchQ && matchCat && matchPriority && matchStatus;
     });
-  }, [helpdesk, isEmployeeOnly, persona.employeeId, q, catFilter, priorityFilter, statusFilter, nameOf]);
+  }, [helpdesk, isEmployeeOnly, myId, myCode, q, catFilter, priorityFilter, statusFilter, nameOf]);
 
   const activeTicket = helpdesk.find((t) => t.id === activeTicketId) ?? null;
 
@@ -105,44 +119,45 @@ function HelpdeskPage() {
     const newTkt: HelpdeskTicket = {
       id: `TKT-${Date.now().toString().slice(-4)}`,
       subject: form.subject.trim(),
-      requesterId: persona.employeeId,
+      requesterId: myId,
       category: form.category,
       priority: form.priority,
-      assignedTechnician: "Neel Shah", // Default IT Lead
+      assignedTechnician: "Karan Shah", // Default IT Lead
       createdDate: new Date().toISOString().slice(0, 10),
       updatedDate: new Date().toISOString().slice(0, 10),
       status: "Open",
       description: form.description.trim(),
       comments: [
         {
-          id: `c-init`,
+          id: `C-${Date.now().toString().slice(-4)}`,
           author: persona.name,
-          text: `Ticket opened: ${form.description.trim()}`,
-          at: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          text: form.description.trim(),
+          at: new Date().toISOString().slice(0, 16).replace("T", " "),
         },
       ],
     };
 
     createTicket(newTkt);
-    log(`Created IT Helpdesk ticket ${newTkt.id} [${newTkt.priority}]`, "Helpdesk");
-    toast.success("Helpdesk ticket logged", {
-      description: `Technician assigned: ${newTkt.assignedTechnician}`,
+    log(`Created helpdesk ticket ${newTkt.id}: ${newTkt.subject}`, "Helpdesk");
+    toast.success("Helpdesk ticket opened", {
+      description: `Ticket ${newTkt.id} assigned to IT triage.`,
     });
-    setAddOpen(false);
     setForm(emptyTicket);
+    setAddOpen(false);
   };
 
   const handlePostComment = () => {
     if (!activeTicket || !newComment.trim()) return;
     addTicketComment(activeTicket.id, persona.name, newComment.trim());
-    toast.success("Comment added to ticket thread");
+    log(`Added comment on ticket ${activeTicket.id}`, "Helpdesk");
     setNewComment("");
+    toast.success("Comment added");
   };
 
   const handleStatusChange = (status: TicketStatus) => {
     if (!activeTicket) return;
     updateTicket(activeTicket.id, { status });
-    log(`Updated ticket ${activeTicket.id} status to ${status}`, "Helpdesk");
+    log(`Changed ticket ${activeTicket.id} status to ${status}`, "Helpdesk");
     toast.success(`Ticket status updated to ${status}`);
   };
 
@@ -163,8 +178,12 @@ function HelpdeskPage() {
   return (
     <>
       <PageHeader
-        title="IT Helpdesk"
-        description="Internal technical support, device provisioning, network diagnostics, and access ticket resolution."
+        title={isEmployeeOnly ? "My IT Support Tickets" : "IT Helpdesk"}
+        description={
+          isEmployeeOnly
+            ? `Track and manage technical support and access requests submitted by ${me?.name || persona.name}`
+            : "Internal technical support, device provisioning, network diagnostics, and access ticket resolution."
+        }
         actions={
           <Button onClick={() => setAddOpen(true)}>
             <Plus className="mr-2 size-4" /> Create ticket
@@ -174,30 +193,30 @@ function HelpdeskPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Open Tickets"
+          label={isEmployeeOnly ? "My Active Tickets" : "Open Tickets"}
           value={openTickets.length}
-          hint="Active queue across IT"
+          hint={isEmployeeOnly ? "Currently in progress" : "Active queue across IT"}
           icon={<LifeBuoy className="size-5" />}
           tone="default"
         />
         <StatCard
-          label="Critical Priority"
+          label={isEmployeeOnly ? "High / Urgent" : "Critical Priority"}
           value={criticalCount}
-          hint="Requires < 2hr resolution"
+          hint={isEmployeeOnly ? "High priority requests" : "Requires < 2hr resolution"}
           icon={<ShieldAlert className="size-5" />}
           tone="warning"
         />
         <StatCard
-          label="Assigned to Me"
+          label={isEmployeeOnly ? "Total Tickets Filed" : "Assigned to Me"}
           value={myAssignedCount}
-          hint="Your queue workload"
+          hint={isEmployeeOnly ? "All time support requests" : "Your queue workload"}
           icon={<UserCheck className="size-5" />}
           tone="accent"
         />
         <StatCard
           label="Resolved / Closed"
           value={resolvedCount}
-          hint="Resolved this period"
+          hint="Completed tickets"
           icon={<CheckCircle2 className="size-5" />}
           tone="success"
         />

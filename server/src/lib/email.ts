@@ -1,3 +1,6 @@
+import "dotenv/config";
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
 import nodemailer from "nodemailer";
 import fs from "node:fs";
 import path from "node:path";
@@ -131,29 +134,53 @@ export async function sendCredentialsEmail(payload: CredentialsEmailPayload): Pr
   let previewUrl: string | undefined = undefined;
 
   // If SMTP is configured in environment
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: process.env.SMTP_SECURE === "true",
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
+  const smtpHost = process.env.SMTP_HOST?.trim();
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASS?.trim();
+  const smtpPort = Number(process.env.SMTP_PORT || 465);
 
+  if (smtpHost && smtpUser && smtpPass) {
+    try {
+      const isGmail = smtpHost.includes("gmail") || smtpUser.includes("@gmail.com");
+      const cleanPass = smtpPass.replace(/\s+/g, "");
+      const transporter = isGmail
+        ? nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+              user: smtpUser,
+              pass: cleanPass,
+            },
+          })
+        : nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: process.env.SMTP_SECURE === "true" || smtpPort === 465,
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+          });
+
+      const fromAddress = process.env.EMAIL_FROM || `"PeoplePay360 HR" <${smtpUser}>`;
       const info = await transporter.sendMail({
-        from: process.env.EMAIL_FROM || '"PeoplePay360 HR" <hr@peoplepay360.io>',
+        from: fromAddress,
         to,
         subject: `Welcome to PeoplePay360 — Your Login Credentials`,
         html: htmlContent,
       });
 
       messageId = info.messageId;
-      console.log(`✉️ [Email Service] Credentials email sent to ${to} via SMTP (MessageID: ${messageId})`);
+      console.log(`\n================================================================================`);
+      console.log(`✉️  [REAL LIVE INBOX DELIVERY VIA GMAIL/SMTP]`);
+      console.log(`To:                 ${employeeName} <${to}>`);
+      console.log(`From:               ${fromAddress}`);
+      console.log(`Subject:            Welcome to PeoplePay360 — Your Login Credentials`);
+      console.log(`Role:               ${roleTitle} (${role})`);
+      console.log(`Temporary Password: ${temporaryPassword}`);
+      console.log(`Message ID:         ${messageId}`);
+      console.log(`================================================================================\n`);
     } catch (smtpErr) {
-      console.warn("⚠️ [Email Service] SMTP dispatch failed, falling back to local audit delivery:", smtpErr);
+      console.warn("⚠️ [Email Service] Real SMTP dispatch error:", smtpErr);
     }
   } else {
     // Real-time SMTP transmission via Ethereal (no manual setup required)

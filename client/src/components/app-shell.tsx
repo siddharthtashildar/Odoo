@@ -161,7 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <NavList role={role} />
         <div className="mt-auto p-4 text-[0.7rem] leading-relaxed text-sidebar-foreground/50">
-          Demo workspace · mock data only. Changes stay on this device.
+          Production Workspace · Realtime PostgreSQL &amp; Better Auth
         </div>
       </aside>
 
@@ -189,18 +189,26 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <Select value={role} onValueChange={(v) => { setRole(v as Role); navigate({ to: "/app/dashboard" }); }}>
-              <SelectTrigger className="hidden w-[190px] sm:flex" aria-label="Switch role">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {ROLE_LABELS[r]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {role === "admin" ? (
+              <Select value={role} onValueChange={(v) => { setRole(v as Role); navigate({ to: "/app/dashboard" }); }}>
+                <SelectTrigger className="hidden w-[190px] sm:flex" aria-label="Switch role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {ROLE_LABELS[r]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="hidden items-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground sm:flex">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                <span>{ROLE_LABELS[role]}</span>
+                {persona.employeeCode && <span className="text-[10px] text-muted-foreground/70">({persona.employeeCode})</span>}
+              </div>
+            )}
 
             <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
               {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
@@ -211,7 +219,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Button variant="ghost" className="gap-2 px-2">
                   <Avatar className="size-8">
                     <AvatarFallback className="bg-primary text-xs text-primary-foreground">
-                      {persona.name.split(" ").map((p) => p[0]).join("")}
+                      {(persona.name || "User").split(" ").filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <span className="hidden text-sm md:inline">{persona.name}</span>
@@ -224,20 +232,22 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <p className="text-xs font-normal text-muted-foreground">{ROLE_LABELS[role]}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <div className="p-1 sm:hidden">
-                  <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {ROLE_LABELS[r]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {role === "admin" && (
+                  <div className="p-1 sm:hidden">
+                    <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {ROLE_LABELS[r]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <DropdownMenuItem onClick={() => navigate({ to: "/app/me" })}>
                   <UserRound className="mr-2 size-4" /> My workspace
                 </DropdownMenuItem>

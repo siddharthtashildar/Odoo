@@ -24,21 +24,48 @@ export const Route = createFileRoute("/app/payslips")({
 });
 
 function Payslips() {
-  const { payroll, persona, employees, role } = useApp();
+  const { payroll, persona, employees, role, generatePayslips } = useApp();
   const ready = useDelayed();
-  const [who, setWho] = useState(persona.employeeId);
+
+  const me = employees.find(
+    (e) =>
+      e.id === persona.employeeId ||
+      e.code === persona.employeeCode ||
+      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+  );
+  const myId = me?.id || persona.employeeId;
+  const myCode = me?.code || persona.employeeCode;
+
+  const [who, setWho] = useState(myId);
   const [openSlip, setOpenSlip] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const canSwitch = role === "hr_user" || role === "payroll_manager" || role === "payroll_user" || role === "admin";
-  const target = canSwitch ? who : persona.employeeId;
-  const employee = employees.find((e) => e.id === target);
+  const target = canSwitch ? who : myId;
+  const employee = employees.find((e) => e.id === target || e.code === target);
 
   const slips = payroll
     .filter((r) => r.status === "paid")
-    .map((r) => ({ run: r, line: r.lines.find((l) => l.employeeId === target) }))
+    .map((r) => ({
+      run: r,
+      line: r.lines.find((l) => l.employeeId === target || (employee && (l.employeeId === employee.code || l.employeeId === employee.id))),
+    }))
     .filter((s) => s.line);
 
   const ytd = slips.reduce((s, x) => s + (x.line?.net ?? 0), 0);
   const active = slips.find((s) => s.run.id === openSlip);
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    toast.info("Generating payslip for " + (employee?.name || "employee") + "...");
+    try {
+      await generatePayslips(target);
+      toast.success("Payslip generated successfully from compensation structure");
+    } catch (err) {
+      toast.error("Failed to generate payslip");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <>
@@ -46,16 +73,26 @@ function Payslips() {
         title="Payslips"
         description="Published slips from completed payroll cycles."
         actions={
-          canSwitch ? (
-            <Select value={who} onValueChange={setWho}>
-              <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {employees.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isGenerating}
+              onClick={handleGenerate}
+            >
+              <Receipt className="size-4 mr-1.5" /> Generate Payslip
+            </Button>
+            {canSwitch && (
+              <Select value={who} onValueChange={setWho}>
+                <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         }
       />
 
@@ -77,7 +114,7 @@ function Payslips() {
             <EmptyState
               icon={<Receipt className="size-5" />}
               title="No payslips yet"
-              description="Slips appear here once a payroll run is released."
+              description="Click 'Generate Payslip' above to compute compensation and publish your statement."
             />
           ) : (
             <div className="overflow-x-auto">

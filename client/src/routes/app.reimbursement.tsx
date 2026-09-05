@@ -75,18 +75,33 @@ function ReimbursementPage() {
   const canApprove = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin" || role === "hr_user";
   const isEmployeeOnly = role === "employee";
 
+  const me = employees.find(
+    (e) =>
+      e.id === persona.employeeId ||
+      e.code === persona.employeeCode ||
+      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+  );
+  const myId = me?.id || persona.employeeId;
+  const myCode = me?.code || persona.employeeCode;
+
   // Compute metrics
-  const totalClaims = reimbursements.length;
-  const pendingClaims = reimbursements.filter((r) => r.approvalStatus === "pending").length;
-  const approvedClaims = reimbursements.filter((r) => r.approvalStatus === "approved");
+  const myClaims = reimbursements.filter((r) => r.employeeId === myId || (myCode && r.employeeId === myCode));
+  const activeSet = isEmployeeOnly ? myClaims : reimbursements;
+
+  const totalClaims = activeSet.length;
+  const pendingClaims = activeSet.filter((r) => r.approvalStatus === "pending").length;
+  const approvedClaims = activeSet.filter((r) => r.approvalStatus === "approved");
   const approvedAmount = approvedClaims.reduce((s, r) => s + r.amount, 0);
-  const rejectedClaims = reimbursements.filter((r) => r.approvalStatus === "rejected").length;
-  const paidClaims = reimbursements.filter((r) => r.paymentStatus === "paid").length;
+  const rejectedClaims = activeSet.filter((r) => r.approvalStatus === "rejected").length;
+  const paidClaims = activeSet.filter((r) => r.paymentStatus === "paid").length;
 
   const rows = useMemo(() => {
     return reimbursements.filter((r) => {
       // Employees only see their own claims
-      if (isEmployeeOnly && r.employeeId !== persona.employeeId) return false;
+      if (isEmployeeOnly) {
+        const isMine = r.employeeId === myId || (myCode && r.employeeId === myCode);
+        if (!isMine) return false;
+      }
 
       const empName = nameOf(r.employeeId).toLowerCase();
       const matchQ =
@@ -97,7 +112,7 @@ function ReimbursementPage() {
       const matchStatus = statusFilter === "all" || r.approvalStatus === statusFilter;
       return matchQ && matchCat && matchStatus;
     });
-  }, [reimbursements, isEmployeeOnly, persona.employeeId, q, catFilter, statusFilter, nameOf]);
+  }, [reimbursements, isEmployeeOnly, myId, myCode, q, catFilter, statusFilter, nameOf]);
 
   const handleSubmit = () => {
     const next: Record<string, string | undefined> = {};
@@ -108,7 +123,7 @@ function ReimbursementPage() {
 
     const newClaim: ReimbursementClaim = {
       id: `CLM-${Date.now().toString().slice(-4)}`,
-      employeeId: persona.employeeId,
+      employeeId: myId,
       category: form.category,
       amount: Number(form.amount),
       submittedDate: form.submittedDate,

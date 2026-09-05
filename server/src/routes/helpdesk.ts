@@ -26,26 +26,41 @@ router.get("/", async (req, res) => {
       },
     });
 
-    const mapped = tickets.map((t) => ({
-      id: t.id,
-      ticketNumber: t.ticket_number,
-      employeeId: t.employee_id,
-      employeeName: t.employees.full_name,
-      category: t.category,
-      priority: t.priority,
-      subject: t.subject,
-      description: t.description ?? "",
-      status: t.status,
-      linkedAssetId: t.linked_asset_id ?? null,
-      createdAt: t.created_at.toISOString(),
-      resolvedAt: t.resolved_at?.toISOString() ?? null,
-      comments: t.it_ticket_comments.map((c) => ({
-        id: c.id,
-        author: c.users.email,
-        comment: c.comment,
-        createdAt: c.created_at.toISOString(),
-      })),
-    }));
+    const mapped = tickets.map((t) => {
+      const statusMap = {
+        open: "Open",
+        in_progress: "In Progress",
+        resolved: "Resolved",
+        closed: "Closed",
+      } as const;
+
+      return {
+        id: t.id,
+        ticketNumber: t.ticket_number,
+        employeeId: t.employee_id,
+        requesterId: t.employee_id,
+        employeeName: t.employees.full_name,
+        category: (t.category || "Hardware") as any,
+        priority: (t.priority === "critical" ? "Critical" : t.priority === "high" ? "High" : t.priority === "medium" ? "Medium" : "Low") as any,
+        subject: t.subject,
+        description: t.description ?? "",
+        status: (statusMap[t.status as keyof typeof statusMap] ?? "Open") as any,
+        assignedTechnician: "Karan Shah",
+        createdDate: t.created_at.toISOString().slice(0, 10),
+        updatedDate: (t.resolved_at ?? t.created_at).toISOString().slice(0, 10),
+        linkedAssetId: t.linked_asset_id ?? null,
+        createdAt: t.created_at.toISOString(),
+        resolvedAt: t.resolved_at?.toISOString() ?? null,
+        comments: t.it_ticket_comments.map((c) => ({
+          id: c.id,
+          author: c.users.email,
+          comment: c.comment,
+          text: c.comment,
+          at: c.created_at.toISOString().slice(0, 16).replace("T", " "),
+          createdAt: c.created_at.toISOString(),
+        })),
+      };
+    });
 
     res.json({ success: true, data: mapped });
   } catch (err) {

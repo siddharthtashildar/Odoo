@@ -1,5 +1,51 @@
 [
   {
+    "id": "<3449e990-25aa-b07b-4a19-e1d323e97a58@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "PP360!SV3T916",
+    "sentAt": "2026-09-05T13:18:14.597Z"
+  },
+  {
+    "id": "<17b70208-ac35-22bc-b1a2-09f14dfcfd38@gmail.com>",
+    "to": "siddharthtashildar17@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Siddharth Tashildar",
+    "role": "admin",
+    "temporaryPassword": "PP360!CXJA487",
+    "sentAt": "2026-09-05T13:11:30.653Z"
+  },
+  {
+    "id": "<8f0ce921-b11b-530e-4d8d-155ca15a6e48@gmail.com>",
+    "to": "siddharthtashildar17@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Siddharth",
+    "role": "admin",
+    "temporaryPassword": "PP360!LIVE_ADMIN_2026",
+    "sentAt": "2026-09-05T13:10:24.526Z"
+  },
+  {
+    "id": "<4cb54cbc-a4a3-d360-01a2-8c8f97e0d688@gmail.com>",
+    "to": "siddharthtashildar17@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Siddharth",
+    "role": "hr_manager",
+    "temporaryPassword": "PP360!REAL_LIVE_TEST_123",
+    "sentAt": "2026-09-05T13:09:27.638Z"
+  },
+  {
+    "id": "<23b98f0b-f792-be4d-fedf-9391195fd728@peoplepay360.io>",
+    "to": "siddharthtashildar17@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Siddharth",
+    "role": "hr_manager",
+    "temporaryPassword": "PP360!REAL_LIVE_TEST_123",
+    "sentAt": "2026-09-05T13:08:43.612Z",
+    "previewUrl": "https://ethereal.email/message/apwUWAlT7djrFs6lapwUW94vWvYlxWATAAAAAeB2W6UbfnWXGBkmDuWAaVs"
+  },
+  {
     "id": "<a9de2cc1-b269-064c-f17b-1264fcbe6640@peoplepay360.io>",
     "to": "shreeya@gmail.com",
     "subject": "Welcome to PeoplePay360 — Your Login Credentials",

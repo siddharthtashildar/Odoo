@@ -69,16 +69,33 @@ function AllowancePage() {
   const canManage = role === "hr_manager" || role === "payroll_manager" || role === "payroll_user" || role === "admin" || role === "hr_user";
   const isEmployeeOnly = role === "employee";
 
+  const me = employees.find(
+    (e) =>
+      e.id === persona.employeeId ||
+      e.code === persona.employeeCode ||
+      (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+  );
+  const myId = me?.id || persona.employeeId;
+  const myCode = me?.code || persona.employeeCode;
+
   // Summaries
-  const activeAllowances = allowances.filter((a) => a.status === "approved");
+  const myAllowances = allowances.filter((a) => a.employeeId === myId || (myCode && a.employeeId === myCode));
+  const activeAllowances = isEmployeeOnly
+    ? myAllowances.filter((a) => a.status === "approved")
+    : allowances.filter((a) => a.status === "approved");
   const totalMonthlySpend = activeAllowances.reduce((s, a) => s + a.amount, 0);
-  const pendingCount = allowances.filter((a) => a.status === "pending").length;
+  const pendingCount = isEmployeeOnly
+    ? myAllowances.filter((a) => a.status === "pending").length
+    : allowances.filter((a) => a.status === "pending").length;
 
   const rows = useMemo(() => {
     return allowances.filter((a) => {
-      if (isEmployeeOnly && a.employeeId !== persona.employeeId) return false;
+      if (isEmployeeOnly) {
+        const isMine = a.employeeId === myId || (myCode && a.employeeId === myCode);
+        if (!isMine) return false;
+      }
 
-      const emp = employees.find((e) => e.id === a.employeeId);
+      const emp = employees.find((e) => e.id === a.employeeId || e.code === a.employeeId);
       const empName = emp ? emp.name.toLowerCase() : "";
       const matchQ =
         a.id.toLowerCase().includes(q.toLowerCase()) ||
@@ -89,7 +106,7 @@ function AllowancePage() {
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       return matchQ && matchEmp && matchType && matchStatus;
     });
-  }, [allowances, isEmployeeOnly, persona.employeeId, q, empFilter, typeFilter, statusFilter, employees]);
+  }, [allowances, isEmployeeOnly, myId, myCode, q, empFilter, typeFilter, statusFilter, employees]);
 
   const handleSave = () => {
     const next: Record<string, string | undefined> = {};
@@ -137,14 +154,23 @@ function AllowancePage() {
   return (
     <>
       <PageHeader
-        title="Allowances"
-        description="Structured recurring allowances: House Rent Allowance, travel perks, connectivity subsidies, and performance components."
+        title={isEmployeeOnly ? "My Allowances" : "Allowances"}
+        description={
+          isEmployeeOnly
+            ? `Recurring monthly components, subsidies, and perks allocated to ${me?.name || persona.name}`
+            : "Structured recurring allowances: House Rent Allowance, travel perks, connectivity subsidies, and performance components."
+        }
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleExport}>
               <Download className="mr-2 size-4" /> Export
             </Button>
-            <Button onClick={() => setAddOpen(true)}>
+            <Button
+              onClick={() => {
+                if (isEmployeeOnly) setForm({ ...emptyAllowance, employeeId: myId });
+                setAddOpen(true);
+              }}
+            >
               <Plus className="mr-2 size-4" /> Add allowance
             </Button>
           </div>
@@ -153,30 +179,30 @@ function AllowancePage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Total Active Allowances"
+          label={isEmployeeOnly ? "My Active Components" : "Total Active Allowances"}
           value={activeAllowances.length}
-          hint={`${allowances.length} registered on file`}
+          hint={isEmployeeOnly ? "Active recurring benefits" : `${allowances.length} registered on file`}
           icon={<HandCoins className="size-5" />}
           tone="default"
         />
         <StatCard
-          label="Monthly Disbursal"
+          label={isEmployeeOnly ? "My Monthly Allowance" : "Monthly Disbursal"}
           value={inr(totalMonthlySpend)}
-          hint="Disbursed across all active components"
+          hint={isEmployeeOnly ? "Combined recurring credit" : "Disbursed across all active components"}
           icon={<Wallet className="size-5" />}
           tone="accent"
         />
         <StatCard
           label="Pending Approvals"
           value={pendingCount}
-          hint="Awaiting HR / Payroll verification"
+          hint={isEmployeeOnly ? "Your claims awaiting review" : "Awaiting HR / Payroll verification"}
           icon={<Clock className="size-5" />}
           tone="warning"
         />
         <StatCard
-          label="Top Component"
-          value="House Rent"
-          hint="Accounts for 62% of allowances"
+          label="Primary Component"
+          value={activeAllowances[0]?.type ? activeAllowances[0].type.split(" ")[0] : "HRA"}
+          hint={activeAllowances[0] ? inr(activeAllowances[0].amount) : "Standard benefit"}
           icon={<CheckCircle2 className="size-5" />}
           tone="success"
         />
