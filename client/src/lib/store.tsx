@@ -367,11 +367,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const persona = useMemo(() => {
+    const staticP = seed.ROLE_PERSONA[state.role];
+    if (staticP) {
+      const match = state.employees.find(
+        (e) =>
+          e.id === staticP.employeeId ||
+          e.code === staticP.employeeId ||
+          (Boolean(staticP.name) && e.name.toLowerCase().includes((staticP.name ?? "").split(" ")[0]?.toLowerCase() ?? "")) ||
+          (state.role === "payroll_manager" && (e.code === "PP-1005" || e.code === "PP-1004" || e.email.includes("arjun"))) ||
+          (state.role === "payroll_user" && (e.code === "PP-1004" || e.code === "PP-1005" || e.email.includes("devika"))),
+      );
+      if (match) {
+        return { employeeId: match.id, name: match.name };
+      }
+    }
+    return staticP ?? { employeeId: "E1001", name: "Charmi Patel" };
+  }, [state.role, state.employees]);
+
   const value = useMemo<Store>(
     () => ({
       ...state,
       hydrated,
-      persona: seed.ROLE_PERSONA[state.role] ?? { employeeId: "E1001", name: "Charmi Patel" },
+      persona,
       signIn: (role) => setState((s) => ({ ...s, signedIn: true, role })),
       signOut: () => setState((s) => ({ ...s, signedIn: false })),
       setRole: (role) => setState((s) => ({ ...s, role })),
