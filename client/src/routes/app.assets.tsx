@@ -30,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import { inr, type Asset, type AssetCategory, type AssetStatus } from "@/lib/mock-data";
 
@@ -96,6 +96,8 @@ function AssetsPage() {
   const maintenanceCount = assets.filter((a) => a.status === "Under Maintenance" || a.status === "repair").length;
   const totalBookValue = isEmployeeOnly ? myAssets.reduce((s, a) => s + a.value, 0) : assets.reduce((s, a) => s + a.value, 0);
 
+  const [page, setPage] = useState(1);
+
   const rows = useMemo(() => {
     return assets.filter((a) => {
       if (isEmployeeOnly) {
@@ -116,6 +118,12 @@ function AssetsPage() {
       return matchQ && matchCat && matchStatus;
     });
   }, [assets, isEmployeeOnly, myId, myCode, q, catFilter, statusFilter, nameOf]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE) || 1;
+  const paginatedRows = useMemo(() => {
+    return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [rows, page]);
 
   const handleAddAsset = () => {
     const next: Record<string, string | undefined> = {};
@@ -406,24 +414,33 @@ function AssetsPage() {
               icon={<Laptop className="size-8" />}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {!isEmployeeOnly && <TableHead>Asset ID</TableHead>}
-                    <TableHead>Asset Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    {!isEmployeeOnly && <TableHead>Assigned Employee</TableHead>}
-                    <TableHead>Purchase Date</TableHead>
-                    <TableHead>Condition</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Location</TableHead>
-                    {!isEmployeeOnly && <TableHead className="text-right">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((a) => {
-                    const isAssigned = a.status === "Assigned" || a.status === "assigned";
+            <>
+              {/* Pagination ON TOP of Asset Registry */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {!isEmployeeOnly && <TableHead>Asset ID</TableHead>}
+                      <TableHead>Asset Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      {!isEmployeeOnly && <TableHead>Assigned Employee</TableHead>}
+                      <TableHead>Purchase Date</TableHead>
+                      <TableHead>Condition</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Location</TableHead>
+                      {!isEmployeeOnly && <TableHead className="text-right">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRows.map((a) => {
+                      const isAssigned = a.status === "Assigned" || a.status === "assigned";
                     return (
                       <TableRow key={a.id}>
                         {!isEmployeeOnly && (
@@ -528,7 +545,15 @@ function AssetsPage() {
                 </TableBody>
               </Table>
             </div>
-          )}
+            <TablePagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={rows.length}
+              pageSize={5}
+              onPageChange={setPage}
+            />
+          </>
+        )}
         </CardContent>
       </Card>
 

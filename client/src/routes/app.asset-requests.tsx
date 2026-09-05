@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import type { Asset, AssetRequest, AssetCategory } from "@/lib/mock-data";
 
@@ -71,7 +71,15 @@ function AssetRequestsPage() {
   });
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
+  const [page, setPage] = useState(1);
+
   const visible = isIt ? assetRequests : assetRequests.filter((r) => r.employeeId === persona.employeeId);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(visible.length / PAGE_SIZE) || 1;
+  const paginatedVisible = useMemo(() => {
+    return visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [visible, page]);
 
   // Filter assets by selected category
   const assetsInCategory = form.category
@@ -167,58 +175,75 @@ function AssetRequestsPage() {
               action={<Button onClick={() => setOpen(true)}>Raise request</Button>}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {isIt && <TableHead>Requester</TableHead>}
-                    <TableHead>Asset Name</TableHead>
-                    <TableHead className="hidden sm:table-cell">Category</TableHead>
-                    <TableHead>Required Period</TableHead>
-                    <TableHead className="hidden md:table-cell">Reason</TableHead>
-                    <TableHead>Status</TableHead>
-                    {isIt && <TableHead className="text-right">Action</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visible.map((r) => (
-                    <TableRow key={r.id}>
-                      {isIt && <TableCell className="font-medium text-sm">{nameOf(r.employeeId)}</TableCell>}
-                      <TableCell>
-                        <p className="font-medium">{r.item}</p>
-                        <p className="text-xs text-muted-foreground">{r.id}</p>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell text-sm">{r.category || "—"}</TableCell>
-                      <TableCell className="text-sm">
-                        {r.requiredFrom && r.requiredUntil ? (
-                          <div>
-                            <div className="font-medium">{r.requiredFrom} → {r.requiredUntil}</div>
-                            <div className="text-xs text-muted-foreground">{r.raisedOn}</div>
-                          </div>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden max-w-xs truncate md:table-cell text-xs text-muted-foreground">
-                        {r.justification}
-                      </TableCell>
-                      <TableCell><StatusBadge status={r.status} /></TableCell>
-                      {isIt && (
-                        <TableCell className="text-right">
-                          {r.status === "open" ? (
-                            <Button size="sm" variant="outline" onClick={() => move(r.id, "in_progress")}>Start</Button>
-                          ) : r.status === "in_progress" ? (
-                            <Button size="sm" onClick={() => move(r.id, "resolved")}>Resolve</Button>
+            <>
+              {/* Pagination ON TOP of Asset Requests */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={visible.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {isIt && <TableHead>Requester</TableHead>}
+                      <TableHead>Asset Name</TableHead>
+                      <TableHead className="hidden sm:table-cell">Category</TableHead>
+                      <TableHead>Required Period</TableHead>
+                      <TableHead className="hidden md:table-cell">Reason</TableHead>
+                      <TableHead>Status</TableHead>
+                      {isIt && <TableHead className="text-right">Action</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedVisible.map((r) => (
+                      <TableRow key={r.id}>
+                        {isIt && <TableCell className="font-medium text-sm">{nameOf(r.employeeId)}</TableCell>}
+                        <TableCell>
+                          <p className="font-medium">{r.item}</p>
+                          <p className="text-xs text-muted-foreground">{r.id}</p>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell text-sm">{r.category || "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          {r.requiredFrom && r.requiredUntil ? (
+                            <div>
+                              <div className="font-medium">{r.requiredFrom} → {r.requiredUntil}</div>
+                              <div className="text-xs text-muted-foreground">{r.raisedOn}</div>
+                            </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">Closed</span>
+                            "—"
                           )}
                         </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                        <TableCell className="hidden max-w-xs truncate md:table-cell text-xs text-muted-foreground">
+                          {r.justification}
+                        </TableCell>
+                        <TableCell><StatusBadge status={r.status} /></TableCell>
+                        {isIt && (
+                          <TableCell className="text-right">
+                            {r.status === "open" ? (
+                              <Button size="sm" variant="outline" onClick={() => move(r.id, "in_progress")}>Start</Button>
+                            ) : r.status === "in_progress" ? (
+                              <Button size="sm" onClick={() => move(r.id, "resolved")}>Resolve</Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Closed</span>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={visible.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

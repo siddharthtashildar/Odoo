@@ -28,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import type { LeaveRequest, LeaveType } from "@/lib/mock-data";
 
@@ -97,6 +97,8 @@ function LeavePage() {
     ? myLeaves.filter((l) => l.status === "rejected")
     : leave.filter((l) => l.status === "rejected");
 
+  const [page, setPage] = useState(1);
+
   const rows = useMemo(() => {
     return leave.filter((l) => {
       if (isEmployeeOnly) {
@@ -116,6 +118,12 @@ function LeavePage() {
       return matchQ && matchType && matchStatus;
     });
   }, [leave, isEmployeeOnly, myId, myCode, q, typeFilter, statusFilter, nameOf]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE) || 1;
+  const paginatedRows = useMemo(() => {
+    return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [rows, page]);
 
   const decide = (id: string, status: "approved" | "rejected") => {
     const req = leave.find((l) => l.id === id);
@@ -348,25 +356,33 @@ function LeavePage() {
               ))}
             </div>
           ) : (
-            // Admin/Manager table view
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Request ID</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Leave Type</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead className="text-right">Number of Days</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Submitted Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((l) => (
+            <>
+              {/* Pagination ON TOP of Leave Requests */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Request ID</TableHead>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Leave Type</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead className="text-right">Number of Days</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Submitted Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRows.map((l) => (
                     <TableRow key={l.id}>
                       <TableCell className="font-mono text-xs font-semibold text-primary">
                         {l.id}
@@ -443,7 +459,15 @@ function LeavePage() {
                 </TableBody>
               </Table>
             </div>
-          )}
+            <TablePagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={rows.length}
+              pageSize={5}
+              onPageChange={setPage}
+            />
+          </>
+        )}
         </CardContent>
       </Card>
 

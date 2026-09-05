@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { EmptyState, PageHeader, StatCard, StatusBadge } from "@/components/bits";
+import { EmptyState, PageHeader, StatCard, StatusBadge, TablePagination } from "@/components/bits";
 import { useApp, useEmployeeName } from "@/lib/store";
 import { inr } from "@/lib/mock-data";
 
@@ -87,6 +87,11 @@ function PayrollDetail() {
     setConfirm(null);
   };
 
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(run.lines.length / PAGE_SIZE) || 1;
+  const paginatedLines = run.lines.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <>
       <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">
@@ -135,6 +140,14 @@ function PayrollDetail() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
+          {/* Pagination ON TOP of Staff Run Lines */}
+          <TablePagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={run.lines.length}
+            pageSize={5}
+            onPageChange={setPage}
+          />
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -147,7 +160,7 @@ function PayrollDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {run.lines.map((l) => (
+                {paginatedLines.map((l) => (
                   <TableRow key={l.employeeId}>
                     <TableCell>
                       <Link to="/app/employees/$id" params={{ id: l.employeeId }} className="font-medium hover:underline">
@@ -174,6 +187,13 @@ function PayrollDetail() {
               </TableBody>
             </Table>
           </div>
+          <TablePagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={run.lines.length}
+            pageSize={5}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   BadgeIndianRupee,
@@ -27,7 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { EmptyState, PageHeader, StatCard } from "@/components/bits";
+import { EmptyState, PageHeader, StatCard, TablePagination } from "@/components/bits";
 import { useApp, useEmployeeName } from "@/lib/store";
 import { inr, salaryStructures, type SalaryRecord } from "@/lib/mock-data";
 
@@ -69,6 +69,8 @@ function SalaryPage() {
     [employees],
   );
 
+  const [page, setPage] = useState(1);
+
   const enriched = useMemo(() => {
     return records
       .map((r) => {
@@ -91,6 +93,12 @@ function SalaryPage() {
         return sortDir === "asc" ? cmp : -cmp;
       });
   }, [records, employees, q, deptFilter, statusFilter, sortKey, sortDir]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(enriched.length / PAGE_SIZE) || 1;
+  const paginatedEnriched = useMemo(() => {
+    return enriched.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [enriched, page]);
 
   const totalCTC = records.reduce((s, r) => s + r.annualCTC, 0);
   const avgCTC = records.length ? totalCTC / records.length : 0;
@@ -226,79 +234,95 @@ function SalaryPage() {
               description="Try adjusting your search or filters."
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
-                      Employee <SortIcon k="name" />
-                    </TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Structure</TableHead>
-                    <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort("ctc")}>
-                      Annual CTC <SortIcon k="ctc" />
-                    </TableHead>
-                    <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort("net")}>
-                      Net / mo <SortIcon k="net" />
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {enriched.map((r) => (
-                    <>
-                      <TableRow
-                        key={r.id}
-                        className="cursor-pointer"
-                        onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                      >
-                        <TableCell className="font-medium">{r.empName}</TableCell>
-                        <TableCell className="text-muted-foreground">{r.dept}</TableCell>
-                        <TableCell className="text-muted-foreground">{r.struct}</TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">{inr(r.annualCTC)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{inr(r.netMonthly)}</TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[r.status]}`}>
-                            {r.status}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          {canEdit && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="size-8"
-                              aria-label="Edit salary record"
-                              onClick={(e) => { e.stopPropagation(); openEdit(r); }}
-                            >
-                              <Edit2 className="size-3.5" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                      {expandedId === r.id && (
-                        <TableRow key={`${r.id}-expand`} className="bg-muted/30">
-                          <TableCell colSpan={7} className="py-3">
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs sm:grid-cols-4">
-                              <Detail label="Basic" value={inr(r.basic)} />
-                              <Detail label="HRA" value={inr(r.hra)} />
-                              <Detail label="Special Allowance" value={inr(r.specialAllowance)} />
-                              <Detail label="Monthly CTC" value={inr(r.monthlyCTC)} />
-                              <Detail label="PF (Employee)" value={`− ${inr(r.providentFund)}`} />
-                              <Detail label="Professional Tax" value={`− ${inr(r.professionalTax)}`} />
-                              <Detail label="Income Tax (TDS)" value={`− ${inr(r.incomeTax)}`} />
-                              <Detail label="Effective From" value={r.effectiveFrom} />
-                              {r.remarks && <Detail label="Remarks" value={r.remarks} span />}
-                            </div>
+            <>
+              {/* Pagination ON TOP of Employees' Staff Salary Records */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={enriched.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
+                        Employee <SortIcon k="name" />
+                      </TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Structure</TableHead>
+                      <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort("ctc")}>
+                        Annual CTC <SortIcon k="ctc" />
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort("net")}>
+                        Net / mo <SortIcon k="net" />
+                      </TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedEnriched.map((r) => (
+                      <Fragment key={r.id}>
+                        <TableRow
+                          className="cursor-pointer"
+                          onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                        >
+                          <TableCell className="font-medium">{r.empName}</TableCell>
+                          <TableCell className="text-muted-foreground">{r.dept}</TableCell>
+                          <TableCell className="text-muted-foreground">{r.struct}</TableCell>
+                          <TableCell className="text-right tabular-nums font-medium">{inr(r.annualCTC)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{inr(r.netMonthly)}</TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[r.status]}`}>
+                              {r.status}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {canEdit && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="size-8"
+                                aria-label="Edit salary record"
+                                onClick={(e) => { e.stopPropagation(); openEdit(r); }}
+                              >
+                                <Edit2 className="size-3.5" />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
-                      )}
-                    </>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                        {expandedId === r.id && (
+                          <TableRow key={`${r.id}-expand`} className="bg-muted/30">
+                            <TableCell colSpan={7} className="py-3">
+                              <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs sm:grid-cols-4">
+                                <Detail label="Basic" value={inr(r.basic)} />
+                                <Detail label="HRA" value={inr(r.hra)} />
+                                <Detail label="Special Allowance" value={inr(r.specialAllowance)} />
+                                <Detail label="Monthly CTC" value={inr(r.monthlyCTC)} />
+                                <Detail label="PF (Employee)" value={`− ${inr(r.providentFund)}`} />
+                                <Detail label="Professional Tax" value={`− ${inr(r.professionalTax)}`} />
+                                <Detail label="Income Tax (TDS)" value={`− ${inr(r.incomeTax)}`} />
+                                <Detail label="Effective From" value={r.effectiveFrom} />
+                                {r.remarks && <Detail label="Remarks" value={r.remarks} span />}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={enriched.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>

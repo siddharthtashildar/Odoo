@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import { inr, type AllowanceRecord, type AllowanceType } from "@/lib/mock-data";
 
@@ -87,6 +87,7 @@ function AllowancePage() {
   const pendingCount = isEmployeeOnly
     ? myAllowances.filter((a) => a.status === "pending").length
     : allowances.filter((a) => a.status === "pending").length;
+  const [page, setPage] = useState(1);
 
   const rows = useMemo(() => {
     return allowances.filter((a) => {
@@ -106,7 +107,13 @@ function AllowancePage() {
       const matchStatus = statusFilter === "all" || a.status === statusFilter;
       return matchQ && matchEmp && matchType && matchStatus;
     });
-  }, [allowances, isEmployeeOnly, myId, myCode, q, empFilter, typeFilter, statusFilter, employees]);
+  }, [allowances, isEmployeeOnly, myId, myCode, employees, q, empFilter, typeFilter, statusFilter]);
+
+  const PAGE_SIZE = 5;
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE) || 1;
+  const paginatedRows = useMemo(() => {
+    return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [rows, page]);
 
   const handleSave = () => {
     const next: Record<string, string | undefined> = {};
@@ -287,80 +294,97 @@ function AllowancePage() {
               icon={<HandCoins className="size-8" />}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Allowance ID</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Allowance Type</TableHead>
-                    <TableHead className="text-right">Monthly Amount</TableHead>
-                    <TableHead>Effective Date</TableHead>
-                    <TableHead>Expiry Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="font-mono text-xs font-semibold text-primary">
-                        {a.id}
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{nameOf(a.employeeId)}</div>
-                        <div className="text-xs text-muted-foreground">{a.employeeId}</div>
-                      </TableCell>
-                      <TableCell>{a.type}</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {inr(a.amount)}/mo
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{a.effectiveDate}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{a.expiryDate}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={a.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 px-2"
-                            onClick={() => setViewRecord(a)}
-                            title="View details"
-                          >
-                            <Eye className="size-3.5" />
-                          </Button>
-
-                          {canManage && a.status === "pending" && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 px-2 text-success hover:text-success"
-                                onClick={() => handleStatusChange(a.id, "approved")}
-                                title="Approve"
-                              >
-                                <CheckCircle2 className="size-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 px-2 text-destructive hover:text-destructive"
-                                onClick={() => handleStatusChange(a.id, "rejected")}
-                                title="Reject"
-                              >
-                                <XCircle className="size-3.5" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
+            <>
+              {/* Pagination ON TOP of Employees' Staff Allowances */}
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Allowance ID</TableHead>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Allowance Type</TableHead>
+                      <TableHead className="text-right">Monthly Amount</TableHead>
+                      <TableHead>Effective Date</TableHead>
+                      <TableHead>Expiry Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRows.map((a) => (
+                      <TableRow key={a.id}>
+                        <TableCell className="font-mono text-xs font-semibold text-primary">
+                          {a.id}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{nameOf(a.employeeId)}</div>
+                          <div className="text-xs text-muted-foreground">{a.employeeId}</div>
+                        </TableCell>
+                        <TableCell>{a.type}</TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {inr(a.amount)}/mo
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{a.effectiveDate}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{a.expiryDate}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={a.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2"
+                              onClick={() => setViewRecord(a)}
+                              title="View details"
+                            >
+                              <Eye className="size-3.5" />
+                            </Button>
+
+                            {canManage && a.status === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2 text-success hover:text-success"
+                                  onClick={() => handleStatusChange(a.id, "approved")}
+                                  title="Approve"
+                                >
+                                  <CheckCircle2 className="size-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2 text-destructive hover:text-destructive"
+                                  onClick={() => handleStatusChange(a.id, "rejected")}
+                                  title="Reject"
+                                >
+                                  <XCircle className="size-3.5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={5}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </CardContent>
       </Card>
