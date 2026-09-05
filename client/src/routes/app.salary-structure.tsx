@@ -88,6 +88,20 @@ const emptyForm = (): SalaryFormState => ({
   components: [] as SalaryComponent[],
 });
 
+function getComponents(s: SalaryStructure): SalaryComponent[] {
+  if (s && Array.isArray(s.components)) return s.components;
+  const rules = (s as any)?.rules;
+  if (Array.isArray(rules)) {
+    return rules.map((r: any) => ({
+      name: r.name || r.code,
+      type: r.category === "DEDUCTION" || r.category === "TAX" || r.type === "deduction" ? "deduction" : "earning",
+      basis: r.calculationType === "fixed" ? "fixed" : "percent_of_basic",
+      value: r.calculationType === "fixed" ? Number(r.fixedAmount || 0) : Number(r.percentage || 0),
+    }));
+  }
+  return [];
+}
+
 function SalaryStructurePage() {
   const { salaryStructures: structures, update, role } = useApp();
   const [expandedId, setExpandedId] = useState<string | null>(null);
