@@ -66,7 +66,7 @@ const NAV: { to: string; label: string; icon: typeof Users; roles: Role[]; group
   { to: "/app/payroll", label: "Payroll", icon: Coins, group: "Compensation", roles: ["payroll_user", "payroll_manager", "admin"] },
   { to: "/app/salary", label: "Salary", icon: IndianRupee, group: "Compensation", roles: ["payroll_user", "payroll_manager", "admin"] },
   { to: "/app/salary-structure", label: "Salary Structure", icon: LayoutList, group: "Compensation", roles: ["payroll_user", "payroll_manager", "admin"] },
-  { to: "/app/payslips", label: "Payslips", icon: Receipt, group: "Compensation", roles: ["employee", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
+  { to: "/app/payslips", label: "Payslips", icon: Receipt, group: "Compensation", roles: ["payroll_user", "payroll_manager", "admin"] },
   { to: "/app/reimbursement", label: "Reimbursement", icon: ReceiptText, group: "Compensation", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"] },
   { to: "/app/allowance", label: "Allowance", icon: HandCoins, group: "Compensation", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"] },
 

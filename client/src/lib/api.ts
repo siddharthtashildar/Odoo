@@ -139,24 +139,56 @@ export const api = {
   payroll: {
     list: () => request<unknown[]>("GET", "/api/payroll"),
     get: (id: string) => request<unknown>("GET", `/api/payroll/${id}`),
+    getDashboardAnalytics: () => request<any>("GET", "/api/payroll/dashboard-analytics"),
     create: (data: Record<string, unknown>) =>
-      request<{ id: string }>("POST", "/api/payroll", data),
+      request<{ id: string; generatedCount?: number; warnings?: any[] }>("POST", "/api/payroll", data),
     generate: (data?: { employeeId?: string | undefined; periodMonth?: number | undefined; periodYear?: number | undefined }) =>
       request<{ runId: string; period: string; generatedCount: number }>("POST", "/api/payroll/generate", data ?? {}),
+    compute: (id: string) => request<{ runId: string; status: string; recomputedCount: number }>("POST", `/api/payroll/${id}/compute`),
+    validate: (id: string) => request<{ id: string; status: string; warnings: any[] }>("POST", `/api/payroll/${id}/validate`),
+    markPaid: (id: string) => request<{ id: string; status: string }>("POST", `/api/payroll/${id}/mark-paid`),
     patch: (id: string, data: Record<string, unknown>) =>
       request<{ id: string }>("PATCH", `/api/payroll/${id}`, data),
+    sendSingleEmail: (data: {
+      employeeId: string;
+      period: string;
+      gross: number;
+      net: number;
+      basic: number;
+      allowances: number;
+      deductions: number;
+    }) =>
+      request<{ message: string; previewUrl?: string }>("POST", "/api/payroll/send-single-email", data),
+    sendEmails: (id: string) =>
+      request<{ runId: string; sentCount: number; failedCount?: number; message: string }>("POST", `/api/payroll/${id}/send-emails`),
+    retryFailedEmails: (id: string) =>
+      request<{ retriedCount: number; successfullyResentCount: number }>("POST", `/api/payroll/${id}/retry-failed-emails`),
+    getValidationWarnings: () =>
+      request<{ warnings: Array<{ employeeId: string; employeeName: string; type: string; message: string }>; count: number }>(
+        "GET",
+        "/api/payroll/validation/warnings",
+      ),
+    delete: (id: string) =>
+      request<{ message: string }>("DELETE", `/api/payroll/${id}`),
   },
 
   // ── Salary ────────────────────────────────────────────────────────────────
   salary: {
     structures: () => request<unknown[]>("GET", "/api/salary/structures"),
     records: () => request<unknown[]>("GET", "/api/salary/records"),
+    rules: () => request<unknown[]>("GET", "/api/salary/rules"),
     createStructure: (data: Record<string, unknown>) =>
       request<{ id: string }>("POST", "/api/salary/structures", data),
     patchStructure: (id: string, data: Record<string, unknown>) =>
       request<{ id: string }>("PATCH", `/api/salary/structures/${id}`, data),
     deleteStructure: (id: string) =>
       request<void>("DELETE", `/api/salary/structures/${id}`),
+    createRule: (data: Record<string, unknown>) =>
+      request<{ id: string; code: string }>("POST", "/api/salary/rules", data),
+    patchRule: (id: string, data: Record<string, unknown>) =>
+      request<{ id: string }>("PATCH", `/api/salary/rules/${id}`, data),
+    deleteRule: (id: string) =>
+      request<void>("DELETE", `/api/salary/rules/${id}`),
   },
 
   // ── Reimbursements ────────────────────────────────────────────────────────
