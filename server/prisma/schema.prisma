@@ -1,6 +1,6 @@
+
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -83,6 +83,7 @@ model assets {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
 model attendance {
   id                             String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   employee_id                    String                           @db.Uuid
@@ -138,6 +139,7 @@ model audit_log {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This table contains exclusion constraints and requires additional setup for migrations. Visit https://pris.ly/d/exclusion-constraints for more info.
+
 model contracts {
   id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   contract_number        String                  @unique @db.VarChar(50)
@@ -385,6 +387,7 @@ model leave_allocations {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
 model leave_requests {
   id                                              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   employee_id                                     String                    @db.Uuid
@@ -586,6 +589,7 @@ model payroll_run_employees {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
 model payroll_runs {
   id                                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   period_month                          Int
@@ -699,6 +703,7 @@ model reimbursement_categories {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
 model reimbursements {
   id                                              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   employee_id                                     String                    @db.Uuid
@@ -1104,4 +1109,69 @@ enum ticket_status_enum {
   waiting_for_employee
   resolved
   closed
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  role          String?   @default("employee")
+  employeeId    String?
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
 }
