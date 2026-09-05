@@ -66,7 +66,7 @@ const NAV: { to: string; label: string; icon: typeof Users; roles: Role[]; group
   { to: "/app/salary-structure", label: "Salary Structure", icon: LayoutList, group: "Compensation", roles: ["payroll_user", "payroll_manager", "admin"] },
   { to: "/app/payslips", label: "Payslips", icon: Receipt, group: "Compensation", roles: ["employee", "hr_user", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },
   { to: "/app/reimbursement", label: "Reimbursement", icon: ReceiptText, group: "Compensation", roles: ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
-  { to: "/app/allowance", label: "Allowance", icon: HandCoins, group: "Compensation", roles: ["employee", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/allowance", label: "Allowance", icon: HandCoins, group: "Compensation", roles: ["hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },
 
   // Operations & IT
   { to: "/app/assets", label: "AssetFlow", icon: Laptop, group: "Operations", roles: ["employee", "it_asset_manager", "hr_manager", "hr_user", "payroll_user", "payroll_manager", "admin"] },

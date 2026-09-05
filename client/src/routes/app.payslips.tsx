@@ -59,8 +59,7 @@ function Payslips() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Published slips" value={slips.length} icon={<Receipt className="size-5" />} />
+      <div className="grid gap-4 sm:grid-cols-2">
         <StatCard label="Net paid (in workspace)" value={inr(ytd)} tone="success" />
         <StatCard label="Monthly gross" value={inr(Math.round((employee?.ctc ?? 0) / 12))} hint={employee?.name} />
       </div>

@@ -59,6 +59,7 @@ function Dashboard() {
     reimbursements,
     helpdesk,
     assets,
+    contracts,
     role,
     persona,
     audit,
@@ -68,6 +69,11 @@ function Dashboard() {
   const navigate = useNavigate();
 
   if (role === "employee") {
+    const me = employees.find((e) => e.id === persona.employeeId);
+    const myContract = contracts.find((c) => c.employeeId === persona.employeeId);
+    const lastSlip = payroll.find((r) => r.status === "paid" && r.lines.some((l) => l.employeeId === persona.employeeId));
+    const lastLine = lastSlip?.lines.find((l) => l.employeeId === persona.employeeId);
+
     const myRecords = attendance.filter((a) => a.employeeId === persona.employeeId);
     const countable = myRecords.filter((a) => a.status !== "Holiday" && a.status !== "On Leave");
     const attended = countable.filter(
@@ -92,6 +98,35 @@ function Dashboard() {
             }
             icon={<UserCheck className="size-5" />}
             tone="success"
+          />
+          <StatCard
+            label="Payroll"
+            value={lastLine ? inr(lastLine.net) : me ? inr(Math.round(me.ctc / 12)) : "—"}
+            hint={lastSlip ? `Last net · ${lastSlip.period}` : "Estimated monthly net"}
+            icon={<BadgeIndianRupee className="size-5" />}
+            tone="accent"
+          />
+          <StatCard
+            label="Remaining Leaves"
+            value={`${me?.leaveBalance ?? 0} Days`}
+            hint="Paid leave available"
+            icon={<CalendarDays className="size-5" />}
+          />
+          <StatCard
+            label="Current Contract"
+            value={myContract?.contractType ?? me?.employmentType ?? "—"}
+            hint={
+              myContract
+                ? `${myContract.status} · ${myContract.startDate} → ${myContract.endDate}`
+                : "No contract on file"
+            }
+            icon={<FilePlus className="size-5" />}
+          />
+          <StatCard
+            label="Department"
+            value={me?.department ?? "—"}
+            hint={me?.designation}
+            icon={<Building2 className="size-5" />}
           />
         </div>
       </>

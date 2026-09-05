@@ -282,6 +282,7 @@ function AssetsPage() {
         }
       />
 
+      {!isEmployeeOnly && (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Available in Stock"
@@ -312,6 +313,7 @@ function AssetsPage() {
           tone="accent"
         />
       </div>
+      )}
 
       <Card>
         <CardHeader className="pb-3">
@@ -387,15 +389,15 @@ function AssetsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Asset ID</TableHead>
+                    {!isEmployeeOnly && <TableHead>Asset ID</TableHead>}
                     <TableHead>Asset Name</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Assigned Employee</TableHead>
+                    {!isEmployeeOnly && <TableHead>Assigned Employee</TableHead>}
                     <TableHead>Purchase Date</TableHead>
                     <TableHead>Condition</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Location</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    {!isEmployeeOnly && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -403,14 +405,17 @@ function AssetsPage() {
                     const isAssigned = a.status === "Assigned" || a.status === "assigned";
                     return (
                       <TableRow key={a.id}>
+                        {!isEmployeeOnly && (
                         <TableCell className="font-mono text-xs font-semibold text-primary">
                           {a.tag}
                         </TableCell>
+                        )}
                         <TableCell>
                           <div className="font-medium">{a.name}</div>
                           <div className="font-mono text-xs text-muted-foreground">{a.serial}</div>
                         </TableCell>
                         <TableCell>{a.category}</TableCell>
+                        {!isEmployeeOnly && (
                         <TableCell>
                           {a.assignedTo ? (
                             <div>
@@ -421,6 +426,7 @@ function AssetsPage() {
                             <span className="text-xs text-muted-foreground italic">Unassigned (In Vault)</span>
                           )}
                         </TableCell>
+                        )}
                         <TableCell className="text-xs text-muted-foreground">{a.purchasedOn}</TableCell>
                         <TableCell>
                           <StatusBadge status={a.condition || "Good"} />
@@ -429,6 +435,7 @@ function AssetsPage() {
                           <StatusBadge status={a.status} />
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{a.location}</TableCell>
+                        {!isEmployeeOnly && (
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {/* View History */}
@@ -493,6 +500,7 @@ function AssetsPage() {
                             )}
                           </div>
                         </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
