@@ -73,7 +73,6 @@ function Dashboard() {
     role,
     persona,
     audit,
-    punchAttendance,
   } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
@@ -102,7 +101,6 @@ function Dashboard() {
         reimbursements={reimbursements}
         assets={assets}
         helpdesk={helpdesk}
-        punchAttendance={punchAttendance}
         navigate={navigate}
       />
     );
@@ -617,7 +615,6 @@ function EmployeeDashboard({
   reimbursements,
   assets,
   helpdesk,
-  punchAttendance,
   navigate,
 }: {
   me: Employee | undefined;
@@ -628,7 +625,6 @@ function EmployeeDashboard({
   reimbursements: ReimbursementClaim[];
   assets: Asset[];
   helpdesk: HelpdeskTicket[];
-  punchAttendance: (employeeId: string) => void;
   navigate: ReturnType<typeof useNavigate>;
 }) {
   const today = new Date().toISOString().slice(0, 10);
@@ -674,20 +670,9 @@ function EmployeeDashboard({
         title={`Welcome back, ${myName}`}
         description={`${me?.designation ?? "Employee"} · ${me?.department ?? "Engineering"} · ID: ${myCode || myId.slice(0, 8)}`}
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => punchAttendance(myId)}
-              variant={isPunchedIn ? "destructive" : "default"}
-              size="sm"
-              className="gap-1.5 font-medium"
-            >
-              <Clock className="size-4" />
-              {isPunchedIn ? "Clock Out" : "Clock In"}
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/app/me">My Workspace</Link>
-            </Button>
-          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/app/me">My Workspace</Link>
+          </Button>
         }
       />
 
@@ -710,7 +695,7 @@ function EmployeeDashboard({
             {isPunchedIn ? "Clocked In" : myToday ? myToday.status : "Not Clocked In"}
           </div>
           <div className="mt-1 text-xs text-muted-foreground truncate">
-            {myToday?.checkIn ? `In at ${myToday.checkIn}` : "Tap to clock in today"}
+            {myToday?.checkIn ? `In at ${myToday.checkIn}` : "View today's attendance"}
           </div>
         </Link>
 

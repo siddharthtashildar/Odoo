@@ -52,16 +52,24 @@ router.get("/", async (_req, res) => {
 // POST /api/contracts
 router.post("/", async (req, res) => {
   try {
-    const { employeeId, contractType, salary, startDate, endDate } = req.body as {
+    const { employeeId, contractType, salary, startDate, endDate, status } = req.body as {
       employeeId: string;
       contractType: string;
       salary: number;
       startDate: string;
       endDate?: string;
+      status?: string;
     };
 
     const emp = await resolveEmployee(employeeId);
     if (!emp) return res.status(404).json({ success: false, error: "Employee not found" });
+    const effectiveStart = new Date(startDate || new Date().toISOString().slice(0, 10));
+    const effectiveEnd = endDate ? new Date(endDate) : null;
+    if (effectiveEnd && effectiveEnd < effectiveStart) return res.status(400).json({ success: false, error: "End date must be after start date" });
+    if ((status ?? "draft") === "active") {
+      const overlap = await prisma.contracts.findFirst({ where: { employee_id: emp.id, start_date: { lte: effectiveEnd ?? new Date("2999-12-31") }, OR: [{ end_date: null }, { end_date: { gte: effectiveStart } }], status: "active" } });
+      if (overlap) return res.status(409).json({ success: false, error: "An overlapping active contract already exists" });
+    }
 
     const count = await prisma.contracts.count();
     const contractNumber = `CT-${String(count + 1).padStart(4, "0")}`;
@@ -79,9 +87,9 @@ router.post("/", async (req, res) => {
         designation_id: emp.designation_id,
         contract_type: normContractType as any,
         salary: Number(salary),
-        start_date: new Date(startDate || new Date().toISOString().slice(0, 10)),
-        end_date: endDate ? new Date(endDate) : null,
-        status: "active",
+        start_date: effectiveStart,
+        end_date: effectiveEnd,
+        status: (status ?? "draft") as any,
       },
     });
 

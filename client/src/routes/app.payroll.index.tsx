@@ -318,6 +318,25 @@ function PayrollList() {
 
   const departments = useMemo(() => Array.from(new Set(employees.map((e) => e.department))).sort(), [employees]);
 
+  const warningGroups = useMemo(() => {
+    const labels: Record<string, string> = {
+      MISSING_BANK_DETAILS: "Missing bank details",
+      DUPLICATE_PAYSLIP: "Duplicate payslip detected",
+      MISSING_CONTRACT: "Missing contract",
+      MISSING_SALARY_STRUCTURE: "Missing salary structure",
+      EXPIRED_CONTRACT: "Expired contract",
+      NEGATIVE_NET_SALARY: "Invalid net salary",
+    };
+    const grouped = new Map<string, { label: string; warnings: any[] }>();
+    for (const warning of analytics?.validationWarnings ?? []) {
+      const key = warning.type ?? "OTHER";
+      const current = grouped.get(key) ?? { label: labels[key] ?? "Needs attention", warnings: [] };
+      current.warnings.push(warning);
+      grouped.set(key, current);
+    }
+    return Array.from(grouped.values());
+  }, [analytics?.validationWarnings]);
+
   if (isRestricted) {
     return (
       <EmptyState
@@ -359,22 +378,47 @@ function PayrollList() {
 
       {/* Operational Warnings Banner */}
       {analytics?.validationWarnings && analytics.validationWarnings.length > 0 && (
-        <Card className="border-warning/50 bg-warning/10">
-          <CardContent className="flex items-start gap-3 p-4">
-            <AlertTriangle className="size-5 shrink-0 text-warning-foreground mt-0.5" />
-            <div className="flex-1 text-sm">
-              <p className="font-semibold text-warning-foreground">
-                Operational Readiness Warnings ({analytics.validationWarnings.length})
-              </p>
-
-              <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                {analytics.validationWarnings.map((w: any, idx: number) => (
-                  <span key={idx} className="rounded bg-background/80 px-2 py-1 border border-warning/30">
-                    <strong>{w.employeeName}</strong>: {w.message}
-                  </span>
-                ))}
+        <Card className="border-warning/40 bg-warning/5">
+          <CardHeader className="gap-3 border-b border-warning/20 pb-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-warning/15 p-2 text-warning-foreground">
+                <AlertTriangle className="size-5" />
               </div>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-base">Payroll readiness needs attention</CardTitle>
+                <CardDescription className="mt-1">
+                  Resolve these items before finalizing or sending this payrun.
+                </CardDescription>
+              </div>
+              <span className="shrink-0 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning-foreground">
+                {analytics.validationWarnings.length} issues
+              </span>
             </div>
+            <div className="flex flex-wrap gap-2 pl-12">
+              {warningGroups.map((group) => (
+                <span key={group.label} className="rounded-md border border-border/70 bg-background/70 px-2.5 py-1 text-xs text-muted-foreground">
+                  <strong className="text-foreground">{group.warnings.length}</strong> {group.label}
+                </span>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent className="max-h-72 space-y-4 overflow-y-auto p-4">
+            {warningGroups.map((group) => (
+              <section key={group.label}>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</h3>
+                  <span className="text-xs tabular-nums text-muted-foreground">{group.warnings.length}</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {group.warnings.map((warning, index) => (
+                    <div key={`${warning.employeeId}-${group.label}-${index}`} className="rounded-lg border border-border/70 bg-background/75 px-3 py-2.5 text-sm">
+                      <p className="font-medium text-foreground">{warning.employeeName}</p>
+                      <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{warning.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
           </CardContent>
         </Card>
       )}

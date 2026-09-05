@@ -19,8 +19,6 @@ import {
   ChevronRight,
   Clock,
   Edit2,
-  LogIn,
-  LogOut,
   Search,
   UserCheck,
   UserX,
@@ -313,7 +311,7 @@ function EmployeeAttendance() {
 }
 
 function StaffAttendance() {
-  const { attendance, employees, punchAttendance, correctAttendance, log, role, persona } = useApp();
+  const { attendance, employees, correctAttendance, log, role, persona } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
 
@@ -392,12 +390,6 @@ const halfDayCount = dateRecords.filter((a) => a.status === "Half Day").length;
     { name: "Absent", count: Math.max(0, absentCount) },
   ];
 
-  const handlePunchToggle = () => {
-    punchAttendance(myId);
-    log(`${isPunchedIn ? "Clocked out from" : "Clocked in to"} attendance workspace`, "Attendance");
-    toast.success(isPunchedIn ? "Clocked out successfully" : "Clocked in successfully");
-  };
-
   const handleOpenCorrection = (r: AttendanceRecord) => {
     setCorrecting(r);
     setEditCheckIn(r.checkIn);
@@ -435,23 +427,6 @@ const halfDayCount = dateRecords.filter((a) => a.status === "Half Day").length;
           isEmployeeOnly
             ? `Daily clock records, punch timings, and work hours for ${me?.name || persona.name}`
             : "Daily biometric & web punch logging, working hours tracking, status verification and attendance corrections."
-        }
-        actions={
-          <Button
-            variant={isPunchedIn ? "destructive" : "default"}
-            onClick={handlePunchToggle}
-            className="shadow-sm"
-          >
-            {isPunchedIn ? (
-              <>
-                <LogOut className="mr-2 size-4" /> Punch Out
-              </>
-            ) : (
-              <>
-                <LogIn className="mr-2 size-4" /> Punch In (Now)
-              </>
-            )}
-          </Button>
         }
       />
 
@@ -533,66 +508,25 @@ const halfDayCount = dateRecords.filter((a) => a.status === "Half Day").length;
         </div>
       )}
 
-      <div className={`grid gap-4 ${isEmployeeOnly ? "lg:grid-cols-1" : "lg:grid-cols-3"}`}>
-        {!isEmployeeOnly && (
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Attendance Distribution</CardTitle>
-              <CardDescription>Daily status breakdown for {selectedDate}</CardDescription>
-            </CardHeader>
-            <CardContent className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="name" stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
-                  <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      background: "var(--popover)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 8,
-                      color: "var(--popover-foreground)",
-                    }}
-                  />
-                  <Bar dataKey="count" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card className={isEmployeeOnly ? "w-full" : ""}>
+      {!isEmployeeOnly && (
+        <Card>
           <CardHeader>
-            <CardTitle>Quick Attendance Punch</CardTitle>
-            <CardDescription>Signed in as {me?.name || persona.name}</CardDescription>
+            <CardTitle>Attendance Distribution</CardTitle>
+            <CardDescription>Daily status breakdown for {selectedDate}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border border-border bg-muted/40 p-3.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Today's Punch Status</span>
-                <StatusBadge status={isPunchedIn ? "Present" : myTodayRecord ? "Completed" : "Absent"} />
-              </div>
-              <div className="mt-2 text-sm font-medium">
-                {myTodayRecord
-                  ? `In: ${myTodayRecord.checkIn} · Out: ${myTodayRecord.checkOut}`
-                  : "No check-in recorded yet today"}
-              </div>
-            </div>
-
-            <div className="text-xs text-muted-foreground">
-              Standard shift hours: 09:00 AM – 06:00 PM (9.0 hrs). Geofencing enabled for Ahmedabad, Bengaluru, Mumbai offices.
-            </div>
-
-            <Button
-              className="w-full"
-              variant={isPunchedIn ? "outline" : "default"}
-              onClick={handlePunchToggle}
-            >
-              {isPunchedIn ? "Mark Evening Check-Out" : "Record Morning Punch"}
-            </Button>
+          <CardContent className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
+                <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--popover-foreground)" }} />
+                <Bar dataKey="count" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
-      </div>
+      )}
 
       <Card>
         <CardHeader className="pb-3">

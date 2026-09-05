@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { EmptyState, PageHeader, StatCard } from "@/components/bits";
 import { useApp } from "@/lib/store";
+import { api } from "@/lib/api";
 import { type SalaryComponent, type SalaryStructure, type SalaryStructureStatus } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/salary-structure")({
@@ -115,7 +116,7 @@ function SalaryStructurePage() {
       applicableTo: s.applicableTo,
       status: s.status,
       effectiveFrom: s.effectiveFrom,
-      components: s.components.map((c) => ({ ...c })),
+      components: (s.components ?? []).map((c) => ({ ...c })),
     });
     setFormOpen(true);
   };
@@ -124,32 +125,51 @@ function SalaryStructurePage() {
     setForm((f) => ({ ...f, components: [...f.components, emptyComponent()] }));
 
   const removeComponent = (i: number) =>
-    setForm((f) => ({ ...f, components: f.components.filter((_, idx) => idx !== i) }));
+    setForm((f) => ({ ...f, components: (f.components ?? []).filter((_, idx) => idx !== i) }));
 
   const patchComponent = (i: number, patch: Partial<SalaryComponent>) =>
     setForm((f) => ({
       ...f,
-      components: f.components.map((c, idx) => (idx === i ? { ...c, ...patch } : c)),
+      components: (f.components ?? []).map((c, idx) => (idx === i ? { ...c, ...patch } : c)),
     }));
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim()) { toast.error("Structure name is required"); return; }
     if (!form.effectiveFrom) { toast.error("Effective date is required"); return; }
-    if (form.components.some((c) => !c.name.trim() || c.value < 0)) {
+    if ((form.components ?? []).some((c) => !c.name.trim() || c.value < 0)) {
       toast.error("All components need a name and a non-negative value");
       return;
     }
 
     const now = new Date().toISOString().slice(0, 10);
-    if (editTarget) {
-      const updated: SalaryStructure = { ...editTarget, ...form, updatedAt: now };
-      update("salaryStructures", structures.map((s) => (s.id === editTarget.id ? updated : s)));
-      toast.success("Structure updated", { description: form.name });
-    } else {
-      const newId = `SS-${String(structures.length + 1).padStart(3, "0")}`;
-      const created: SalaryStructure = { id: newId, ...form, createdBy: "Arjun Nair", updatedAt: now };
-      update("salaryStructures", [...structures, created]);
-      toast.success("Structure created", { description: form.name });
+    try {
+      const ruleIds: string[] = [];
+      for (const [index, component] of form.components.entries()) {
+        const rule = await api.salary.createRule({
+          code: `${form.name.slice(0, 8).toUpperCase().replace(/\W/g, "")}_${index + 1}_${Date.now()}`,
+          name: component.name,
+          category: component.type === "deduction" ? "DEDUCTION" : "ALLOWANCE",
+          ruleType: component.type,
+          calculationType: component.basis === "fixed" ? "fixed" : "percentage",
+          fixedAmount: component.basis === "fixed" ? component.value : undefined,
+          percentage: component.basis === "percent_of_basic" ? component.value : undefined,
+          sequence: (index + 1) * 10,
+        });
+        ruleIds.push(rule.id);
+      }
+      const payload = { name: form.name.trim(), description: form.description, status: form.status, effectiveDate: form.effectiveFrom, ruleIds };
+      if (editTarget) {
+        await api.salary.patchStructure(editTarget.id, payload);
+        update("salaryStructures", structures.map((s) => (s.id === editTarget.id ? { ...editTarget, ...form, updatedAt: now } : s)));
+        toast.success("Structure updated", { description: form.name });
+      } else {
+        const result = await api.salary.createStructure(payload);
+        update("salaryStructures", [...structures, { id: result.id, ...form, createdBy: "Current User", updatedAt: now }]);
+        toast.success("Structure created", { description: form.name });
+      }
+    } catch (error) {
+      toast.error("Could not save salary structure", { description: error instanceof Error ? error.message : "API request failed" });
+      return;
     }
     setFormOpen(false);
   };
@@ -269,11 +289,11 @@ function SalaryStructurePage() {
                   {/* Earnings/Allowances */}
                   <div className="mb-4">
                     <div className="text-xs font-semibold uppercase tracking-wide text-success mb-2">Earnings / Allowances</div>
-                    {s.components.filter(c => c.type === "earning").length === 0 ? (
+                    {(s.components ?? []).filter(c => c.type === "earning").length === 0 ? (
                       <p className="text-xs text-muted-foreground italic">None configured</p>
                     ) : (
                       <div className="space-y-1">
-                        {s.components.filter(c => c.type === "earning").map((c, i) => (
+                        {(s.components ?? []).filter(c => c.type === "earning").map((c, i) => (
                           <div
                             key={i}
                             className="flex items-center justify-between rounded-md px-3 py-1.5 bg-muted/30 text-sm"
@@ -293,11 +313,11 @@ function SalaryStructurePage() {
                   {/* Deductions */}
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-destructive mb-2">Deductions</div>
-                    {s.components.filter(c => c.type === "deduction").length === 0 ? (
+                    {(s.components ?? []).filter(c => c.type === "deduction").length === 0 ? (
                       <p className="text-xs text-muted-foreground italic">None configured</p>
                     ) : (
                       <div className="space-y-1">
-                        {s.components.filter(c => c.type === "deduction").map((c, i) => (
+                        {(s.components ?? []).filter(c => c.type === "deduction").map((c, i) => (
                           <div
                             key={i}
                             className="flex items-center justify-between rounded-md px-3 py-1.5 bg-muted/30 text-sm"
@@ -410,10 +430,10 @@ function SalaryStructurePage() {
                     </Button>
                   </div>
                   <div className="space-y-2">
-                    {form.components.filter(c => c.type === "earning").length === 0 ? (
+                    {(form.components ?? []).filter(c => c.type === "earning").length === 0 ? (
                       <p className="text-xs text-muted-foreground italic px-2 py-1.5">No earnings configured yet</p>
                     ) : (
-                      form.components
+                      (form.components ?? [])
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "earning")
                         .map(({ origIdx }) => {
@@ -476,10 +496,10 @@ function SalaryStructurePage() {
                     </Button>
                   </div>
                   <div className="space-y-2">
-                    {form.components.filter(c => c.type === "deduction").length === 0 ? (
+                    {(form.components ?? []).filter(c => c.type === "deduction").length === 0 ? (
                       <p className="text-xs text-muted-foreground italic px-2 py-1.5">No deductions configured yet</p>
                     ) : (
-                      form.components
+                      (form.components ?? [])
                         .map((c, origIdx) => ({ c, origIdx }))
                         .filter(({ c }) => c.type === "deduction")
                         .map(({ origIdx }) => {

@@ -3,7 +3,7 @@
  * All requests go through here. Uses VITE_API_URL env variable.
  */
 
-const BASE = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
+const BASE = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5001";
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -133,6 +133,10 @@ export const api = {
       request<{ id: string }>("POST", "/api/leave", data),
     patch: (id: string, data: Record<string, unknown>) =>
       request<{ id: string }>("PATCH", `/api/leave/${id}`, data),
+  },
+  leaveAllocations: {
+    list: (employeeId?: string) => request<unknown[]>("GET", employeeId ? `/api/leave/allocations?employeeId=${employeeId}` : "/api/leave/allocations"),
+    create: (data: Record<string, unknown>) => request<{ id: string }>("POST", "/api/leave/allocations", data),
   },
 
   // ── Payroll ────────────────────────────────────────────────────────────────
