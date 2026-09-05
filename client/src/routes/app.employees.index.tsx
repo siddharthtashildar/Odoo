@@ -17,6 +17,8 @@ import {
   Check,
   Send,
   ShieldCheck,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -82,6 +84,7 @@ function EmployeesPage() {
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [view, setView] = useState<"list" | "kanban">("list");
 
   const [addOpen, setAddOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
@@ -427,6 +430,10 @@ function EmployeesPage() {
               <CardTitle>Staff Records ({rows.length})</CardTitle>
               <CardDescription>Filter by department, status or employment type</CardDescription>
             </div>
+            <div className="flex items-center gap-1 rounded-lg border border-border p-1">
+              <Button type="button" size="icon" variant={view === "list" ? "secondary" : "ghost"} className="size-8" onClick={() => setView("list")} aria-label="List view"><List className="size-4" /></Button>
+              <Button type="button" size="icon" variant={view === "kanban" ? "secondary" : "ghost"} className="size-8" onClick={() => setView("kanban")} aria-label="Kanban view"><LayoutGrid className="size-4" /></Button>
+            </div>
           </div>
 
           <div className="mt-2 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
@@ -493,6 +500,15 @@ function EmployeesPage() {
               description="Try adjusting your search criteria."
               icon={<Users className="size-8" />}
             />
+          ) : view === "kanban" ? (
+            <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
+              {rows.map((e) => (
+                <Card key={e.id} className="border-border/70 shadow-none">
+                  <CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><Avatar className="size-10"><AvatarFallback className="bg-primary text-primary-foreground text-xs">{e.name.split(" ").map((p) => p[0]).join("")}</AvatarFallback></Avatar><div><CardTitle className="text-sm">{e.name}</CardTitle><CardDescription>{e.code}</CardDescription></div></div><StatusBadge status={e.status} /></div></CardHeader>
+                  <CardContent className="space-y-2 text-sm"><div className="flex justify-between"><span className="text-muted-foreground">Department</span><span>{e.department}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Position</span><span>{e.designation}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Manager</span><span>{e.manager}</span></div><Button asChild size="sm" variant="outline" className="mt-2 w-full"><Link to="/app/employees/$id" params={{ id: e.id }}><Eye className="mr-1.5 size-3.5" /> Open profile</Link></Button></CardContent>
+                </Card>
+              ))}
+            </div>
           ) : (
             <>
               {/* Pagination ON TOP of Employees' Staff Records */}

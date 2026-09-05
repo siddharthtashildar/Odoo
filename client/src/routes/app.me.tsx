@@ -59,7 +59,6 @@ function MyWorkspace() {
     onboarding,
     allowances,
     patchEmployee,
-    punchAttendance,
     log,
   } = useApp();
 
@@ -350,22 +349,9 @@ function MyWorkspace() {
                 <CardTitle>My Attendance Log</CardTitle>
                 <CardDescription>Daily punch logs and hours worked</CardDescription>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant={isPunchedIn ? "destructive" : "default"}
-                  onClick={async () => {
-                    await punchAttendance(myId);
-                    toast.success(isPunchedIn ? "Clocked out from My Workspace" : "Clocked in from My Workspace");
-                  }}
-                >
-                  <Clock className="size-3.5 mr-1.5" />
-                  {isPunchedIn ? "Punch Out" : "Punch In (Now)"}
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link to="/app/attendance">Open Punch Clock</Link>
-                </Button>
-              </div>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/app/attendance">Open Attendance</Link>
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               {myAttendance.length === 0 ? (
