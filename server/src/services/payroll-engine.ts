@@ -109,7 +109,7 @@ export async function computeEmployeePayslip(
   const overtimeHours = attendanceLogs.reduce((acc, a) => acc + Number(a.overtime_hours || 0), 0);
 
   // 2. Resolve Structure & Rules
-  const structureId = overrideStructureId || emp.employee_salary_structures[0]?.structure_id || contract?.salary_structure_id;
+  const structureId = overrideStructureId || emp.employee_salary_structures[0]?.structure_id;
 
   let rules: Array<{
     id: string;
@@ -134,13 +134,13 @@ export async function computeEmployeePayslip(
       id: sr.salary_rules.id,
       code: sr.salary_rules.code,
       name: sr.salary_rules.name,
-      category: sr.salary_rules.category || "ALLOWANCE",
+      category: sr.salary_rules.rule_type === "deduction" ? "DEDUCTION" : "ALLOWANCE",
       calculation_type: sr.salary_rules.calculation_type,
       fixed_amount: sr.salary_rules.fixed_amount,
       percentage: sr.salary_rules.percentage,
       formula: sr.salary_rules.formula,
       sequence: sr.sequence || sr.salary_rules.priority || 10,
-      appears_on_payslip: sr.salary_rules.appears_on_payslip,
+      appears_on_payslip: true,
     }));
   }
 

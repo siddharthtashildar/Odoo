@@ -123,7 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Fetch all data from the database API on mount
   useEffect(() => {
-    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
+    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5001";
 
     async function fetchAll() {
       try {
