@@ -49,6 +49,11 @@ router.get("/", async (req, res) => {
       joinedOn: e.joining_date?.toISOString().slice(0, 10) ?? "",
       exitDate: e.exit_date?.toISOString().slice(0, 10) ?? null,
       ctc: e.contracts[0]?.salary ? Number(e.contracts[0].salary) : 1800000,
+      location: e.address || "Ahmedabad HQ",
+      bankAccount: e.bank_account_number || "HDFC00984210",
+      bankName: e.bank_name || "HDFC Bank",
+      pan: `AAAC${e.employee_code.replace(/[^0-9]/g, "").slice(0, 4) || "1234"}P`,
+      leaveBalance: 18,
     }));
 
     res.json({ success: true, data: mapped });

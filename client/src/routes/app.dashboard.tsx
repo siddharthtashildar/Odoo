@@ -86,7 +86,8 @@ function Dashboard() {
       (e) =>
         e.id === persona.employeeId ||
         e.code === persona.employeeCode ||
-        (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()),
+        (persona.email && e.email.toLowerCase() === persona.email.toLowerCase()) ||
+        (persona.name && e.name.toLowerCase() === persona.name.toLowerCase()),
     );
 
     return (
