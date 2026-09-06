@@ -43,8 +43,9 @@ app.use(
   }),
 );
 
-// Better Auth requires raw or standard JSON body handling
-app.use(express.json());
+// Express body parser with 50mb limit for PDF/image data URL attachments
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Health check
 app.get("/", (_req, res) => {

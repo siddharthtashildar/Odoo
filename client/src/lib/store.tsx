@@ -132,6 +132,15 @@ interface Store extends State {
 const Ctx = createContext<Store | null>(null);
 const KEY = "pp360-state-v3";
 
+const HELPDESK_UI_TO_BACKEND: Record<string, string> = {
+  Open: "open",
+  "In Progress": "in_progress",
+  "Waiting for User": "waiting_for_employee",
+  Resolved: "resolved",
+  Closed: "closed",
+};
+
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial);
   const [hydrated, setHydrated] = useState(false);
@@ -598,7 +607,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+
+
   const updateTicket = useCallback(async (id: string, patch: Partial<HelpdeskTicket>) => {
+    // Keep UI-friendly status in local state (optimistic update)
     setState((s) => ({
       ...s,
       helpdesk: s.helpdesk.map((t) =>
@@ -606,7 +618,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ),
     }));
     try {
-      await api.helpdesk.patch(id, patch as Record<string, unknown>);
+      // Convert UI status label to backend enum value before sending
+      const backendPatch: Record<string, unknown> = { ...patch };
+      if (patch.status && typeof patch.status === "string") {
+        const mapped = HELPDESK_UI_TO_BACKEND[patch.status];
+        if (mapped) backendPatch["status"] = mapped;
+      }
+      await api.helpdesk.patch(id, backendPatch);
       const res = await api.helpdesk.list();
       if (Array.isArray(res)) {
         setState((s) => ({ ...s, helpdesk: res as HelpdeskTicket[] }));
@@ -849,10 +867,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
     try {
       await api.onboarding.patch(processId, { status });
+      await refreshSlice("onboarding");
     } catch (err) {
       console.warn("[store] updateOnboardingStatus error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const addOffboardingCase = useCallback(async (
     employeeId: string,

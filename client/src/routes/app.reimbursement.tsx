@@ -59,7 +59,7 @@ const emptyClaim = {
 interface ParsedAttachment {
   name: string;
   url: string;
-  type?: string;
+  type?: string | undefined;
 }
 
 function parseClaimAttachments(claim: ReimbursementClaim): ParsedAttachment[] {
@@ -72,14 +72,25 @@ function parseClaimAttachments(claim: ReimbursementClaim): ParsedAttachment[] {
       return parsed.map((item: any, i: number) => ({
         name: item.name || `Attachment_${i + 1}`,
         url: item.url || "#",
-        type: item.type,
+        type: item.type || (item.url?.startsWith("data:image/") ? "image/png" : undefined),
       }));
     }
+    if (parsed && typeof parsed === "object" && parsed.url) {
+      return [{
+        name: parsed.name || "Attachment_1",
+        url: parsed.url,
+        type: parsed.type,
+      }];
+    }
   } catch {
-    /* raw is a plain filename string */
+    /* raw is a plain string or data URL */
   }
 
   if (typeof raw === "string" && raw.trim() && raw !== "Mock_Receipt.pdf") {
+    if (raw.startsWith("data:") || raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("/")) {
+      const isImg = raw.startsWith("data:image/");
+      return [{ name: "Supporting_Attachment", url: raw, type: isImg ? "image/png" : undefined }];
+    }
     const names = raw.split(",").map((s) => s.trim()).filter(Boolean);
     return names.map((name) => ({ name, url: "#" }));
   }
@@ -91,6 +102,8 @@ function ReimbursementPage() {
   const { reimbursements, employees, submitReimbursement, updateReimbursement, log, role, persona } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
+
+  const [previewAttachment, setPreviewAttachment] = useState<ParsedAttachment | null>(null);
 
   const [q, setQ] = useState("");
   const [catFilter, setCatFilter] = useState("all");
@@ -106,10 +119,22 @@ function ReimbursementPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const selected = Array.from(e.target.files);
-    if (attachments.length + selected.length > 2) {
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
+    const validFiles: File[] = [];
+
+    for (const file of selected) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`File "${file.name}" exceeds the maximum limit of 10MB.`);
+      } else {
+        validFiles.push(file);
+      }
+    }
+    if (validFiles.length === 0) return;
+
+    if (attachments.length + validFiles.length > 2) {
       toast.warning("You can attach a maximum of 2 supporting files per claim.");
     }
-    const updated = [...attachments, ...selected].slice(0, 2);
+    const updated = [...attachments, ...validFiles].slice(0, 2);
     setAttachments(updated);
   };
 
@@ -251,24 +276,7 @@ function ReimbursementPage() {
       toast.info("No attachment found for this claim.");
       return;
     }
-    // Open the first attachment in a new window (same viewer used in the detail modal)
-    const att = attachs[0]!;
-    if (att.url && att.url !== "#") {
-      const win = window.open();
-      if (win) {
-        if (att.type?.startsWith("image/")) {
-          win.document.write(
-            `<title>${att.name}</title><body style="margin:0;background:#111;display:flex;justify-content:center;align-items:center;height:100vh;"><img src="${att.url}" style="max-width:95vw;max-height:95vh;object-fit:contain;"/></body>`,
-          );
-        } else {
-          win.document.write(
-            `<title>${att.name}</title><body style="margin:0;"><iframe src="${att.url}" style="width:100vw;height:100vh;border:none;"></iframe></body>`,
-          );
-        }
-      }
-    } else {
-      toast.info(`Attachment: ${att.name}`);
-    }
+    setPreviewAttachment(attachs[0]!);
   };
 
   return (
@@ -685,24 +693,7 @@ function ReimbursementPage() {
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs"
-                          onClick={() => {
-                            if (att.url && att.url !== "#") {
-                              const win = window.open();
-                              if (win) {
-                                if (att.type?.startsWith("image/")) {
-                                  win.document.write(
-                                    `<title>${att.name}</title><body style="margin:0;background:#111;display:flex;justify-content:center;align-items:center;height:100vh;"><img src="${att.url}" style="max-width:95vw;max-height:95vh;object-fit:contain;"/></body>`,
-                                  );
-                                } else {
-                                  win.document.write(
-                                    `<title>${att.name}</title><body style="margin:0;"><iframe src="${att.url}" style="width:100vw;height:100vh;border:none;"></iframe></body>`,
-                                  );
-                                }
-                              }
-                            } else {
-                              toast.info(`Opening attachment: ${att.name}`);
-                            }
-                          }}
+                          onClick={() => setPreviewAttachment(att)}
                         >
                           <Eye className="mr-1 size-3.5 text-primary" /> View / Open
                         </Button>
@@ -758,6 +749,45 @@ function ReimbursementPage() {
               <Button variant="outline" onClick={() => setViewClaim(null)}>
                 Close
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Attachment Preview Modal */}
+      {previewAttachment && (
+        <Dialog open={!!previewAttachment} onOpenChange={(open) => !open && setPreviewAttachment(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="truncate pr-4">{previewAttachment.name}</DialogTitle>
+              <DialogDescription>
+                Uploaded supporting attachment preview
+              </DialogDescription>
+            </DialogHeader>
+            <div className="my-2 max-h-[70vh] overflow-auto flex items-center justify-center bg-muted/20 p-2 rounded-lg border border-border">
+              {previewAttachment.url && previewAttachment.url !== "#" ? (
+                previewAttachment.type?.startsWith("image/") || previewAttachment.url.startsWith("data:image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(previewAttachment.name) ? (
+                  <img src={previewAttachment.url} alt={previewAttachment.name} className="max-h-[65vh] w-auto max-w-full rounded object-contain" />
+                ) : (
+                  <iframe src={previewAttachment.url} title={previewAttachment.name} className="w-full h-[60vh] border-0 rounded" />
+                )
+              ) : (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  Attachment reference: <span className="font-semibold text-foreground">{previewAttachment.name}</span>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="flex items-center justify-between gap-2">
+              {previewAttachment.url && previewAttachment.url !== "#" ? (
+                <a
+                  href={previewAttachment.url}
+                  download={previewAttachment.name}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                >
+                  <Download className="size-3.5" /> Download File
+                </a>
+              ) : <div />}
+              <Button variant="outline" onClick={() => setPreviewAttachment(null)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

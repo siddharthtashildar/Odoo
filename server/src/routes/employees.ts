@@ -117,6 +117,7 @@ router.post("/", async (req, res) => {
       autoProvision = true,
       role = "employee",
       customPassword,
+      status,
     } = req.body as {
       name: string;
       email: string;
@@ -131,6 +132,7 @@ router.post("/", async (req, res) => {
       autoProvision?: boolean;
       role?: string;
       customPassword?: string;
+      status?: string;
     };
 
     if (!name || !email) {
@@ -181,6 +183,18 @@ router.post("/", async (req, res) => {
       employmentType.toLowerCase().includes("intern") ? "intern" :
       employmentType.toLowerCase().includes("consultant") ? "consultant" : "full_time";
 
+    const statusNorm = status
+      ? status.toLowerCase() === "active"
+        ? "active"
+        : status.toLowerCase() === "onboarding"
+          ? "onboarding"
+          : status.toLowerCase() === "offboarding"
+            ? "offboarding"
+            : status.toLowerCase() === "exited"
+              ? "exited"
+              : "onboarding"
+      : "onboarding";
+
     const employee = await prisma.employees.create({
       data: {
         id: crypto.randomUUID(),
@@ -192,7 +206,7 @@ router.post("/", async (req, res) => {
         designation_id: desigRecord.id,
         reporting_manager_id: managerId,
         employment_type: empTypeNorm as any,
-        status: "active",
+        status: statusNorm as any,
         joining_date: new Date(joinedOn),
         address: location,
       },
@@ -246,27 +260,35 @@ router.post("/", async (req, res) => {
         `PP360!${Math.random().toString(36).slice(2, 6).toUpperCase()}${Math.floor(100 + Math.random() * 900)}`;
       const passwordHash = await hashPassword(temporaryPassword);
 
-      const newUserId = crypto.randomUUID();
-      const betterUser = await prisma.user.create({
-        data: {
-          id: newUserId,
-          name: employee.full_name,
-          email: employee.email,
-          emailVerified: true,
-          role,
-          employeeId: employee.id,
-        },
-      });
+      let betterUser = await prisma.user.findUnique({ where: { email: employee.email } });
+      if (betterUser) {
+        betterUser = await prisma.user.update({
+          where: { id: betterUser.id },
+          data: { employeeId: employee.id, role },
+        });
+      } else {
+        const newUserId = crypto.randomUUID();
+        betterUser = await prisma.user.create({
+          data: {
+            id: newUserId,
+            name: employee.full_name,
+            email: employee.email,
+            emailVerified: true,
+            role,
+            employeeId: employee.id,
+          },
+        });
 
-      await prisma.account.create({
-        data: {
-          id: crypto.randomUUID(),
-          userId: newUserId,
-          accountId: newUserId,
-          providerId: "credential",
-          password: passwordHash,
-        },
-      });
+        await prisma.account.create({
+          data: {
+            id: crypto.randomUUID(),
+            userId: newUserId,
+            accountId: newUserId,
+            providerId: "credential",
+            password: passwordHash,
+          },
+        });
+      }
 
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8081";
       const changePasswordUrl = `${frontendUrl}/?action=change-password&email=${encodeURIComponent(employee.email)}`;

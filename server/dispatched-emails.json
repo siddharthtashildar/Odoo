@@ -1,5 +1,167 @@
 [
   {
+    "id": "<13a4afb6-2872-a10f-f967-de3c675fce29@gmail.com>",
+    "to": "202451180@iiitvadodara.ac.in",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "viha",
+    "role": "employee",
+    "temporaryPassword": "PP360!8DCF956",
+    "sentAt": "2026-09-06T00:53:01.613Z"
+  },
+  {
+    "id": "<f68051a5-5206-0bf1-1e84-79fb2a65054c@gmail.com>",
+    "to": "pcharmi567@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "charmiya",
+    "role": "employee",
+    "temporaryPassword": "PP360!UTDA980",
+    "sentAt": "2026-09-06T00:44:14.924Z"
+  },
+  {
+    "id": "<102bfcb9-cffc-7345-0126-b3040943b840@gmail.com>",
+    "to": "pcharmi002@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "charm",
+    "role": "employee",
+    "temporaryPassword": "PP360!KEGG200",
+    "sentAt": "2026-09-06T00:34:25.954Z"
+  },
+  {
+    "id": "<107094cf-16d5-6073-0929-fd482ac40ae1@gmail.com>",
+    "to": "charmi9627@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Sid",
+    "role": "employee",
+    "temporaryPassword": "PP360!1961422",
+    "sentAt": "2026-09-06T00:17:59.697Z"
+  },
+  {
+    "id": "<41368f87-27fa-43bd-27e8-6760cae37f3f@gmail.com>",
+    "to": "jaiswakshreeya24@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Shreeya",
+    "role": "employee",
+    "temporaryPassword": "PP360!ANNS870",
+    "sentAt": "2026-09-06T00:14:48.033Z"
+  },
+  {
+    "id": "<3a74515b-78d5-e2ba-31ff-792c974a1451@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Approved — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:15.946Z"
+  },
+  {
+    "id": "<31889730-a1d7-7575-9fd8-bc4902bd5ea2@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Approved — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:15.448Z"
+  },
+  {
+    "id": "<1221be60-275c-64ed-ee42-addc5aa2994c@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Approved — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:14.868Z"
+  },
+  {
+    "id": "<6a304474-9a53-5a6e-9577-7144b61fe113@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Approved — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:14.420Z"
+  },
+  {
+    "id": "<3be5f927-089e-138f-3963-295bb6ec886c@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Approved — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:13.642Z"
+  },
+  {
+    "id": "<40bfc7f0-ec21-d8a2-6caa-8b016c976d3f@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Approved — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:13.053Z"
+  },
+  {
+    "id": "<59b9566c-ebf2-4f94-8f60-af539b8aacce@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Rejected — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:12.689Z"
+  },
+  {
+    "id": "<649bde21-714a-d25f-6aad-b40a55cda762@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Rejected — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:12.025Z"
+  },
+  {
+    "id": "<54e76a13-5858-213b-1523-c0e15e9b351d@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Rejected — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:11.442Z"
+  },
+  {
+    "id": "<e77c3c45-353d-32c8-5d67-e8cd943d8aea@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Rejected — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:11.008Z"
+  },
+  {
+    "id": "<cba5fb17-7a27-31f9-4d7f-2651451c2687@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Rejected — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:09.830Z"
+  },
+  {
+    "id": "<72ffaaac-e1f0-ca62-bacb-6b40e673c41c@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Rejected — Travel",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:09:08.697Z"
+  },
+  {
+    "id": "<3d896a9a-ae6a-1467-fb39-b2521072b53f@gmail.com>",
+    "to": "arjun.nair@peoplepay360.io",
+    "subject": "Time-Off Request Rejected — Sick Leave",
+    "employeeName": "Arjun Nair",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-09-06T00:06:08.079Z"
+  },
+  {
     "id": "<be0fb892-3bc8-e8ed-b90a-e6374f35d1b6@gmail.com>",
     "to": "code.sid17@gmail.com",
     "subject": "Time-Off Request Approved — Casual Leave",
@@ -761,45 +923,5 @@
     "temporaryPassword": "PP360!L5D3779",
     "sentAt": "2026-09-05T12:41:34.743Z",
     "previewUrl": "https://ethereal.email/message/apwKDglT7djrFZKEapwN.oIuM2RB06fTAAAABc-IY2U9WkHQpo1qKiORjHc"
-  },
-  {
-    "id": "<89c59e28-426f-3ee3-5869-dde5179791e6@peoplepay360.io>",
-    "to": "siddharthtashildar17@gmail.com",
-    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
-    "employeeName": "Sid",
-    "role": "employee",
-    "temporaryPassword": "PP360!0U8M865",
-    "sentAt": "2026-09-05T12:40:30.245Z",
-    "previewUrl": "https://ethereal.email/message/apwKDglT7djrFZKEapwNvmNZ89.4y6l.AAAABE5ZfsybUp0Qq9L94WrUbi4"
-  },
-  {
-    "id": "<c0f26d36-c5bc-ff0a-b83f-a0942059df68@peoplepay360.io>",
-    "to": "siddharthtashildar17@gmail.com",
-    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
-    "employeeName": "Sid",
-    "role": "employee",
-    "temporaryPassword": "PP360!FTJV113",
-    "sentAt": "2026-09-05T12:27:58.553Z",
-    "previewUrl": "https://ethereal.email/message/apwKDglT7djrFZKEapwKzvNVsWIVeWU5AAAAA054YtT2fFZMBP4UlXqkR-M"
-  },
-  {
-    "id": "<bcf39597-6351-b83b-6722-9a0f50e54d30@peoplepay360.io>",
-    "to": "ananya.deshmukh@peoplepay360.io",
-    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
-    "employeeName": "Ananya Deshmukh",
-    "role": "hr_user",
-    "temporaryPassword": "PP360!O7A3536",
-    "sentAt": "2026-09-05T12:25:40.137Z",
-    "previewUrl": "https://ethereal.email/message/apwKDglT7djrFZKEapwKRN4vWvYlxV7fAAAAAqm5ziOk9R6UZvoiAlIqcL8"
-  },
-  {
-    "id": "<c56faba9-4595-7c0e-69ca-d4afb39728ed@peoplepay360.io>",
-    "to": "vikram.rao@peoplepay360.io",
-    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
-    "employeeName": "Vikramaditya Rao",
-    "role": "employee",
-    "temporaryPassword": "PP360!Y1DF630",
-    "sentAt": "2026-09-05T12:24:48.826Z",
-    "previewUrl": "https://ethereal.email/message/apwKDglT7djrFZKEapwKEPNVsWIVeWUqAAAAAUBkXthrzTP5ckrvAS6fZzE"
   }
 ]
