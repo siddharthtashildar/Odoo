@@ -103,7 +103,7 @@ function Payslips() {
     }
   }, [myId, canSwitch, employees, who]);
 
-  const target = canSwitch ? (who || myId) : myId;
+  const target = canSwitch ? (who || myId) : (myId || persona.employeeId || persona.employeeCode);
   const currentEmployee = employees.find((e) => e.id === target || e.code === target);
 
   // Dynamic fetch of live database payslips for the selected employee

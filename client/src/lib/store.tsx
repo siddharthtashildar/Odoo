@@ -1145,7 +1145,7 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/payroll": ["payroll_user", "payroll_manager", "admin"],
   "/app/salary": ["payroll_user", "payroll_manager", "admin"],
   "/app/salary-structure": ["payroll_user", "payroll_manager", "admin"],
-  "/app/payslips": ["payroll_user", "payroll_manager", "admin"],
+  "/app/payslips": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/reimbursement": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
   "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
