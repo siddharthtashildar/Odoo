@@ -72,7 +72,7 @@ router.get("/onboarding", async (_req, res) => {
 
       const allDone = tasks.length > 0 && tasks.every((t) => t.done);
       const anyDone = tasks.some((t) => t.done);
-      const hasChangedPassword = p.notes?.includes("password_changed") || false;
+      const hasChangedPassword = (p as any).notes?.includes("password_changed") || false;
 
       let computedStatus: "Invitation Sent" | "Account Created" | "In Progress" | "Completed" | "Overdue" = "Invitation Sent";
       if (rawStatus === "completed" || allDone) {
@@ -614,8 +614,8 @@ router.get("/offboarding", async (_req, res) => {
         exitInterviewDone: p.exit_interview_completed,
         exitInterviewNotes: p.exit_interview_notes ?? undefined,
         exitInterviewStatus: p.exit_interview_completed ? "Completed" : "Pending",
-        assetsReturned: p.assets_returned ?? false,
-        accessRevoked: p.access_revoked ?? false,
+        assetsReturned: (p as any).assets_returned ?? false,
+        accessRevoked: (p as any).access_revoked ?? false,
         fnfStatus: fnfStatusMap[fnfRaw] ?? "Pending",
         finalSettlement: fnfRaw === "settled" || fnfRaw === "disbursed" ? "settled" : fnfRaw,
         finalPayrollStatus: fnfRaw === "settled" || fnfRaw === "disbursed" ? "Processed" : "Pending",

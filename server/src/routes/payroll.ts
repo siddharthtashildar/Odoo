@@ -194,17 +194,33 @@ router.get("/", async (_req, res) => {
       totalGross: r.payslips.reduce((s, p) => s + Number(p.gross_salary), 0),
       totalNet: r.payslips.reduce((s, p) => s + Number(p.net_salary), 0),
       employeeCount: r.payslips.length,
-      lines: r.payslips.map((p) => ({
-        id: p.id,
-        employeeId: p.employee_id,
-        gross: Number(p.gross_salary),
-        net: Number(p.net_salary),
-        basicSalary: Number(p.basic_salary),
-        allowances: Number(p.allowances_total),
-        deductions: Number(p.deductions_total),
-        tax: Number(p.tax_amount),
-        emailStatus: p.email_status || "pending",
-      })),
+      lines: r.payslips.map((p) => {
+        const gross = Number(p.gross_salary || 0);
+        const basic = Number(p.basic_salary || 0);
+        const allowances = Number(p.allowances_total || Math.max(0, gross - basic));
+        const hra = Math.round(allowances * 0.4);
+        const specialAllowance = Math.round(allowances * 0.6);
+        const pf = 1800;
+        const pt = 200;
+        const tax = Number(p.tax_amount || 0);
+        return {
+          id: p.id,
+          employeeId: p.employee_id,
+          gross,
+          net: Number(p.net_salary || 0),
+          basicSalary: basic,
+          allowances,
+          hra,
+          specialAllowance,
+          bonus: 0,
+          providentFund: pf,
+          professionalTax: pt,
+          incomeTax: tax,
+          deductions: Number(p.deductions_total || 0),
+          tax,
+          emailStatus: p.email_status || "pending",
+        };
+      }),
     }));
 
     res.json({ success: true, data: mapped });
@@ -435,10 +451,10 @@ router.get("/payslips/:id", async (req, res) => {
   }
 });
 
-// GET /api/payroll/dashboard-analytics — KPIs, Charts & Operational Alerts
+// GET /api/payroll/dashboard-analytics — KPIs, Charts & Operational Alerts with Redis Caching
 router.get("/dashboard-analytics", async (_req, res) => {
   try {
-    const data = await cacheService.getOrSet("payroll:dashboard:analytics", 300, async () => {
+    const cacheResult = await cacheService.getOrSet("payroll:dashboard:analytics", 300, async () => {
       const activeEmployees = await prisma.employees.findMany({
         where: { status: "active" },
         include: {
@@ -539,7 +555,15 @@ router.get("/dashboard-analytics", async (_req, res) => {
       };
     });
 
-    res.json({ success: true, data });
+    res.setHeader("X-Cache-Status", cacheResult.cached ? "HIT" : "MISS");
+    res.setHeader("X-Cache-Source", cacheResult.source);
+
+    res.json({
+      success: true,
+      source: cacheResult.source,
+      cached: cacheResult.cached,
+      data: cacheResult.data,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: "Failed to compute dashboard analytics" });

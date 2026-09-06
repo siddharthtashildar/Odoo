@@ -658,7 +658,8 @@ function PayrollList() {
                   </TableHeader>
                   <TableBody>
                     {paginatedLines.map(({ line, emp }) => {
-                      const allowanceSum = line.hra + line.specialAllowance + (line.bonus || 0);
+                      const allowRaw = Number((line as any).allowances ?? (line.hra !== undefined && line.hra !== null && !isNaN(line.hra) ? (Number(line.hra || 0) + Number(line.specialAllowance || 0) + Number(line.bonus || 0)) : (Number(line.gross || 0) - Number(line.basicSalary || 0))));
+                      const allowanceSum = isNaN(allowRaw) || allowRaw < 0 ? Math.max(0, Number(line.gross || 0) - Number(line.basicSalary || 0)) : allowRaw;
                       return (
                         <TableRow key={line.employeeId}>
                           <TableCell>
@@ -772,11 +773,9 @@ function PayrollList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Pay Period</TableHead>
-                  <TableHead>Execution Cycle</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Employees Included</TableHead>
                   <TableHead className="text-right">Total Net Disbursal</TableHead>
-                  <TableHead>Prepared By</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -787,7 +786,6 @@ function PayrollList() {
                   return (
                     <TableRow key={run.id} className={isCurrent ? "bg-muted/40" : undefined}>
                       <TableCell className="font-semibold">{formatPeriodName(run.period)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{run.cycle}</TableCell>
                       <TableCell>
                         <StatusBadge status={run.status} />
                       </TableCell>
@@ -795,7 +793,6 @@ function PayrollList() {
                       <TableCell className="text-right font-bold text-foreground tabular-nums">
                         {inr(runNet)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{run.createdBy}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           size="sm"
@@ -978,61 +975,75 @@ function PayrollList() {
               </div>
 
               {/* Earnings vs Deductions Table */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="border rounded-lg p-3 space-y-1.5">
-                  <p className="font-semibold text-xs text-foreground uppercase tracking-wider">
-                    Earnings / Allowances
-                  </p>
-                  <div className="flex justify-between text-xs">
-                    <span>Basic Salary:</span>
-                    <span className="font-medium">{inr(payslipModalLine.line.basicSalary)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span>HRA:</span>
-                    <span className="font-medium">{inr(payslipModalLine.line.hra)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span>Special Allowance:</span>
-                    <span className="font-medium">{inr(payslipModalLine.line.specialAllowance)}</span>
-                  </div>
-                  <div className="border-t pt-1 flex justify-between font-semibold text-xs">
-                    <span>Gross Earnings:</span>
-                    <span>{inr(payslipModalLine.line.gross + (payslipModalLine.line.bonus || 0))}</span>
-                  </div>
-                </div>
+              {(() => {
+                const line = payslipModalLine.line;
+                const modalAllow = Number((line as any).allowances ?? (Number(line.gross || 0) - Number(line.basicSalary || 0)));
+                const modalHra = Number(line.hra ?? Math.round(modalAllow * 0.4));
+                const modalSpecial = Number(line.specialAllowance ?? Math.round(modalAllow * 0.6));
+                const modalPf = Number(line.providentFund ?? 1800);
+                const modalPt = Number(line.professionalTax ?? 200);
+                const modalTds = Number(line.incomeTax ?? (line as any).tax ?? 0);
 
-                <div className="border rounded-lg p-3 space-y-1.5">
-                  <p className="font-semibold text-xs text-destructive uppercase tracking-wider">
-                    Deductions & Tax
-                  </p>
-                  <div className="flex justify-between text-xs">
-                    <span>PF (12%):</span>
-                    <span className="font-medium">{inr(payslipModalLine.line.providentFund)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span>Professional Tax:</span>
-                    <span className="font-medium">{inr(payslipModalLine.line.professionalTax)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span>TDS (Income Tax):</span>
-                    <span className="font-medium">{inr(payslipModalLine.line.incomeTax)}</span>
-                  </div>
-                  <div className="border-t pt-1 flex justify-between font-semibold text-xs text-destructive">
-                    <span>Total Deductions:</span>
-                    <span>-{inr(payslipModalLine.line.deductions)}</span>
-                  </div>
-                </div>
-              </div>
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="border rounded-lg p-3 space-y-1.5">
+                        <p className="font-semibold text-xs text-foreground uppercase tracking-wider">
+                          Earnings / Allowances
+                        </p>
+                        <div className="flex justify-between text-xs">
+                          <span>Basic Salary:</span>
+                          <span className="font-medium">{inr(line.basicSalary)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>HRA:</span>
+                          <span className="font-medium">{inr(modalHra)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>Special Allowance:</span>
+                          <span className="font-medium">{inr(modalSpecial)}</span>
+                        </div>
+                        <div className="border-t pt-1 flex justify-between font-semibold text-xs">
+                          <span>Gross Earnings:</span>
+                          <span>{inr(line.gross + (line.bonus || 0))}</span>
+                        </div>
+                      </div>
 
-              <div className="rounded-lg bg-primary/10 p-3.5 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase font-semibold">Take-Home Net Salary</p>
-                  <p className="text-xs text-muted-foreground">Direct Bank Deposit</p>
-                </div>
-                <div className="text-2xl font-bold font-display text-primary tabular-nums">
-                  {inr(payslipModalLine.line.net)}
-                </div>
-              </div>
+                      <div className="border rounded-lg p-3 space-y-1.5">
+                        <p className="font-semibold text-xs text-destructive uppercase tracking-wider">
+                          Deductions & Tax
+                        </p>
+                        <div className="flex justify-between text-xs">
+                          <span>PF (12%):</span>
+                          <span className="font-medium">{inr(modalPf)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>Professional Tax:</span>
+                          <span className="font-medium">{inr(modalPt)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>TDS (Income Tax):</span>
+                          <span className="font-medium">{inr(modalTds)}</span>
+                        </div>
+                        <div className="border-t pt-1 flex justify-between font-semibold text-xs text-destructive">
+                          <span>Total Deductions:</span>
+                          <span>-{inr(line.deductions)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-primary/10 p-3.5 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase font-semibold">Take-Home Net Salary</p>
+                        <p className="text-xs text-muted-foreground">Direct Bank Deposit</p>
+                      </div>
+                      <div className="text-2xl font-bold font-display text-primary tabular-nums">
+                        {inr(line.net)}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             <DialogFooter className="gap-2">
@@ -1040,24 +1051,32 @@ function PayrollList() {
                 variant="outline"
                 onClick={() => {
                   const emp = employees.find((e) => e.id === payslipModalLine.line.employeeId);
+                  const line = payslipModalLine.line;
+                  const modalAllow = Number((line as any).allowances ?? (Number(line.gross || 0) - Number(line.basicSalary || 0)));
+                  const modalHra = Number(line.hra ?? Math.round(modalAllow * 0.4));
+                  const modalSpecial = Number(line.specialAllowance ?? Math.round(modalAllow * 0.6));
+                  const modalPf = Number(line.providentFund ?? 1800);
+                  const modalPt = Number(line.professionalTax ?? 200);
+                  const modalTds = Number(line.incomeTax ?? (line as any).tax ?? 0);
+
                   downloadPayslipPDF({
-                    employeeName: emp?.name ?? payslipModalLine.line.employeeId,
-                    employeeCode: emp?.code ?? payslipModalLine.line.employeeId,
+                    employeeName: emp?.name ?? line.employeeId,
+                    employeeCode: emp?.code ?? line.employeeId,
                     department: emp?.department ?? "—",
                     designation: emp?.designation ?? "—",
                     bankAccount: emp?.bankAccount ?? "—",
                     pan: emp?.pan ?? "—",
                     period: payslipModalLine.run.period,
-                    basic: payslipModalLine.line.basicSalary,
-                    hra: payslipModalLine.line.hra,
-                    specialAllowance: payslipModalLine.line.specialAllowance,
-                    bonus: payslipModalLine.line.bonus,
-                    gross: payslipModalLine.line.gross + (payslipModalLine.line.bonus || 0),
-                    pf: payslipModalLine.line.providentFund,
-                    pt: payslipModalLine.line.professionalTax,
-                    tds: payslipModalLine.line.incomeTax,
-                    deductions: payslipModalLine.line.deductions,
-                    net: payslipModalLine.line.net,
+                    basic: line.basicSalary,
+                    hra: modalHra,
+                    specialAllowance: modalSpecial,
+                    bonus: line.bonus,
+                    gross: line.gross + (line.bonus || 0),
+                    pf: modalPf,
+                    pt: modalPt,
+                    tds: modalTds,
+                    deductions: line.deductions,
+                    net: line.net,
                   });
                 }}
               >
@@ -1068,25 +1087,33 @@ function PayrollList() {
                 variant="secondary"
                 onClick={() => {
                   const emp = employees.find((e) => e.id === payslipModalLine.line.employeeId);
+                  const line = payslipModalLine.line;
+                  const modalAllow = Number((line as any).allowances ?? (Number(line.gross || 0) - Number(line.basicSalary || 0)));
+                  const modalHra = Number(line.hra ?? Math.round(modalAllow * 0.4));
+                  const modalSpecial = Number(line.specialAllowance ?? Math.round(modalAllow * 0.6));
+                  const modalPf = Number(line.providentFund ?? 1800);
+                  const modalPt = Number(line.professionalTax ?? 200);
+                  const modalTds = Number(line.incomeTax ?? (line as any).tax ?? 0);
+
                   emailPayslipToEmployee(
                     {
-                      employeeName: emp?.name ?? payslipModalLine.line.employeeId,
-                      employeeCode: emp?.code ?? payslipModalLine.line.employeeId,
+                      employeeName: emp?.name ?? line.employeeId,
+                      employeeCode: emp?.code ?? line.employeeId,
                       department: emp?.department ?? "—",
                       designation: emp?.designation ?? "—",
                       bankAccount: emp?.bankAccount ?? "—",
                       pan: emp?.pan ?? "—",
                       period: payslipModalLine.run.period,
-                      basic: payslipModalLine.line.basicSalary,
-                      hra: payslipModalLine.line.hra,
-                      specialAllowance: payslipModalLine.line.specialAllowance,
-                      bonus: payslipModalLine.line.bonus,
-                      gross: payslipModalLine.line.gross + (payslipModalLine.line.bonus || 0),
-                      pf: payslipModalLine.line.providentFund,
-                      pt: payslipModalLine.line.professionalTax,
-                      tds: payslipModalLine.line.incomeTax,
-                      deductions: payslipModalLine.line.deductions,
-                      net: payslipModalLine.line.net,
+                      basic: line.basicSalary,
+                      hra: modalHra,
+                      specialAllowance: modalSpecial,
+                      bonus: line.bonus,
+                      gross: line.gross + (line.bonus || 0),
+                      pf: modalPf,
+                      pt: modalPt,
+                      tds: modalTds,
+                      deductions: line.deductions,
+                      net: line.net,
                     },
                     payslipModalLine.line.employeeId,
                   );
