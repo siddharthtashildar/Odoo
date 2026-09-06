@@ -320,10 +320,26 @@ router.get("/requests", async (req, res) => {
 // POST /api/assets/requests
 router.post("/requests", async (req, res) => {
   try {
-    const { employeeId, assetTypeRequested, reason, item, justification, category, requiredFrom, requiredUntil } = req.body as any;
+    const { employeeId, assetTypeRequested, reason, item, justification, category, assetId, requiredFrom, requiredUntil } = req.body as any;
 
     const emp = await resolveEmployee(employeeId);
     if (!emp) return res.status(404).json({ success: false, error: "Employee not found" });
+
+    const requestedCategory = category || assetTypeRequested || item || "Equipment";
+
+    // Validate assetId category if specified
+    if (assetId) {
+      const selectedAsset = await prisma.assets.findUnique({ where: { id: assetId } });
+      if (!selectedAsset) {
+        return res.status(400).json({ success: false, error: "Specified asset not found" });
+      }
+      if (requestedCategory && selectedAsset.asset_type.toLowerCase() !== requestedCategory.toLowerCase()) {
+        return res.status(400).json({
+          success: false,
+          error: `Selected asset (${selectedAsset.asset_code}) of type '${selectedAsset.asset_type}' does not match requested category '${requestedCategory}'`,
+        });
+      }
+    }
 
     const timeWindow = requiredFrom && requiredUntil ? ` [Required: ${requiredFrom} to ${requiredUntil}]` : "";
     const fullReason = `${reason || justification || "Standard issue hardware request"}${timeWindow}`;
@@ -331,9 +347,10 @@ router.post("/requests", async (req, res) => {
     const request = await prisma.asset_requests.create({
       data: {
         employee_id: emp.id,
-        asset_type_requested: assetTypeRequested || item || category || "Equipment",
+        asset_type_requested: requestedCategory,
         reason: fullReason,
         status: "pending",
+        ...(assetId && { fulfilled_asset_id: assetId }),
       },
     });
 

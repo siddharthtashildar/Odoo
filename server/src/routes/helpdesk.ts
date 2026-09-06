@@ -4,7 +4,13 @@ import { resolveEmployee } from "../lib/resolve-employee";
 import { sendHelpdeskUpdateEmail } from "../lib/email";
 
 const router = Router();
-
+const UI_STATUS_MAP: Record<string, string> = {
+  Open: "open",
+  "In Progress": "in_progress",
+  "Waiting for User": "waiting_for_employee",
+  Resolved: "resolved",
+  Closed: "closed",
+};
 // GET /api/helpdesk
 router.get("/", async (req, res) => {
   try {
@@ -57,6 +63,12 @@ router.get("/", async (req, res) => {
     const mapped = tickets.map((t) => {
       const emp = t.employees;
       const techName = t.users?.email ? t.users.email.split("@")[0] : "Karan Shah (IT Lead)";
+      const rawStatus = String(t.status).toLowerCase().trim();
+      const statusValue = statusMap[rawStatus as keyof typeof statusMap] ??
+        (rawStatus === "resolved" ? "Resolved" : rawStatus === "closed" ? "Closed" : rawStatus === "in_progress" ? "In Progress" : "Open");
+
+      const rawCat = String(t.category).toLowerCase().trim();
+      const rawPriority = String(t.priority).toLowerCase().trim();
 
       return {
         id: t.ticket_number || t.id,
@@ -66,11 +78,11 @@ router.get("/", async (req, res) => {
         employeeCode: emp?.employee_code,
         requesterId: emp?.employee_code || emp?.id || t.employee_id,
         employeeName: emp?.full_name ?? "Employee",
-        category: (categoryMap[t.category] ?? "Other") as any,
-        priority: (priorityMap[t.priority] ?? "Medium") as any,
+        category: (categoryMap[rawCat] ?? "Other") as any,
+        priority: (priorityMap[rawPriority] ?? "Medium") as any,
         subject: t.subject,
         description: t.description ?? "",
-        status: (statusMap[t.status as keyof typeof statusMap] ?? "Open") as any,
+        status: statusValue as any,
         assignedTechnician: techName,
         createdDate: t.created_at.toISOString().slice(0, 10),
         updatedDate: (t.resolved_at ?? t.updated_at ?? t.created_at).toISOString().slice(0, 10),
@@ -202,6 +214,7 @@ router.patch("/:id", async (req, res) => {
         OR: [{ id: targetId }, { ticket_number: targetId }],
       },
     });
+    console.log("[Helpdesk PATCH] id:", targetId, "payload:", { status, priority, category });
 
     if (!existing) {
       return res.status(404).json({ success: false, error: "Ticket not found" });
@@ -348,7 +361,19 @@ router.post("/:id/comments", async (req, res) => {
     }
 
     if (!user) {
-      return res.status(400).json({ success: false, error: "No system user found to associate comment" });
+      let roleRec = await prisma.roles.findFirst();
+      if (!roleRec) {
+        roleRec = await prisma.roles.create({
+          data: { name: "System Admin", code: "admin" },
+        });
+      }
+      user = await prisma.users.create({
+        data: {
+          email: "support@peoplepay360.com",
+          password_hash: "system",
+          role_id: roleRec.id,
+        },
+      });
     }
 
     const created = await prisma.it_ticket_comments.create({

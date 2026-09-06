@@ -392,6 +392,7 @@ export function OnboardingPage() {
         location: "Headquarters",
         autoProvision: true,
         role: "employee",
+        status: "onboarding",
       });
 
       // 2. Create onboarding case in DB

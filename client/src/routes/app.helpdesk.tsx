@@ -33,6 +33,8 @@ import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, Ta
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import type { HelpdeskTicket, TicketCategory, TicketPriority, TicketStatus } from "@/lib/mock-data";
 
+
+
 export const Route = createFileRoute("/app/helpdesk")({
   head: () => ({
     meta: [
@@ -80,8 +82,13 @@ function HelpdeskPage() {
   const myId = me?.id || persona.employeeId;
   const myCode = me?.code || persona.employeeCode;
 
+  const isTicketMine = (t: HelpdeskTicket) =>
+    t.requesterId === myId ||
+    (myCode && (t.requesterId === myCode || (t as any).employeeId === myCode || (t as any).employeeCode === myCode)) ||
+    (me?.email && ((t as any).employeeEmail?.toLowerCase() === me.email.toLowerCase() || (t as any).email?.toLowerCase() === me.email.toLowerCase()));
+
   // Summaries
-  const myTickets = helpdesk.filter((t) => t.requesterId === myId || (myCode && t.requesterId === myCode));
+  const myTickets = helpdesk.filter(isTicketMine);
   const activeTicketSet = isEmployeeOnly ? myTickets : helpdesk;
   const openTickets = activeTicketSet.filter((t) => t.status === "Open" || t.status === "In Progress");
   const criticalCount = activeTicketSet.filter((t) => (t.priority === "Critical" || t.priority === "High") && t.status !== "Closed").length;
@@ -93,11 +100,10 @@ function HelpdeskPage() {
   const rows = useMemo(() => {
     return helpdesk.filter((t) => {
       if (isEmployeeOnly) {
-        const isMine = t.requesterId === myId || (myCode && t.requesterId === myCode);
-        if (!isMine) return false;
+        if (!isTicketMine(t)) return false;
       }
 
-      const requesterName = nameOf(t.requesterId).toLowerCase();
+      const requesterName = nameOf(t.requesterId || (t as any).employeeId || "").toLowerCase();
       const matchQ =
         t.id.toLowerCase().includes(q.toLowerCase()) ||
         t.subject.toLowerCase().includes(q.toLowerCase()) ||
@@ -107,7 +113,7 @@ function HelpdeskPage() {
       const matchStatus = statusFilter === "all" || t.status === statusFilter;
       return matchQ && matchCat && matchPriority && matchStatus;
     });
-  }, [helpdesk, isEmployeeOnly, myId, myCode, q, catFilter, priorityFilter, statusFilter, nameOf]);
+  }, [helpdesk, isEmployeeOnly, myId, myCode, me?.email, q, catFilter, priorityFilter, statusFilter, nameOf]);
 
   const PAGE_SIZE = 5;
   const totalPages = Math.ceil(rows.length / PAGE_SIZE) || 1;
@@ -115,7 +121,9 @@ function HelpdeskPage() {
     return rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   }, [rows, page]);
 
-  const activeTicket = helpdesk.find((t) => t.id === activeTicketId) ?? null;
+  const activeTicket = helpdesk.find(
+    (t) => t.id === activeTicketId || (t as any).ticketId === activeTicketId || (t as any).ticketNumber === activeTicketId,
+  ) ?? null;
 
   const handleCreate = () => {
     const next: Record<string, string | undefined> = {};
@@ -164,6 +172,7 @@ function HelpdeskPage() {
 
   const handleStatusChange = (status: TicketStatus) => {
     if (!activeTicket) return;
+    // Pass UI label directly; store.updateTicket converts to backend value
     updateTicket(activeTicket.id, { status });
     log(`Changed ticket ${activeTicket.id} status to ${status}`, "Helpdesk");
     toast.success(`Ticket status updated to ${status}`);

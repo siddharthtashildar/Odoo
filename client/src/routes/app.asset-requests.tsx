@@ -105,9 +105,9 @@ function AssetRequestsPage() {
     return visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   }, [visible, page]);
 
-  // Filter assets by selected category
+  // Filter assets by selected category (case-insensitive)
   const assetsInCategory = form.category
-    ? assets.filter((a) => a.category === form.category)
+    ? assets.filter((a) => (a.category || a.name || "").toLowerCase() === form.category.toLowerCase())
     : [];
 
   // Get selected asset for availability check

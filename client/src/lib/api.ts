@@ -19,7 +19,17 @@ async function request<T>(
     ...(body !== undefined && { body: JSON.stringify(body) }),
   });
 
-  const json = (await res.json()) as ApiResponse<T>;
+  const text = await res.text();
+  let json: ApiResponse<T>;
+  try {
+    json = JSON.parse(text) as ApiResponse<T>;
+  } catch {
+    throw new Error(
+      res.ok
+        ? "Invalid JSON response from server"
+        : `Server error (${res.status}): ${text.includes("<!DOCTYPE") || text.includes("<html") ? "Server payload limit or internal server error" : text.slice(0, 100)}`
+    );
+  }
   if (!json.success) throw new Error(json.error);
   return json.data;
 }
@@ -89,6 +99,7 @@ export const api = {
       autoProvision?: boolean | undefined;
       role?: string | undefined;
       customPassword?: string | undefined;
+      status?: string | undefined;
     }) =>
       request<{
         id: string;
