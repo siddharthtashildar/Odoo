@@ -113,6 +113,7 @@ interface Store extends State {
   deleteSchedule: (id: string) => Promise<void>;
   assignSchedule: (scheduleId: string, employeeIds: string[]) => Promise<void>;
   // Lifecycle
+  refreshSlice: (key: keyof State) => Promise<void>;
   addOnboardingCase: (employeeId: string, assignedHr?: string, buddy?: string) => Promise<OnboardingCase | null>;
   updateOnboardingTask: (processId: string, taskId: string, done: boolean) => Promise<void>;
   updateOnboardingStatus: (processId: string, status: string) => Promise<void>;
@@ -127,7 +128,6 @@ interface Store extends State {
     completeOffboarding?: boolean;
   }) => Promise<void>;
   updateOffboardingClearanceTask: (processId: string, taskId: string, cleared: boolean) => Promise<void>;
-  refreshSlice: (key: keyof State) => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -144,8 +144,6 @@ const HELPDESK_UI_TO_BACKEND: Record<string, string> = {
   Completed: "resolved",
   Closed: "closed",
 };
-
-
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial);
   const [hydrated, setHydrated] = useState(false);
@@ -196,26 +194,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
           fetch(`${API}/api/audit`).then((r) => r.json()),
         ]);
 
-          // Preserve existing state on failed fetches instead of falling back to seed data
-          setState((s) => ({
-            ...s,
-            employees: empRes.status === "fulfilled" && empRes.value?.success ? empRes.value.data : s.employees,
-            contracts: conRes.status === "fulfilled" && conRes.value?.success ? conRes.value.data : s.contracts,
-            attendance: attRes.status === "fulfilled" && attRes.value?.success ? attRes.value.data : s.attendance,
-            leave: leaveRes.status === "fulfilled" && leaveRes.value?.success ? leaveRes.value.data : s.leave,
-            payroll: payrollRes.status === "fulfilled" && payrollRes.value?.success ? payrollRes.value.data : s.payroll,
-            salaryStructures: structRes.status === "fulfilled" && structRes.value?.success ? structRes.value.data : s.salaryStructures,
-            salaryRecords: recordsRes.status === "fulfilled" && recordsRes.value?.success ? recordsRes.value.data : s.salaryRecords,
-            reimbursements: reimRes.status === "fulfilled" && reimRes.value?.success ? reimRes.value.data : s.reimbursements,
-            allowances: allowRes.status === "fulfilled" && allowRes.value?.success ? allowRes.value.data : s.allowances,
-            assets: assetRes.status === "fulfilled" && assetRes.value?.success ? assetRes.value.data : s.assets,
-            helpdesk: helpdeskRes.status === "fulfilled" && helpdeskRes.value?.success ? helpdeskRes.value.data : s.helpdesk,
-            schedules: schedRes.status === "fulfilled" && schedRes.value?.success ? schedRes.value.data : s.schedules,
-            onboarding: onbRes.status === "fulfilled" && onbRes.value?.success ? onbRes.value.data : s.onboarding,
-            offboarding: offRes.status === "fulfilled" && offRes.value?.success ? offRes.value.data : s.offboarding,
-            provisioning: prvRes.status === "fulfilled" && prvRes.value?.success ? prvRes.value.data : s.provisioning,
-            assetRequests: assetReqRes.status === "fulfilled" && assetReqRes.value?.success ? assetReqRes.value.data : s.assetRequests,
-          }));
+        // Preserve existing state on failed fetches instead of falling back to seed data
+        setState((s) => ({
+          ...s,
+          employees: empRes.status === "fulfilled" && empRes.value?.success ? empRes.value.data : s.employees,
+          contracts: conRes.status === "fulfilled" && conRes.value?.success ? conRes.value.data : s.contracts,
+          attendance: attRes.status === "fulfilled" && attRes.value?.success ? attRes.value.data : s.attendance,
+          leave: leaveRes.status === "fulfilled" && leaveRes.value?.success ? leaveRes.value.data : s.leave,
+          payroll: payrollRes.status === "fulfilled" && payrollRes.value?.success ? payrollRes.value.data : s.payroll,
+          salaryStructures: structRes.status === "fulfilled" && structRes.value?.success ? structRes.value.data : s.salaryStructures,
+          salaryRecords: recordsRes.status === "fulfilled" && recordsRes.value?.success ? recordsRes.value.data : s.salaryRecords,
+          reimbursements: reimRes.status === "fulfilled" && reimRes.value?.success ? reimRes.value.data : s.reimbursements,
+          allowances: allowRes.status === "fulfilled" && allowRes.value?.success ? allowRes.value.data : s.allowances,
+          assets: assetRes.status === "fulfilled" && assetRes.value?.success ? assetRes.value.data : s.assets,
+          helpdesk: helpdeskRes.status === "fulfilled" && helpdeskRes.value?.success ? helpdeskRes.value.data : s.helpdesk,
+          schedules: schedRes.status === "fulfilled" && schedRes.value?.success ? schedRes.value.data : s.schedules,
+          onboarding: onbRes.status === "fulfilled" && onbRes.value?.success ? onbRes.value.data : s.onboarding,
+          offboarding: offRes.status === "fulfilled" && offRes.value?.success ? offRes.value.data : s.offboarding,
+          provisioning: prvRes.status === "fulfilled" && prvRes.value?.success ? prvRes.value.data : s.provisioning,
+          assetRequests: assetReqRes.status === "fulfilled" && assetReqRes.value?.success ? assetReqRes.value.data : s.assetRequests,
+        }));
       } catch (err) {
         console.warn("[store] API unreachable", err);
       } finally {
@@ -229,7 +227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Poll all key data slices to keep the UI in sync across all roles
   useEffect(() => {
     if (!hydrated) return;
-    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
+    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5001";
     const isManager = state.role === "hr_manager" || state.role === "admin";
     const intervalMs = isManager ? 5000 : 10000;
 
@@ -509,7 +507,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const submitReimbursement = useCallback(async (r: ReimbursementClaim) => {
-    // Optimistic update — employee sees the claim immediately
     setState((s) => ({ ...s, reimbursements: [r, ...s.reimbursements] }));
     try {
       await api.reimbursements.create({
@@ -519,19 +516,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         amount: r.amount,
         description: r.description,
         receiptFileName: r.receiptFileName,
-        receiptUrl: r.receiptUrl ?? r.receiptFileName,
+        receiptUrl: (r as any).receiptUrl ?? r.receiptFileName,
       });
-      // Refresh from DB so both employee and HR Manager see the server-authoritative record
-      // (with the correct DB id, receipt_url, and status from the backend)
       await refreshSlice("reimbursements");
     } catch (err) {
-      // Rollback the optimistic update so the employee is not misled
-      setState((s) => ({
-        ...s,
-        reimbursements: s.reimbursements.filter((item) => item.id !== r.id),
-      }));
       console.warn("[store] submitReimbursement sync error:", err);
-      throw err; // re-throw so the calling UI can show the error to the user
     }
   }, [refreshSlice]);
 
@@ -546,14 +535,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         status: patch.approvalStatus,
         paymentStatus: patch.paymentStatus,
       });
-      const res = await api.reimbursements.list();
-      if (Array.isArray(res)) {
-        setState((s) => ({ ...s, reimbursements: res as ReimbursementClaim[] }));
-      }
+      await refreshSlice("reimbursements");
     } catch (err) {
       console.warn("[store] updateReimbursement sync error:", err);
     }
-  }, []);
+  }, [refreshSlice]);
 
   const addAllowance = useCallback(async (a: AllowanceRecord) => {
     setState((s) => ({ ...s, allowances: [a, ...s.allowances] }));
@@ -612,10 +598,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-
-
   const updateTicket = useCallback(async (id: string, patch: Partial<HelpdeskTicket>) => {
-    // Keep UI-friendly status in local state (optimistic update)
     setState((s) => ({
       ...s,
       helpdesk: s.helpdesk.map((t) =>
@@ -623,13 +606,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ),
     }));
     try {
-      // Convert UI status label to backend enum value before sending
-      const backendPatch: Record<string, unknown> = { ...patch };
-      if (patch.status && typeof patch.status === "string") {
-        const mapped = HELPDESK_UI_TO_BACKEND[patch.status];
-        if (mapped) backendPatch["status"] = mapped;
-      }
-      await api.helpdesk.patch(id, backendPatch);
+      await api.helpdesk.patch(id, patch as Record<string, unknown>);
       const res = await api.helpdesk.list();
       if (Array.isArray(res)) {
         setState((s) => ({ ...s, helpdesk: res as HelpdeskTicket[] }));
@@ -825,8 +802,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (assignedHr) data.assignedHr = assignedHr;
       if (buddy) data.buddy = buddy;
       await api.onboarding.create(data);
-      await refreshSlice("employees");
-      await refreshSlice("onboarding");
       const fresh = await api.onboarding.list();
       if (Array.isArray(fresh)) {
         setState((s) => ({ ...s, onboarding: fresh as OnboardingCase[] }));
@@ -836,7 +811,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.warn("[store] addOnboardingCase error:", err);
     }
     return null;
-  }, [refreshSlice]);
+  }, []);
 
   const updateOnboardingTask = useCallback(async (processId: string, taskId: string, done: boolean): Promise<void> => {
     // Optimistic update
@@ -876,11 +851,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
     try {
       await api.onboarding.patch(processId, { status });
-      await refreshSlice("onboarding");
     } catch (err) {
       console.warn("[store] updateOnboardingStatus error:", err);
     }
-  }, [refreshSlice]);
+  }, []);
 
   const addOffboardingCase = useCallback(async (
     employeeId: string,
@@ -908,7 +882,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       accessRevoked?: boolean;
       assetsReturned?: boolean;
       exitInterviewDone?: boolean;
-      exitInterviewNotes?: string;
       finalSettlement?: string;
       status?: string;
       completeOffboarding?: boolean;
@@ -920,14 +893,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       offboarding: s.offboarding.map((c) =>
         c.id === id
           ? {
-              ...c,
-              ...(patch.accessRevoked !== undefined && { accessRevoked: patch.accessRevoked }),
-              ...(patch.assetsReturned !== undefined && { assetsReturned: patch.assetsReturned }),
-              ...(patch.exitInterviewDone !== undefined && { exitInterviewStatus: patch.exitInterviewDone ? ("Completed" as const) : ("Pending" as const), exitInterviewDone: patch.exitInterviewDone }),
-              ...(patch.exitInterviewNotes !== undefined && { exitInterviewNotes: patch.exitInterviewNotes }),
-              ...(patch.finalSettlement !== undefined && { finalSettlement: patch.finalSettlement as "pending" | "processing" | "settled" }),
-              ...(patch.completeOffboarding && { finalSettlement: "settled" as const, clearanceStatus: "Cleared" as const, finalPayrollStatus: "Processed" as const }),
-            }
+            ...c,
+            ...(patch.accessRevoked !== undefined && { accessRevoked: patch.accessRevoked }),
+            ...(patch.assetsReturned !== undefined && { assetsReturned: patch.assetsReturned }),
+            ...(patch.exitInterviewDone !== undefined && { exitInterviewStatus: patch.exitInterviewDone ? ("Completed" as const) : ("Pending" as const) }),
+            ...(patch.finalSettlement !== undefined && { finalSettlement: patch.finalSettlement as "pending" | "processing" | "settled" }),
+            ...(patch.completeOffboarding && { finalSettlement: "settled" as const, clearanceStatus: "Cleared" as const, finalPayrollStatus: "Processed" as const }),
+          }
           : c,
       ) as OffboardingCase[],
     }));
@@ -942,42 +914,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshSlice]);
 
-  const updateOffboardingClearanceTask = useCallback(async (
-    processId: string,
-    taskId: string,
-    cleared: boolean,
-  ): Promise<void> => {
+  const updateOffboardingClearanceTask = useCallback(async (processId: string, taskId: string, cleared: boolean): Promise<void> => {
     setState((s) => ({
       ...s,
       offboarding: s.offboarding.map((c) =>
         c.id === processId
           ? {
-              ...c,
-              clearance: c.clearance.map((task) =>
-                task.id === taskId
-                  ? {
-                      ...task,
-                      cleared,
-                      clearedAt: cleared ? new Date().toISOString().slice(0, 10) : undefined,
-                    }
-                  : task,
-              ),
-              clearanceStatus: c.clearance
-                .map((task) => (task.id === taskId ? { ...task, cleared } : task))
-                .every((t) => t.cleared)
-                ? ("Cleared" as const)
-                : ("Pending" as const),
-            }
+            ...c,
+            clearance: (c.clearance || []).map((t) => {
+              if (t.id !== taskId) return t;
+              const updated = { ...t, cleared };
+              if (cleared) {
+                updated.clearedAt = new Date().toISOString().slice(0, 10);
+              } else {
+                delete updated.clearedAt;
+              }
+              return updated;
+            }),
+          }
           : c,
-      ) as OffboardingCase[],
+      ),
     }));
-
     try {
       await api.offboarding.patchClearance(processId, taskId, { cleared });
       await refreshSlice("offboarding");
     } catch (err) {
       console.warn("[store] updateOffboardingClearanceTask error:", err);
-      await refreshSlice("offboarding");
     }
   }, [refreshSlice]);
 
@@ -1034,7 +996,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, signedIn: false, currentUser: null }));
         try {
           localStorage.removeItem(KEY);
-        } catch {}
+        } catch { }
       },
       setRole: (role) => setState((s) => ({ ...s, role })),
       log,
@@ -1183,7 +1145,7 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/payroll": ["payroll_user", "payroll_manager", "admin"],
   "/app/salary": ["payroll_user", "payroll_manager", "admin"],
   "/app/salary-structure": ["payroll_user", "payroll_manager", "admin"],
-  "/app/payslips": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/payslips": ["payroll_user", "payroll_manager", "admin"],
   "/app/reimbursement": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/assets": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],
   "/app/asset-requests": ["employee", "it_asset_manager", "admin", "hr_manager", "payroll_user", "payroll_manager"],

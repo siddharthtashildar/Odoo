@@ -1,50 +1,64 @@
-/**
- * High-performance Cache Service for Payroll Dashboard, Department Analytics, and KPIs
- */
+import { redis } from "../lib/redis";
 
-interface CacheEntry<T> {
+export interface CacheResult<T> {
   data: T;
-  expiresAt: number;
+  source: "redis" | "database";
+  cached: boolean;
 }
 
-const memoryCache = new Map<string, CacheEntry<any>>();
-
 export const CacheService = {
-  get<T>(key: string): T | null {
-    const entry = memoryCache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) {
-      memoryCache.delete(key);
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      const data = await redis.get<T>(key);
+      if (!data) return null;
+      return data;
+    } catch (err) {
+      console.warn(`[Redis Cache] GET error for key ${key}:`, err);
       return null;
     }
-    return entry.data as T;
   },
 
-  set<T>(key: string, data: T, ttlSeconds = 120): void {
-    memoryCache.set(key, {
-      data,
-      expiresAt: Date.now() + ttlSeconds * 1000,
-    });
+  async set<T>(key: string, data: T, ttlSeconds = 300): Promise<void> {
+    try {
+      await redis.set(key, data, { ex: ttlSeconds });
+    } catch (err) {
+      console.warn(`[Redis Cache] SET error for key ${key}:`, err);
+    }
   },
 
-  del(key: string): void {
-    memoryCache.delete(key);
+  async del(key: string): Promise<void> {
+    try {
+      await redis.del(key);
+    } catch (err) {
+      console.warn(`[Redis Cache] DEL error for key ${key}:`, err);
+    }
   },
 
-  clear(): void {
-    memoryCache.clear();
+  async clearAll(): Promise<void> {
+    try {
+      await redis.del("payroll:dashboard:analytics");
+    } catch (err) {
+      console.warn("[Redis Cache] ClearAll error:", err);
+    }
   },
 
-  clearAll(): void {
-    memoryCache.clear();
-  },
+  async getOrSet<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): Promise<CacheResult<T>> {
+    const cachedData = await this.get<T>(key);
+    if (cachedData !== null) {
+      return {
+        data: cachedData,
+        source: "redis",
+        cached: true,
+      };
+    }
 
-  async getOrSet<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): Promise<T> {
-    const cached = this.get<T>(key);
-    if (cached) return cached;
-    const fresh = await fn();
-    this.set(key, fresh, ttlSeconds);
-    return fresh;
+    const freshData = await fn();
+    await this.set(key, freshData, ttlSeconds);
+    return {
+      data: freshData,
+      source: "database",
+      cached: false,
+    };
   },
 };
 
