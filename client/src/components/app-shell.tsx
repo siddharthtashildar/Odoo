@@ -41,7 +41,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/store";
 import { ROLE_LABELS, type Role } from "@/lib/mock-data";
@@ -190,18 +189,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <Select value={role} onValueChange={(v) => { setRole(v as Role); }}>
-              <SelectTrigger className="hidden w-[190px] sm:flex" aria-label="Switch role">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {ROLE_LABELS[r]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+              <span>{ROLE_LABELS[role]}</span>
+              {persona.employeeCode && <span className="text-[10px] text-muted-foreground/70">({persona.employeeCode})</span>}
+            </div>
 
             <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
               {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
@@ -225,22 +217,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <p className="text-xs font-normal text-muted-foreground">{ROLE_LABELS[role]}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {role === "admin" && (
-                  <div className="p-1 sm:hidden">
-                    <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {ROLE_LABELS[r]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
                 <DropdownMenuItem onClick={() => navigate({ to: "/app/me" })}>
                   <UserRound className="mr-2 size-4" /> My workspace
                 </DropdownMenuItem>

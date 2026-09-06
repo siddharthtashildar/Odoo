@@ -29,15 +29,6 @@ export const Route = createFileRoute("/")({
   component: LoginPage,
 });
 
-const QUICK_ACCOUNTS: Array<{ label: string; email: string; role: Role }> = [
-  { label: "Admin (Siddharth)", email: "siddharthtashildar17@gmail.com", role: "admin" },
-  { label: "HR Manager (Sana)", email: "sana.iqbal@peoplepay360.io", role: "hr_manager" },
-  { label: "Payroll Manager", email: "arjun.nair@peoplepay360.io", role: "payroll_manager" },
-  { label: "IT Asset Manager", email: "karan.shah@peoplepay360.io", role: "it_asset_manager" },
-  { label: "Employee (Jeffrey)", email: "code.sid17@gmail.com", role: "employee" },
-  { label: "Employee (Rohan)", email: "rohan.mehta@peoplepay360.io", role: "employee" },
-];
-
 function LoginPage() {
   const { signIn, log } = useApp();
   const navigate = useNavigate();
@@ -45,8 +36,8 @@ function LoginPage() {
   // Mode: "login" or "change_password"
   const [mode, setMode] = useState<"login" | "change_password">("login");
 
-  const [email, setEmail] = useState("sana.iqbal@peoplepay360.io");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [tempPassword, setTempPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -78,13 +69,6 @@ function LoginPage() {
       }
     }
   }, []);
-
-  const fillAccount = (acc: (typeof QUICK_ACCOUNTS)[0]) => {
-    setMode("login");
-    setEmail(acc.email);
-    setPassword("demo1234");
-    setErrors({});
-  };
 
   const submitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -355,26 +339,6 @@ function LoginPage() {
                   Public registration is restricted. Only Human Resources or Administrators can provision accounts.
                   New team members receive temporary credentials via email to set their permanent password.
                 </p>
-              </div>
-
-              {/* Quick Fill Testing Helper */}
-              <div className="pt-2 border-t">
-                <p className="text-[11px] font-medium text-muted-foreground mb-2">Quick-fill accounts for testing:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {QUICK_ACCOUNTS.map((acc) => (
-                    <button
-                      key={acc.email}
-                      type="button"
-                      onClick={() => fillAccount(acc)}
-                      className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${email === acc.email && mode === "login"
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background hover:bg-muted text-muted-foreground hover:text-foreground border-border"
-                        }`}
-                    >
-                      {acc.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </CardContent>
           </Card>
