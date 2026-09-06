@@ -517,35 +517,92 @@ export function OnboardingPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total Onboarding Cases"
-          value={totalCases}
-          hint="All active processes"
-          icon={<Users className="size-5" />}
-          tone="default"
-        />
-        <StatCard
-          label="Invitation Sent"
-          value={invitationSentCases}
-          hint="Awaiting first password change"
-          icon={<Mail className="size-5" />}
-          tone="default"
-        />
-        <StatCard
-          label="In Progress / Active"
-          value={inProgressCases}
-          hint="Password set & completing checklist"
-          icon={<Clock className="size-5" />}
-          tone="warning"
-        />
-        <StatCard
-          label="Completed Onboarding"
-          value={completedCases}
-          hint="Successfully cleared to active"
-          icon={<CheckCircle2 className="size-5" />}
-          tone="success"
-        />
+      {/* BOLD VISUAL IDEA: Horizontal Employee Journey Sequence Banner */}
+      <div className="rounded-2xl border border-border bg-secondary/40 p-6 shadow-xs">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                Employee Journey & Lifecycle Sequence
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                The complete lifecycle from candidate offer to active contribution and eventual alumni transition.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary self-start sm:self-auto">
+              <Sparkles className="size-3.5" />
+              <span>{activeCases.length} New Hires in Motion</span>
+            </div>
+          </div>
+
+          {/* Interactive Horizontal Timeline Steps */}
+          <div className="relative overflow-x-auto pb-2 pt-3">
+            <div className="flex items-center min-w-[700px] justify-between">
+              {[
+                {
+                  step: 1,
+                  title: "Pre-boarding & Credentials",
+                  sub: `${invitationSentCases} invite(s) sent`,
+                  icon: Mail,
+                  active: invitationSentCases > 0,
+                  status: "Invitation",
+                },
+                {
+                  step: 2,
+                  title: "Day-1 Orientation & Tasks",
+                  sub: `${inProgressCases} checklist active`,
+                  icon: Clock,
+                  active: inProgressCases > 0,
+                  status: "Checklist",
+                },
+                {
+                  step: 3,
+                  title: "IT Assets & Accounts",
+                  sub: "Hardware & SaaS provisioned",
+                  icon: Laptop,
+                  active: true,
+                  status: "Provisioning",
+                },
+                {
+                  step: 4,
+                  title: "Active Teammate",
+                  sub: `${completedCases} cleared & active`,
+                  icon: UserCheck,
+                  active: completedCases > 0,
+                  status: "Active",
+                },
+              ].map((stage, idx, arr) => (
+                <div key={stage.step} className="relative flex flex-1 items-center">
+                  <div className="flex flex-col items-center gap-2 text-center group cursor-pointer z-10">
+                    <div
+                      className={`grid size-10 place-items-center rounded-xl border transition-all ${
+                        stage.active
+                          ? "border-primary bg-primary text-primary-foreground shadow-2xs ring-4 ring-primary/10"
+                          : "border-border bg-background text-muted-foreground"
+                      }`}
+                    >
+                      <stage.icon className="size-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">{stage.title}</p>
+                      <p className="text-[0.7rem] text-muted-foreground">{stage.sub}</p>
+                    </div>
+                  </div>
+
+                  {idx < arr.length - 1 && (
+                    <div className="h-0.5 flex-1 mx-2 bg-border relative -top-3">
+                      <div
+                        className={`h-full bg-primary transition-all ${
+                          stage.active ? "w-full" : "w-0"
+                        }`}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Main Onboarding Cases Table */}

@@ -15,14 +15,20 @@ import {
   Receipt,
   ReceiptText,
   Search,
+  Sparkles,
   UploadCloud,
+  Users,
   XCircle,
+  ArrowRight,
+  ShieldCheck,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +38,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState, Field, PageHeader, StatCard, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
+import { EmptyState, Field, PageHeader, StatusBadge, TableSkeleton, TablePagination } from "@/components/bits";
 import { useApp, useDelayed, useEmployeeName } from "@/lib/store";
 import { inr, type ReimbursementCategory, type ReimbursementClaim } from "@/lib/mock-data";
 
@@ -154,16 +160,39 @@ function ReimbursementPage() {
   const myId = me?.id || persona.employeeId;
   const myCode = me?.code || persona.employeeCode;
 
-  // Compute metrics
+  // Compute metrics for conversational hero
   const myClaims = reimbursements.filter((r) => r.employeeId === myId || (myCode && r.employeeId === myCode));
   const activeSet = isEmployeeOnly ? myClaims : reimbursements;
 
-  const totalClaims = activeSet.length;
-  const pendingClaims = activeSet.filter((r) => r.approvalStatus === "pending").length;
-  const approvedClaims = activeSet.filter((r) => r.approvalStatus === "approved");
-  const approvedAmount = approvedClaims.reduce((s, r) => s + r.amount, 0);
-  const rejectedClaims = activeSet.filter((r) => r.approvalStatus === "rejected").length;
-  const paidClaims = activeSet.filter((r) => r.paymentStatus === "paid").length;
+  const totalClaimsCount = activeSet.length;
+  const pendingClaimsList = activeSet.filter((r) => r.approvalStatus === "pending");
+  const pendingCount = pendingClaimsList.length;
+  const approvedClaimsList = activeSet.filter((r) => r.approvalStatus === "approved");
+  const approvedAmountTotal = approvedClaimsList.reduce((s, r) => s + r.amount, 0);
+  const paidCount = activeSet.filter((r) => r.paymentStatus === "paid").length;
+
+  // Get distinct recent claim submitter names for human headline
+  const recentSubmitters = useMemo(() => {
+    const names: string[] = [];
+    activeSet.forEach((r) => {
+      const n = nameOf(r.employeeId);
+      if (n && n !== "Unknown" && !names.includes(n)) {
+        names.push(n);
+      }
+    });
+    return names;
+  }, [activeSet, nameOf]);
+
+  const heroHeadline = useMemo(() => {
+    if (pendingCount === 0) {
+      return "All clear! Every teammate's expense claim is currently up to date.";
+    }
+    const firstTwo = recentSubmitters.slice(0, 2);
+    const restCount = Math.max(0, recentSubmitters.length - 2);
+    const who = firstTwo.length > 0 ? firstTwo.join(", ") : "Teammates";
+    const extra = restCount > 0 ? ` and ${restCount} others` : "";
+    return `${who}${extra} submitted claims recently. ${pendingCount} ${pendingCount === 1 ? "claim is" : "claims are"} waiting for your sign-off.`;
+  }, [pendingCount, recentSubmitters]);
 
   const [page, setPage] = useState(1);
 
@@ -280,104 +309,140 @@ function ReimbursementPage() {
   };
 
   return (
-    <>
+    <div className="space-y-6">
+      {/* Human-Centered Page Header */}
       <PageHeader
-        title="Reimbursements"
-        description="Employee business expense claims, receipt validation, approval workflows, and disbursals."
+        title="Expense Claims & Reimbursements"
+        description="Every claim represents out-of-pocket effort by your team. Verify receipts and approve disbursals promptly."
         actions={
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="mr-2 size-4" /> Submit reimbursement
+          <Button
+            onClick={() => setAddOpen(true)}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <Plus className="mr-2 size-4" /> Claim Expense
           </Button>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          label="Total Claims"
-          value={totalClaims}
-          hint="All time recorded"
-          icon={<ReceiptText className="size-5" />}
-        />
-        <StatCard
-          label="Pending Claims"
-          value={pendingClaims}
-          hint="Requires review"
-          icon={<Clock className="size-5" />}
-          tone="warning"
-        />
-        <StatCard
-          label="Approved Amount"
-          value={inr(approvedAmount)}
-          hint={`${approvedClaims.length} claims approved`}
-          icon={<CheckCircle2 className="size-5" />}
-          tone="success"
-        />
-        <StatCard
-          label="Paid Claims"
-          value={paidClaims}
-          hint="Disbursed to date"
-          icon={<FileCheck className="size-5" />}
-          tone="accent"
-        />
-        <StatCard
-          label="Rejected Claims"
-          value={rejectedClaims}
-          hint="Policy violations"
-          icon={<XCircle className="size-5" />}
-          tone="default"
-        />
+      {/* ONE BOLD VISUAL IDEA: Human Conversational Pulse Banner (Replaces 4 uniform stat cards) */}
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-secondary/50 p-6 shadow-xs">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <Sparkles className="size-3.5" />
+              <span>Team Expense Overview</span>
+            </div>
+            
+            <h2 className="text-xl font-medium tracking-tight text-foreground sm:text-2xl">
+              {heroHeadline}
+            </h2>
+            
+            <p className="text-sm text-muted-foreground">
+              {isEmployeeOnly
+                ? `You have ${myClaims.length} recorded claims totaling ${inr(approvedAmountTotal)} in approved reimbursements.`
+                : `Totaling ${inr(approvedAmountTotal)} approved across ${approvedClaimsList.length} verified expense claims.`}
+            </p>
+
+            {/* Avatar Stack of Team Members */}
+            {recentSubmitters.length > 0 && (
+              <div className="flex items-center gap-3 pt-1">
+                <div className="flex -space-x-2 overflow-hidden">
+                  {recentSubmitters.slice(0, 4).map((name, i) => (
+                    <Avatar key={i} className="size-8 border-2 border-background ring-1 ring-border">
+                      <AvatarFallback className="bg-primary/15 text-[0.7rem] font-semibold text-primary">
+                        {name.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground font-medium">
+                  {recentSubmitters.slice(0, 3).join(", ")} {recentSubmitters.length > 3 ? `+${recentSubmitters.length - 3} more` : ""}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Quiet, Disciplined Metric Badges */}
+          <div className="flex flex-wrap items-center gap-3 lg:flex-col lg:items-end">
+            <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background/80 px-4 py-2.5 shadow-2xs">
+              <Clock className="size-4 text-accent" />
+              <div className="text-right">
+                <p className="text-[0.7rem] uppercase font-semibold text-muted-foreground">Pending Review</p>
+                <p className="font-display text-lg font-bold text-foreground tabular-nums">{pendingCount} claims</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background/80 px-4 py-2.5 shadow-2xs">
+              <CheckCircle2 className="size-4 text-success" />
+              <div className="text-right">
+                <p className="text-[0.7rem] uppercase font-semibold text-muted-foreground">Approved Disbursal</p>
+                <p className="font-display text-lg font-bold text-foreground tabular-nums">{inr(approvedAmountTotal)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
+      {/* Main Table Card with Tactile Human Controls */}
+      <Card className="border border-border shadow-xs">
+        <CardHeader className="space-y-4 pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>Expense Claims</CardTitle>
+              <CardTitle className="text-lg font-semibold">Expense Claims</CardTitle>
               <CardDescription>
                 {isEmployeeOnly
-                  ? "Showing only your submitted claims"
-                  : "All departmental expense submissions"}
+                  ? "Showing claims submitted by you"
+                  : "All departmental expense submissions and receipt verifications"}
               </CardDescription>
+            </div>
+
+            {/* Tactile Status Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto rounded-lg border border-border bg-muted/40 p-1">
+              {[
+                { id: "all", label: `All (${activeSet.length})` },
+                { id: "pending", label: `Needs Review (${pendingCount})` },
+                { id: "approved", label: `Approved (${approvedClaimsList.length})` },
+                { id: "paid", label: `Disbursed (${paidCount})` },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  onClick={() => setStatusFilter(pill.id)}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:ring-2 focus-visible:ring-primary ${
+                    statusFilter === pill.id
+                      ? "bg-background text-foreground shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="relative">
               <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
               <Input
-                placeholder="Search claim ID or description..."
+                placeholder="Search by team member, claim ID, or reason..."
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                className="pl-9"
+                className="pl-9 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               />
             </div>
 
             <Select value={catFilter} onValueChange={setCatFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
+              <SelectTrigger className="focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                <SelectValue placeholder="Filter by Category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Travel">Travel</SelectItem>
-                <SelectItem value="Food">Food & Entertainment</SelectItem>
-                <SelectItem value="Medical">Medical</SelectItem>
-                <SelectItem value="Internet">Internet & Telecom</SelectItem>
-                <SelectItem value="Office Supplies">Office Supplies</SelectItem>
-                <SelectItem value="Training">Training & Education</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Approval Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="changes_requested">Changes Requested</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="Travel">Travel & Lodging</SelectItem>
+                <SelectItem value="Food">Food & Teammate Outings</SelectItem>
+                <SelectItem value="Medical">Medical Insurance / Expenses</SelectItem>
+                <SelectItem value="Internet">Internet & Work Wi-Fi</SelectItem>
+                <SelectItem value="Office Supplies">Hardware & Supplies</SelectItem>
+                <SelectItem value="Training">Workshops & Learning</SelectItem>
+                <SelectItem value="Other">Other Expenses</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -389,88 +454,130 @@ function ReimbursementPage() {
               <TableSkeleton rows={5} />
             </div>
           ) : rows.length === 0 ? (
-            <EmptyState
-              title="No reimbursement claims found"
-              description="No expense records match your current filters."
-              icon={<Receipt className="size-8" />}
-            />
+            <div className="p-8">
+              <EmptyState
+                title={statusFilter === "pending" ? "Everyone's claims are up to date!" : "No reimbursement claims match your filter"}
+                description={
+                  statusFilter === "pending"
+                    ? "There are currently no pending expense claims awaiting manager sign-off."
+                    : "Try adjusting your search keyword or resetting the category filter."
+                }
+                action={
+                  statusFilter !== "all" || catFilter !== "all" || q ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setStatusFilter("all");
+                        setCatFilter("all");
+                        setQ("");
+                      }}
+                      className="mt-2"
+                    >
+                      Reset All Filters
+                    </Button>
+                  ) : (
+                    <Button onClick={() => setAddOpen(true)} size="sm" className="mt-2">
+                      <Plus className="mr-2 size-4" /> Claim First Expense
+                    </Button>
+                  )
+                }
+                icon={<Receipt className="size-8 text-muted-foreground" />}
+              />
+            </div>
           ) : (
             <>
-              {/* Pagination ON TOP of Reimbursement Claims */}
               <TablePagination
                 currentPage={page}
                 totalPages={totalPages}
                 totalItems={rows.length}
-                pageSize={5}
+                pageSize={PAGE_SIZE}
                 onPageChange={setPage}
               />
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Claim ID</TableHead>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Category</TableHead>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="w-[110px]">Claim ID</TableHead>
+                      <TableHead>Teammate</TableHead>
+                      <TableHead>Category & Notes</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Submitted Date</TableHead>
+                      <TableHead>Submitted</TableHead>
                       <TableHead>Receipt</TableHead>
-                      <TableHead>Approval Status</TableHead>
+                      <TableHead>Approval</TableHead>
                       <TableHead>Payment</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedRows.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="font-mono text-xs font-semibold text-primary">
-                          {r.id}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{nameOf(r.employeeId)}</div>
-                          <div className="text-xs text-muted-foreground">{r.employeeId}</div>
-                        </TableCell>
-                        <TableCell>{r.category}</TableCell>
-                        <TableCell className="text-right font-medium tabular-nums">
-                          {inr(r.amount)}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {r.submittedDate}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={r.receiptStatus} />
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={r.approvalStatus} />
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={r.paymentStatus} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 px-2"
-                              onClick={() => setViewClaim(r)}
-                              title="View claim"
-                            >
-                              <Eye className="size-3.5" />
-                            </Button>
-                            {r.receiptFileName && (
+                    {paginatedRows.map((r) => {
+                      const empName = nameOf(r.employeeId);
+                      return (
+                        <TableRow key={r.id} className="hover:bg-muted/20 transition-colors">
+                          <TableCell className="font-mono text-xs font-semibold text-primary">
+                            {r.id}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2.5">
+                              <Avatar className="size-7">
+                                <AvatarFallback className="bg-primary/10 text-[0.65rem] font-semibold text-primary">
+                                  {empName.slice(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium text-foreground text-sm">{empName}</div>
+                                <div className="text-[0.7rem] text-muted-foreground">{r.employeeId}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium text-xs">{r.category}</div>
+                            <div className="max-w-[200px] truncate text-[0.75rem] text-muted-foreground">
+                              {r.description}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-display text-sm font-semibold text-foreground tabular-nums">
+                            {inr(r.amount)}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {r.submittedDate}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={r.receiptStatus} />
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={r.approvalStatus} />
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={r.paymentStatus} />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                onClick={() => handleDownloadReceipt(r)}
-                                title="Download receipt"
+                                className="h-8 px-2 focus-visible:ring-2 focus-visible:ring-primary"
+                                onClick={() => setViewClaim(r)}
+                                title="View details"
                               >
-                                <Download className="size-3.5" />
+                                <Eye className="size-3.5" />
                               </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                              {r.receiptFileName && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+                                  onClick={() => handleDownloadReceipt(r)}
+                                  title="View receipt"
+                                >
+                                  <Download className="size-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -478,7 +585,7 @@ function ReimbursementPage() {
                 currentPage={page}
                 totalPages={totalPages}
                 totalItems={rows.length}
-                pageSize={5}
+                pageSize={PAGE_SIZE}
                 onPageChange={setPage}
               />
             </>
@@ -490,29 +597,29 @@ function ReimbursementPage() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Submit Reimbursement Claim</DialogTitle>
+            <DialogTitle>Claim a Business Expense</DialogTitle>
             <DialogDescription>
-              Submit out-of-pocket expenses for corporate review.
+              Submit your out-of-pocket expenses for team approval and quick disbursal.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Category">
+              <Field label="Expense Category">
                 <Select
                   value={form.category}
                   onValueChange={(v) => setForm({ ...form, category: v as ReimbursementCategory })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="focus-visible:ring-2 focus-visible:ring-primary">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Travel">Travel</SelectItem>
-                    <SelectItem value="Food">Food</SelectItem>
-                    <SelectItem value="Medical">Medical</SelectItem>
-                    <SelectItem value="Internet">Internet</SelectItem>
-                    <SelectItem value="Office Supplies">Office Supplies</SelectItem>
-                    <SelectItem value="Training">Training</SelectItem>
+                    <SelectItem value="Travel">Travel & Lodging</SelectItem>
+                    <SelectItem value="Food">Food & Entertainment</SelectItem>
+                    <SelectItem value="Medical">Medical Insurance</SelectItem>
+                    <SelectItem value="Internet">Internet & Telecom</SelectItem>
+                    <SelectItem value="Office Supplies">Hardware & Supplies</SelectItem>
+                    <SelectItem value="Training">Training & Certification</SelectItem>
                     <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
@@ -524,6 +631,7 @@ function ReimbursementPage() {
                   placeholder="e.g. 2500"
                   value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  className="focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </Field>
             </div>
@@ -534,6 +642,7 @@ function ReimbursementPage() {
                   type="date"
                   value={form.submittedDate}
                   onChange={(e) => setForm({ ...form, submittedDate: e.target.value })}
+                  className="focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </Field>
 
@@ -544,37 +653,38 @@ function ReimbursementPage() {
                     setForm({ ...form, paymentMethod: v as ReimbursementClaim["paymentMethod"] })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="focus-visible:ring-2 focus-visible:ring-primary">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                    <SelectItem value="Payroll Cycle">Next Payroll Cycle</SelectItem>
-                    <SelectItem value="UPI">UPI Direct</SelectItem>
+                    <SelectItem value="Bank Transfer">Direct Bank Transfer</SelectItem>
+                    <SelectItem value="Payroll Cycle">Next Salary Cycle</SelectItem>
+                    <SelectItem value="UPI">Instant UPI Direct</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
             </div>
 
-            <Field label="Description & Justification" error={errors["description"]}>
+            <Field label="Business Reason & Context" error={errors["description"]}>
               <Textarea
                 rows={3}
-                placeholder="Reason for expenditure and attendees if food/travel..."
+                placeholder="Explain the work purpose (e.g., Client lunch with team, flight to HQ...)"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="focus-visible:ring-2 focus-visible:ring-primary"
               />
             </Field>
 
-            <Field label="Supporting Attachments (Optional — Max 2 Files)">
+            <Field label="Supporting Receipts (Optional — Max 2 Files)">
               <div className="space-y-2">
                 {attachments.length < 2 && (
-                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-3.5 transition-colors hover:bg-muted/50">
-                    <UploadCloud className="size-5 text-muted-foreground" />
+                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-3.5 transition-colors hover:bg-muted/50 focus-within:ring-2 focus-within:ring-primary">
+                    <UploadCloud className="size-5 text-primary" />
                     <span className="mt-1 text-xs font-medium text-foreground">
-                      Click to choose files (Receipts, Invoices, PDFs, Images)
+                      Attach digital receipts (PDF, Image, Bill)
                     </span>
                     <span className="text-[0.7rem] text-muted-foreground">
-                      {attachments.length === 0 ? "Optional · Up to 2 files" : "1 file attached · Add 1 more"}
+                      {attachments.length === 0 ? "Up to 2 files" : "1 attached · Add 1 more"}
                     </span>
                     <input
                       type="file"
@@ -613,9 +723,6 @@ function ReimbursementPage() {
                     ))}
                   </div>
                 )}
-                <p className="text-[0.68rem] text-muted-foreground">
-                  UI Demonstration: Files are attached locally in session memory without server blob storage.
-                </p>
               </div>
             </Field>
           </div>
@@ -624,7 +731,9 @@ function ReimbursementPage() {
             <Button variant="outline" onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit}>Submit Claim</Button>
+            <Button onClick={handleSubmit} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              Submit Claim
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -644,20 +753,20 @@ function ReimbursementPage() {
             </DialogHeader>
 
             <div className="space-y-4 py-2 text-sm">
-              <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted/40 p-3.5">
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-secondary/30 p-3.5">
                 <div>
-                  <p className="text-xs text-muted-foreground">Category</p>
-                  <p className="font-medium">{viewClaim.category}</p>
+                  <p className="text-xs text-muted-foreground">Expense Category</p>
+                  <p className="font-medium text-foreground">{viewClaim.category}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Claim Amount</p>
-                  <p className="font-display text-base font-semibold text-primary">
+                  <p className="text-xs text-muted-foreground">Total Claimed</p>
+                  <p className="font-display text-base font-bold text-primary">
                     {inr(viewClaim.amount)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Disbursement Mode</p>
-                  <p className="font-medium">{viewClaim.paymentMethod}</p>
+                  <p className="font-medium text-foreground">{viewClaim.paymentMethod}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Payment Status</p>
@@ -669,7 +778,7 @@ function ReimbursementPage() {
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Business Justification
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                <p className="mt-1 text-xs leading-relaxed text-foreground/90">
                   {viewClaim.description}
                 </p>
               </div>
@@ -695,7 +804,7 @@ function ReimbursementPage() {
                           className="h-7 text-xs"
                           onClick={() => setPreviewAttachment(att)}
                         >
-                          <Eye className="mr-1 size-3.5 text-primary" /> View / Open
+                          <Eye className="mr-1 size-3.5 text-primary" /> View Attachment
                         </Button>
                       </div>
                     ))}
@@ -704,9 +813,9 @@ function ReimbursementPage() {
               )}
 
               {canApprove && (
-                <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+                <div className="space-y-2 rounded-xl border border-border bg-card p-3.5 shadow-2xs">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Approver Controls
+                    Manager Sign-off Controls
                   </p>
                   <div className="flex flex-wrap gap-2 pt-1">
                     <Button
@@ -714,7 +823,7 @@ function ReimbursementPage() {
                       className="bg-success text-success-foreground hover:bg-success/90"
                       onClick={() => handleDecision(viewClaim.id, "approved")}
                     >
-                      Approve
+                      <Check className="mr-1 size-3.5" /> Approve Claim
                     </Button>
                     <Button
                       size="sm"
@@ -737,7 +846,7 @@ function ReimbursementPage() {
                           variant="secondary"
                           onClick={() => handleMarkPaid(viewClaim.id)}
                         >
-                          Mark as Paid
+                          Mark Disbursed
                         </Button>
                       )}
                   </div>
@@ -792,6 +901,6 @@ function ReimbursementPage() {
           </DialogContent>
         </Dialog>
       )}
-    </>
+    </div>
   );
 }
