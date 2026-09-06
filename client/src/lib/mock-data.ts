@@ -67,6 +67,10 @@ export interface OnboardingCase {
   accountCreatedDate?: string | undefined;
   completedDate?: string | undefined;
   tasks: OnboardingTask[];
+  hasAsset?: boolean;
+  hasAccounts?: boolean;
+  assignedAssetsCount?: number;
+  provisionedAccountsCount?: number;
 }
 
 export interface OffboardingClearanceItem {
@@ -276,7 +280,7 @@ export type TicketCategory =
   | "Other";
 
 export type TicketPriority = "Low" | "Medium" | "High" | "Critical";
-export type TicketStatus = "Open" | "In Progress" | "Waiting for User" | "Resolved" | "Closed";
+export type TicketStatus = "Open" | "In Progress" | "Waiting for User" | "Resolved" | "Closed" | "Pending" | "Approved" | "Done";
 
 export interface TicketComment {
   id: string;

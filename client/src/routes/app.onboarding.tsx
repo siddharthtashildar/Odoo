@@ -308,11 +308,22 @@ export function OnboardingPage() {
         };
       }
 
-      const assigned = await api.onboarding.allotAsset(allotModalCase.id, payload);
+      const assigned: any = await api.onboarding.allotAsset(allotModalCase.id, payload);
       toast.success(`Asset ${assigned.assetCode} allocated!`, {
         description: `Confirmation email dispatched to ${emp?.email || "employee"}.`,
       });
       log(`Allotted asset ${assigned.assetCode} (${assigned.assetType}) to ${emp?.name || nameOf(allotModalCase.employeeId)}`, "Assets");
+
+      if (assigned?.isCompleted) {
+        patchEmployee(allotModalCase.employeeId, { status: "active" });
+        toast.success(`🎉 Onboarding completed for ${emp?.name || nameOf(allotModalCase.employeeId)}!`, {
+          description: "All 3 criteria satisfied (checklist 100%, hardware asset, and work accounts). Employee is now Active.",
+        });
+        log(`Completed onboarding for ${emp?.name || nameOf(allotModalCase.employeeId)}`, "Onboarding");
+      }
+
+      await refreshSlice("onboarding");
+      await refreshSlice("employees");
 
       if (activeChecklistCaseId === allotModalCase.id) {
         const fresh = await api.onboarding.getAssets(allotModalCase.id);
@@ -342,7 +353,7 @@ export function OnboardingPage() {
         password: s.password,
       }));
 
-      await api.onboarding.createServiceAccounts(provisionModalCase.id, accountsPayload);
+      const res: any = await api.onboarding.createServiceAccounts(provisionModalCase.id, accountsPayload);
       toast.success(`${selected.length} work accounts provisioned!`, {
         description: `Credentials & access setup email dispatched to ${emp?.email || "employee"}.`,
       });
@@ -350,6 +361,17 @@ export function OnboardingPage() {
         `Provisioned ${selected.length} accounts (${selected.map((s) => s.serviceName).join(", ")}) for ${emp?.name || nameOf(provisionModalCase.employeeId)}`,
         "Onboarding",
       );
+
+      if (res?.isCompleted) {
+        patchEmployee(provisionModalCase.employeeId, { status: "active" });
+        toast.success(`🎉 Onboarding completed for ${emp?.name || nameOf(provisionModalCase.employeeId)}!`, {
+          description: "All 3 criteria satisfied (checklist 100%, hardware asset, and work accounts). Employee is now Active.",
+        });
+        log(`Completed onboarding for ${emp?.name || nameOf(provisionModalCase.employeeId)}`, "Onboarding");
+      }
+
+      await refreshSlice("onboarding");
+      await refreshSlice("employees");
 
       if (activeChecklistCaseId === provisionModalCase.id) {
         const fresh = await api.onboarding.getServiceAccounts(provisionModalCase.id);
@@ -436,12 +458,23 @@ export function OnboardingPage() {
     const updatedTasks = caseItem.tasks.map((t) => (t.id === taskId ? { ...t, done: newDone } : t));
     const allDone = updatedTasks.every((t) => t.done);
     if (allDone) {
-      await updateOnboardingStatus(caseId, "Completed");
-      patchEmployee(caseItem.employeeId, { status: "active" });
-      toast.success(`${nameOf(caseItem.employeeId)} completed all onboarding tasks!`, {
-        description: "Employee marked Active across system.",
-      });
-      log(`Completed onboarding for ${nameOf(caseItem.employeeId)}`, "Onboarding");
+      const hasAsset = Boolean(caseItem.hasAsset);
+      const hasAccounts = Boolean(caseItem.hasAccounts);
+      if (hasAsset && hasAccounts) {
+        patchEmployee(caseItem.employeeId, { status: "active" });
+        toast.success(`🎉 ${nameOf(caseItem.employeeId)} completed onboarding!`, {
+          description: "All 3 criteria satisfied (checklist 100%, hardware asset, and work accounts). Employee is now Active.",
+        });
+        log(`Completed onboarding for ${nameOf(caseItem.employeeId)}`, "Onboarding");
+      } else {
+        const pendingItems = [
+          !hasAsset ? "Hardware Asset Allocation" : "",
+          !hasAccounts ? "Work Accounts Provisioning" : "",
+        ].filter(Boolean);
+        toast.info(`Checklist 100% completed for ${nameOf(caseItem.employeeId)}`, {
+          description: `To complete onboarding & activate employee, please fulfill: ${pendingItems.join(" and ")}.`,
+        });
+      }
     }
   };
 
@@ -576,6 +609,7 @@ export function OnboardingPage() {
                     <TableHead>Employee</TableHead>
                     <TableHead>Assigned HR</TableHead>
                     <TableHead>Checklist Progress</TableHead>
+                    <TableHead>Prerequisites</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -597,13 +631,37 @@ export function OnboardingPage() {
                           <div className="text-xs text-muted-foreground">{emp?.email}</div>
                         </TableCell>
                         <TableCell>{c.assignedHr || "HR Operations"}</TableCell>
-                        <TableCell className="w-[180px]">
+                        <TableCell className="w-[170px]">
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs">
                               <span>{doneCount} of {c.tasks.length} tasks</span>
                               <span className="font-medium">{percent}%</span>
                             </div>
                             <Progress value={percent} className="h-1.5" />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1 text-[11px]">
+                            <span
+                              className={`inline-flex items-center gap-1 font-medium ${
+                                c.hasAsset
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-amber-600 dark:text-amber-400"
+                              }`}
+                            >
+                              <Laptop className="size-3 shrink-0" />
+                              {c.hasAsset ? "Asset Allotted" : "Asset Pending"}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-1 font-medium ${
+                                c.hasAccounts
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-amber-600 dark:text-amber-400"
+                              }`}
+                            >
+                              <Layers className="size-3 shrink-0" />
+                              {c.hasAccounts ? "Accounts Ready" : "Creds Pending"}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
@@ -624,26 +682,34 @@ export function OnboardingPage() {
                               <Eye className="size-3.5 mr-1" /> Checklist
                             </Button>
 
-                            {/* Direct 1-click actions when checklist is 100% / Completed */}
-                            {canManage && (percent === 100 || c.status === "Completed") && (
+                            {/* Direct actions for resource allocation & accounts generation */}
+                            {canManage && (
                               <>
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 px-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                                  className={`h-8 px-2 ${
+                                    c.hasAsset
+                                      ? "border-border text-muted-foreground hover:bg-muted/50"
+                                      : "border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 font-medium"
+                                  }`}
                                   onClick={() => openAllotModal(c)}
-                                  title="Allot hardware asset (Laptop, Monitor, etc.)"
+                                  title={c.hasAsset ? "Manage allotted hardware asset" : "Allot hardware asset (Laptop, Monitor, etc.)"}
                                 >
-                                  <Laptop className="size-3.5 mr-1" /> Allot Asset
+                                  <Laptop className="size-3.5 mr-1" /> {c.hasAsset ? "Asset" : "Allot Asset"}
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 px-2 border-primary/30 text-primary hover:bg-primary/10"
+                                  className={`h-8 px-2 ${
+                                    c.hasAccounts
+                                      ? "border-border text-muted-foreground hover:bg-muted/50"
+                                      : "border-primary/30 text-primary hover:bg-primary/10 font-medium"
+                                  }`}
                                   onClick={() => openProvisionModal(c)}
-                                  title="Provision work accounts (GitHub, Slack, etc.)"
+                                  title={c.hasAccounts ? "Manage provisioned work accounts" : "Provision work accounts (GitHub, Slack, etc.)"}
                                 >
-                                  <Layers className="size-3.5 mr-1" /> Accounts
+                                  <Layers className="size-3.5 mr-1" /> {c.hasAccounts ? "Accounts" : "Provision"}
                                 </Button>
                               </>
                             )}
@@ -848,73 +914,150 @@ export function OnboardingPage() {
                 ))}
               </div>
 
-              {/* 100% Checklist Completion: Allot Hardware & Provision Accounts Card */}
+              {/* 3 Prerequisites Tracker: Tasks, Hardware Asset, Work Accounts */}
               {(() => {
                 const doneCount = activeChecklistCase.tasks.filter((t) => t.done).length;
-                const is100 =
-                  (activeChecklistCase.tasks.length > 0 && doneCount === activeChecklistCase.tasks.length) ||
-                  activeChecklistCase.status === "Completed";
+                const isChecklistDone =
+                  activeChecklistCase.tasks.length > 0 && doneCount === activeChecklistCase.tasks.length;
+                const hasAsset = Boolean(activeChecklistCase.hasAsset) || caseAssets.length > 0;
+                const hasAccounts = Boolean(activeChecklistCase.hasAccounts) || caseAccounts.length > 0;
+                const isAllComplete = isChecklistDone && hasAsset && hasAccounts;
 
                 return (
                   <div
-                    className={`mt-4 rounded-xl border p-4 space-y-3 transition-all ${
-                      is100
+                    className={`mt-4 rounded-xl border p-4 space-y-3.5 transition-all ${
+                      isAllComplete
                         ? "bg-gradient-to-br from-emerald-500/10 via-primary/5 to-transparent border-emerald-500/30"
+                        : isChecklistDone
+                        ? "bg-amber-500/5 border-amber-500/30"
                         : "bg-muted/30 border-border"
                     }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                              is100
-                                ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                                : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {is100 ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <ShieldCheck className="size-4 text-primary" /> Onboarding Completion Prerequisites
+                        </span>
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                            isAllComplete
+                              ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                              : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                          }`}
+                        >
+                          {isAllComplete ? (
+                            <>
                               <CheckCircle2 className="size-3 text-emerald-600" />
-                            ) : (
+                              All 3 Complete · Active
+                            </>
+                          ) : (
+                            <>
                               <Clock className="size-3" />
-                            )}
-                            {is100
-                              ? "100% Checklist Complete"
-                              : `${doneCount}/${activeChecklistCase.tasks.length} Completed`}
-                          </span>
-                          {is100 && (
-                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                              <Sparkles className="size-3" /> Ready for Gear &amp; Account Setup
-                            </span>
+                              Prerequisites In Progress
+                            </>
                           )}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {isAllComplete
+                          ? "All 3 prerequisites are fully met! Employee is marked Completed and Active across the system."
+                          : "New employees are only marked Completed and Active after 100% checklist tasks, hardware resource allocation, and work accounts credentials generation."}
+                      </p>
+                    </div>
+
+                    {/* 3 Prerequisite Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {/* 1. Checklist */}
+                      <div className={`p-2.5 rounded-lg border text-xs flex flex-col justify-between gap-1.5 ${
+                        isChecklistDone ? "bg-emerald-500/10 border-emerald-500/30" : "bg-card border-border"
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-foreground flex items-center gap-1">
+                            <CheckCircle2 className={`size-3.5 ${isChecklistDone ? "text-emerald-600" : "text-muted-foreground"}`} />
+                            1. Checklist
+                          </span>
+                          <span className="text-[10px] font-mono font-medium">
+                            {doneCount}/{activeChecklistCase.tasks.length}
+                          </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {is100
-                            ? "HR can now allocate IT hardware and configure corporate developer/collaboration accounts with live email alerts."
-                            : "Complete remaining checklist items to unlock full IT equipment allocation and developer tool provisioning."}
-                        </p>
+                        <span className={`text-[11px] ${isChecklistDone ? "text-emerald-600 font-medium" : "text-muted-foreground"}`}>
+                          {isChecklistDone ? "✓ 100% Completed" : `${activeChecklistCase.tasks.length - doneCount} remaining`}
+                        </span>
                       </div>
 
-                      {is100 && canManage && (
-                        <div className="flex items-center gap-2 shrink-0">
+                      {/* 2. Hardware Asset */}
+                      <div className={`p-2.5 rounded-lg border text-xs flex flex-col justify-between gap-1.5 ${
+                        hasAsset ? "bg-emerald-500/10 border-emerald-500/30" : "bg-card border-border"
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-foreground flex items-center gap-1">
+                            <Laptop className={`size-3.5 ${hasAsset ? "text-emerald-600" : "text-muted-foreground"}`} />
+                            2. IT Asset
+                          </span>
+                          {canManage && !hasAsset && (
+                            <button
+                              type="button"
+                              onClick={() => openAllotModal(activeChecklistCase)}
+                              className="text-[10px] text-primary hover:underline font-medium"
+                            >
+                              + Allot
+                            </button>
+                          )}
+                        </div>
+                        <span className={`text-[11px] ${hasAsset ? "text-emerald-600 font-medium" : "text-amber-600 font-medium"}`}>
+                          {hasAsset ? `✓ ${caseAssets.length || 1} Asset(s) Allocated` : "⏳ Allocation Pending"}
+                        </span>
+                      </div>
+
+                      {/* 3. Work Accounts */}
+                      <div className={`p-2.5 rounded-lg border text-xs flex flex-col justify-between gap-1.5 ${
+                        hasAccounts ? "bg-emerald-500/10 border-emerald-500/30" : "bg-card border-border"
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-foreground flex items-center gap-1">
+                            <Layers className={`size-3.5 ${hasAccounts ? "text-emerald-600" : "text-muted-foreground"}`} />
+                            3. Accounts
+                          </span>
+                          {canManage && !hasAccounts && (
+                            <button
+                              type="button"
+                              onClick={() => openProvisionModal(activeChecklistCase)}
+                              className="text-[10px] text-primary hover:underline font-medium"
+                            >
+                              + Provision
+                            </button>
+                          )}
+                        </div>
+                        <span className={`text-[11px] ${hasAccounts ? "text-emerald-600 font-medium" : "text-amber-600 font-medium"}`}>
+                          {hasAccounts ? `✓ ${caseAccounts.length || 1} Accounts Ready` : "⏳ Creds Pending"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick action buttons if anything pending */}
+                    {canManage && (!hasAsset || !hasAccounts) && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {!hasAsset && (
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 border-primary/30 hover:bg-primary/10 text-primary font-medium"
+                            className="h-7 text-xs border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium"
                             onClick={() => openAllotModal(activeChecklistCase)}
                           >
-                            <Laptop className="size-3.5 mr-1" /> Allot Asset
+                            <Laptop className="size-3 mr-1" /> Allot Hardware Asset
                           </Button>
+                        )}
+                        {!hasAccounts && (
                           <Button
                             size="sm"
-                            className="h-8 bg-primary text-primary-foreground font-medium shadow-xs"
+                            className="h-7 text-xs bg-primary text-primary-foreground font-medium shadow-xs"
                             onClick={() => openProvisionModal(activeChecklistCase)}
                           >
-                            <Layers className="size-3.5 mr-1" /> Provision Accounts
+                            <Layers className="size-3 mr-1" /> Provision Work Accounts
                           </Button>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Display Currently Allotted Assets */}
                     {caseAssets.length > 0 && (
