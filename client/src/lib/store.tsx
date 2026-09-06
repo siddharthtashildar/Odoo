@@ -127,6 +127,7 @@ interface Store extends State {
     completeOffboarding?: boolean;
   }) => Promise<void>;
   updateOffboardingClearanceTask: (processId: string, taskId: string, cleared: boolean) => Promise<void>;
+  refreshSlice: (key: keyof State) => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -820,6 +821,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (assignedHr) data.assignedHr = assignedHr;
       if (buddy) data.buddy = buddy;
       await api.onboarding.create(data);
+      await refreshSlice("employees");
+      await refreshSlice("onboarding");
       const fresh = await api.onboarding.list();
       if (Array.isArray(fresh)) {
         setState((s) => ({ ...s, onboarding: fresh as OnboardingCase[] }));
@@ -829,7 +832,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.warn("[store] addOnboardingCase error:", err);
     }
     return null;
-  }, []);
+  }, [refreshSlice]);
 
   const updateOnboardingTask = useCallback(async (processId: string, taskId: string, done: boolean): Promise<void> => {
     // Optimistic update
@@ -1067,6 +1070,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addOffboardingCase,
       patchOffboardingCase,
       updateOffboardingClearanceTask,
+      refreshSlice,
     }),
     [
       state,
@@ -1102,6 +1106,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addOffboardingCase,
       patchOffboardingCase,
       updateOffboardingClearanceTask,
+      refreshSlice,
     ],
   );
 

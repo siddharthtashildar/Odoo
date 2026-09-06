@@ -118,10 +118,22 @@ function AssetRequestsPage() {
     return assets.filter(isAssetAvailable);
   }, [assets]);
 
-  const moveStatus = (id: string, status: AssetRequest["status"]) => {
-    updateAssetRequest(id, { status });
-    log(`Moved request ${id} to ${status.replace(/_/g, " ")}`, "Assets");
-    toast.success(`Request marked ${status.replace(/_/g, " ")}`);
+  const moveStatus = async (id: string, status: AssetRequest["status"]) => {
+    try {
+      await updateAssetRequest(id, { status });
+      const statusLabels: Record<string, string> = {
+        open: "Pending",
+        pending: "Pending",
+        in_progress: "Under Review",
+        resolved: "Completed / Done",
+        completed: "Completed / Done",
+        rejected: "Closed / Rejected",
+      };
+      log(`Updated request ${id} to ${statusLabels[status] || status}`, "Assets");
+      toast.success(`Request marked ${statusLabels[status] || status}`);
+    } catch (e: any) {
+      toast.error("Failed to update status", { description: e?.message });
+    }
   };
 
   const handleOpenFulfill = (request: AssetRequest) => {
@@ -335,58 +347,41 @@ function AssetRequestsPage() {
                         </TableCell>
                         {isIt && (
                           <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {r.status === "open" && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 text-xs"
-                                    onClick={() => moveStatus(r.id, "in_progress")}
-                                  >
-                                    Review
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="h-8 text-xs"
-                                    onClick={() => handleOpenFulfill(r)}
-                                  >
-                                    Fulfill & Assign
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-8 text-xs text-destructive hover:text-destructive"
-                                    onClick={() => moveStatus(r.id, "resolved")}
-                                    title="Reject request"
-                                  >
-                                    <XCircle className="size-3.5" />
-                                  </Button>
-                                </>
-                              )}
-                              {r.status === "in_progress" && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    className="h-8 text-xs bg-primary"
-                                    onClick={() => handleOpenFulfill(r)}
-                                  >
-                                    Assign & Fulfill
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 text-xs"
-                                    onClick={() => moveStatus(r.id, "resolved")}
-                                  >
-                                    Close
-                                  </Button>
-                                </>
-                              )}
-                              {r.status === "resolved" && (
-                                <span className="text-xs text-emerald-600 font-medium inline-flex items-center gap-1">
-                                  <CheckCircle2 className="size-3.5" /> Fulfilled
-                                </span>
+                            <div className="flex items-center justify-end gap-2">
+                              {/* HR quick status dropdown */}
+                              <Select
+                                value={
+                                  r.status === "open" || r.status === "pending"
+                                    ? "open"
+                                    : r.status === "in_progress"
+                                      ? "in_progress"
+                                      : r.status === "resolved" || r.status === "completed"
+                                        ? "resolved"
+                                        : "rejected"
+                                }
+                                onValueChange={(val) => moveStatus(r.id, val as AssetRequest["status"])}
+                              >
+                                <SelectTrigger className="h-8 w-[135px] text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="open">Pending</SelectItem>
+                                  <SelectItem value="in_progress">Under Review</SelectItem>
+                                  <SelectItem value="resolved">Done / Completed</SelectItem>
+                                  <SelectItem value="rejected">Closed / Rejected</SelectItem>
+                                </SelectContent>
+                              </Select>
+
+                              {/* Direct Fulfill & Assign modal trigger */}
+                              {r.status !== "resolved" && r.status !== "completed" && (
+                                <Button
+                                  size="sm"
+                                  className="h-8 text-xs bg-primary"
+                                  onClick={() => handleOpenFulfill(r)}
+                                  title="Fulfill and allocate physical asset from inventory"
+                                >
+                                  Fulfill &amp; Assign
+                                </Button>
                               )}
                             </div>
                           </TableCell>
