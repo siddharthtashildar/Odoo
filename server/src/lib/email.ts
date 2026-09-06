@@ -702,6 +702,89 @@ export async function sendOffboardingCompletionEmail(payload: OffboardingComplet
   });
 }
 
+// ── Asset Request Status Email Alert ──────────────────────────────────────────
+export interface AssetRequestStatusPayload {
+  to: string;
+  employeeName: string;
+  item: string;
+  status: "approved" | "fulfilled" | "rejected" | "pending";
+  assignedAssetCode?: string | undefined;
+  assignedAssetName?: string | undefined;
+  note?: string | undefined;
+}
+
+export async function sendAssetRequestStatusEmail(payload: AssetRequestStatusPayload) {
+  const { to, employeeName, item, status, assignedAssetCode, assignedAssetName, note } = payload;
+  const isFulfilled = status === "fulfilled";
+  const isApproved = status === "approved";
+  const isPending = status === "pending";
+  const statusLabel = isFulfilled ? "Completed / Fulfilled" : isApproved ? "Approved / In Review" : isPending ? "Pending Review" : "Closed / Rejected";
+  const badgeBg = isFulfilled ? "#dcfce7" : isApproved ? "#dbeafe" : isPending ? "#fef3c7" : "#fee2e2";
+  const badgeColor = isFulfilled ? "#15803d" : isApproved ? "#1e40af" : isPending ? "#b45309" : "#b91c1c";
+  const headerGradient = isFulfilled
+    ? "linear-gradient(135deg, #16a34a 0%, #15803d 100%)"
+    : isApproved
+    ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)"
+    : isPending
+    ? "linear-gradient(135deg, #d97706 0%, #b45309 100%)"
+    : "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
+        .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+        .header { background: ${headerGradient}; padding: 28px 24px; color: #ffffff; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .header p { margin: 4px 0 0; opacity: 0.9; font-size: 13px; }
+        .content { padding: 24px; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-weight: 700; font-size: 12px; text-transform: uppercase; background: ${badgeBg}; color: ${badgeColor}; margin-bottom: 16px; }
+        .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0; }
+        .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+        .footer { padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Asset Request Status Update</h1>
+          <p>PeoplePay360 IT &amp; HR Hardware Operations</p>
+        </div>
+        <div class="content">
+          <span class="badge">${statusLabel}</span>
+          <p>Hi <strong>${employeeName}</strong>,</p>
+          <p>Your equipment/license request has been reviewed by HR &amp; IT operations:</p>
+
+          <div class="card">
+            <div class="row"><span>Requested Item:</span> <strong>${item}</strong></div>
+            <div class="row"><span>Current Status:</span> <strong style="color: ${badgeColor};">${statusLabel}</strong></div>
+            ${assignedAssetCode ? `<div class="row"><span>Assigned Inventory:</span> <strong style="color: #0284c7; font-family: monospace;">${assignedAssetName || ""} (${assignedAssetCode})</strong></div>` : ""}
+            ${note ? `<div class="row"><span>Review Note:</span> <span>${note}</span></div>` : ""}
+          </div>
+
+          <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
+            ${isFulfilled ? "Your equipment is ready or has been assigned. Please coordinate with IT for physical handover or license access." : isApproved ? "Your request has been approved and is being sourced by IT operations." : isPending ? "Your request has been placed in the review queue." : "Your request has been closed or rejected. Please contact HR or IT if you have any questions."}
+          </p>
+        </div>
+        <div class="footer">
+          PeoplePay360 IT Asset Management &bull; Automated notification
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return dispatchGenericEmail({
+    to,
+    subject: `Asset Request Update: ${item} — ${statusLabel}`,
+    html,
+    employeeName,
+  });
+}
+
 // ── Reimbursement Status Email Alert ──────────────────────────────────────────
 export interface ReimbursementStatusPayload {
   to: string;

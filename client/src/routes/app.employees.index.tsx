@@ -403,11 +403,6 @@ function EmployeesPage() {
                 <Mail className="mr-2 size-4" /> Dispatched Emails
               </Button>
             )}
-            {canEdit && (
-              <Button onClick={() => setAddOpen(true)}>
-                <Plus className="mr-2 size-4" /> Add employee
-              </Button>
-            )}
           </div>
         }
       />

@@ -266,6 +266,10 @@ router.post("/", async (req, res) => {
           where: { id: betterUser.id },
           data: { employeeId: employee.id, role },
         });
+        await prisma.account.updateMany({
+          where: { userId: betterUser.id },
+          data: { password: passwordHash },
+        });
       } else {
         const newUserId = crypto.randomUUID();
         betterUser = await prisma.user.create({
@@ -310,6 +314,45 @@ router.post("/", async (req, res) => {
         emailDispatched: emailResult.success,
         previewUrl: emailResult.previewUrl,
       };
+    }
+
+    // 9. Automatically Create Onboarding Process & Default Checklist in PostgreSQL
+    const defaultTasks = [
+      { task_name: "Complete personal profile", responsible_department: "Employee", sequence: 1 },
+      { task_name: "Add emergency contact", responsible_department: "Employee", sequence: 2 },
+      { task_name: "Accept company policies", responsible_department: "HR", sequence: 3 },
+      { task_name: "Complete bank details", responsible_department: "Finance", sequence: 4 },
+      { task_name: "Complete tax information", responsible_department: "Finance", sequence: 5 },
+      { task_name: "Review contract", responsible_department: "HR", sequence: 6 },
+      { task_name: "Attend orientation", responsible_department: "HR", sequence: 7 },
+      { task_name: "Receive company assets", responsible_department: "IT", sequence: 8 },
+    ];
+
+    try {
+      const mgrName = managerId
+        ? (await prisma.employees.findUnique({ where: { id: managerId }, select: { full_name: true } }))?.full_name || "Reporting Manager"
+        : "HR Manager";
+
+      await prisma.onboarding_processes.upsert({
+        where: { employee_id: employee.id },
+        create: {
+          employee_id: employee.id,
+          status: "in_progress",
+          assigned_hr: "HR Operations",
+          buddy: mgrName,
+          onboarding_tasks: {
+            create: defaultTasks.map((t) => ({
+              task_name: t.task_name,
+              responsible_department: t.responsible_department,
+              sequence: t.sequence,
+              status: "not_started",
+            })),
+          },
+        },
+        update: {},
+      });
+    } catch (onbErr) {
+      console.warn("Auto-create onboarding process warning:", onbErr);
     }
 
     res.status(201).json({

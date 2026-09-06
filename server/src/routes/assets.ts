@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { resolveEmployee } from "../lib/resolve-employee";
-import { sendAssetAllotmentEmail } from "../lib/email";
+import { sendAssetAllotmentEmail, sendAssetRequestStatusEmail } from "../lib/email";
 
 const router = Router();
 
@@ -364,21 +364,23 @@ router.post("/requests", async (req, res) => {
 // PATCH /api/assets/requests/:id
 router.patch("/requests/:id", async (req, res) => {
   try {
-    const { status, fulfilledAssetId } = req.body as { status: string; fulfilledAssetId?: string };
+    const { status, fulfilledAssetId, note } = req.body as { status: string; fulfilledAssetId?: string; note?: string };
 
+    const s = String(status || "").toLowerCase().trim();
     const normStatus =
-      status === "approved" || status === "in_progress"
+      s === "approved" || s === "in_progress" || s === "review"
         ? "approved"
-        : status === "fulfilled" || status === "resolved"
+        : s === "fulfilled" || s === "resolved" || s === "completed" || s === "done"
           ? "fulfilled"
-          : status === "rejected"
+          : s === "rejected" || s === "closed" || s === "close" || s === "cancelled"
             ? "rejected"
-            : status === "cancelled"
-              ? "rejected"
-              : "pending";
+            : "pending";
 
     const existing = await prisma.asset_requests.findUnique({
       where: { id: req.params.id },
+      include: {
+        employees: { select: { id: true, full_name: true, email: true } },
+      },
     });
 
     if (!existing) {
@@ -392,11 +394,15 @@ router.patch("/requests/:id", async (req, res) => {
         ...(fulfilledAssetId && { fulfilled_asset_id: fulfilledAssetId }),
         resolved_at: normStatus === "fulfilled" || normStatus === "rejected" ? new Date() : null,
       },
+      include: {
+        assets: { select: { asset_code: true, asset_type: true } },
+      },
     });
 
     // If an asset was assigned upon fulfillment, update the asset inventory record and log assignment
+    let assignedAssetInfo: { asset_code: string; asset_type: string } | null = updated.assets;
     if ((normStatus === "fulfilled" || fulfilledAssetId) && fulfilledAssetId) {
-      await prisma.assets.update({
+      const assignedAsset = await prisma.assets.update({
         where: { id: fulfilledAssetId },
         data: {
           status: "assigned",
@@ -404,6 +410,7 @@ router.patch("/requests/:id", async (req, res) => {
           updated_at: new Date(),
         },
       });
+      assignedAssetInfo = { asset_code: assignedAsset.asset_code, asset_type: assignedAsset.asset_type };
 
       await prisma.asset_assignments.create({
         data: {
@@ -415,7 +422,20 @@ router.patch("/requests/:id", async (req, res) => {
       });
     }
 
-    res.json({ success: true, data: { id: updated.id } });
+    // Send real email notification to the employee
+    if (existing.employees?.email) {
+      sendAssetRequestStatusEmail({
+        to: existing.employees.email,
+        employeeName: existing.employees.full_name,
+        item: existing.asset_type_requested,
+        status: normStatus,
+        assignedAssetCode: assignedAssetInfo?.asset_code,
+        assignedAssetName: assignedAssetInfo?.asset_type,
+        note,
+      }).catch((e) => console.warn("Asset request status email error:", e));
+    }
+
+    res.json({ success: true, data: { id: updated.id, status: normStatus } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: "Failed to update asset request" });

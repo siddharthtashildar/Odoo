@@ -249,7 +249,7 @@ export interface Asset {
   history?: AssetHistoryItem[];
 }
 
-export type RequestStatus = "open" | "in_progress" | "resolved";
+export type RequestStatus = "open" | "in_progress" | "resolved" | "rejected" | "pending" | "completed";
 export interface AssetRequest {
   id: string;
   employeeId: string;

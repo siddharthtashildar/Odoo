@@ -95,9 +95,12 @@ export function OnboardingPage() {
     addOnboardingCase,
     updateOnboardingTask,
     updateOnboardingStatus,
+    refreshSlice,
   } = useApp();
   const nameOf = useEmployeeName();
   const ready = useDelayed();
+
+  const [pipelineFilter, setPipelineFilter] = useState<"active" | "completed" | "all">("active");
 
   const [hireOpen, setHireOpen] = useState(false);
   const [hireForm, setHireForm] = useState(emptyHireForm);
@@ -367,6 +370,12 @@ export function OnboardingPage() {
   const invitationSentCases = onboarding.filter((c) => c.status === "Invitation Sent").length;
   const completedCases = onboarding.filter((c) => c.status === "Completed").length;
   const overdueCases = onboarding.filter((c) => c.status === "Overdue").length;
+  const activeCases = onboarding.filter((c) => c.status !== "Completed");
+  const filteredCases: OnboardingCase[] = onboarding.filter((c) => {
+    if (pipelineFilter === "active") return c.status !== "Completed";
+    if (pipelineFilter === "completed") return c.status === "Completed";
+    return true;
+  });
 
   const handleCreateNewHire = async () => {
     const next: Record<string, string | undefined> = {};
@@ -395,8 +404,10 @@ export function OnboardingPage() {
         status: "onboarding",
       });
 
-      // 2. Create onboarding case in DB
+      // 2. Create onboarding case in DB & refresh store slices
       await addOnboardingCase(created.id, "HR Operations", hireForm.manager);
+      await refreshSlice("employees");
+      await refreshSlice("onboarding");
 
       log(`Created employee account for ${created.name} & dispatched credentials email`, "Onboarding");
       toast.success("Employee created & credentials dispatched", {
@@ -506,21 +517,54 @@ export function OnboardingPage() {
 
       {/* Main Onboarding Cases Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Onboarding Pipeline ({onboarding.length})</CardTitle>
-          <CardDescription>
-            Monitor employee invitation status, checklist progress, and completion deadlines
-          </CardDescription>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <CardTitle>
+              {pipelineFilter === "active" ? `Active Onboarding Pipeline (${activeCases.length})` : pipelineFilter === "completed" ? `Completed Onboardings (${completedCases})` : `All Onboarding Cases (${totalCases})`}
+            </CardTitle>
+            <CardDescription>
+              {pipelineFilter === "active" ? "Pending and in-progress new hire activations awaiting checklist completion" : "Archived records of successfully onboarded personnel"}
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border border-border p-1 bg-muted/30 self-start sm:self-auto">
+            <Button
+              type="button"
+              size="sm"
+              variant={pipelineFilter === "active" ? "secondary" : "ghost"}
+              className="h-7 text-xs px-2.5 font-medium"
+              onClick={() => setPipelineFilter("active")}
+            >
+              Active ({activeCases.length})
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={pipelineFilter === "completed" ? "secondary" : "ghost"}
+              className="h-7 text-xs px-2.5 font-medium"
+              onClick={() => setPipelineFilter("completed")}
+            >
+              Completed ({completedCases})
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={pipelineFilter === "all" ? "secondary" : "ghost"}
+              className="h-7 text-xs px-2.5 font-medium"
+              onClick={() => setPipelineFilter("all")}
+            >
+              All ({totalCases})
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {!ready ? (
             <div className="p-4">
               <TableSkeleton rows={4} />
             </div>
-          ) : onboarding.length === 0 ? (
+          ) : filteredCases.length === 0 ? (
             <EmptyState
-              title="No onboarding cases"
-              description="Click 'Create Employee Account' to register a new hire and dispatch credentials."
+              title={pipelineFilter === "active" ? "No active onboarding cases" : "No cases in this view"}
+              description={pipelineFilter === "active" ? "All current new hires have completed onboarding. Click 'Create Employee Account' to register a new hire." : "Switch filters to view active cases."}
               icon={<UserPlus className="size-8" />}
             />
           ) : (
@@ -538,7 +582,7 @@ export function OnboardingPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {onboarding.map((c) => {
+                  {filteredCases.map((c) => {
                     const emp = employees.find((e) => e.id === c.employeeId || e.code === c.employeeCode);
                     const doneCount = c.tasks.filter((t) => t.done).length;
                     const percent = c.tasks.length > 0 ? Math.round((doneCount / c.tasks.length) * 100) : 0;
