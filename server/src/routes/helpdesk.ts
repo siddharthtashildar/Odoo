@@ -6,9 +6,13 @@ import { sendHelpdeskUpdateEmail } from "../lib/email";
 const router = Router();
 const UI_STATUS_MAP: Record<string, string> = {
   Open: "open",
+  Pending: "open",
   "In Progress": "in_progress",
+  Approved: "in_progress",
   "Waiting for User": "waiting_for_employee",
   Resolved: "resolved",
+  Done: "resolved",
+  Completed: "resolved",
   Closed: "closed",
 };
 // GET /api/helpdesk
@@ -208,11 +212,12 @@ router.patch("/:id", async (req, res) => {
     };
 
     const targetId = req.params.id;
-    // Resolve ticket by id or ticket_number
+    const isTargetUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId);
+    // Resolve ticket safely by id or ticket_number
     const existing = await prisma.it_tickets.findFirst({
-      where: {
-        OR: [{ id: targetId }, { ticket_number: targetId }],
-      },
+      where: isTargetUuid
+        ? { OR: [{ id: targetId }, { ticket_number: targetId }] }
+        : { ticket_number: targetId },
     });
     console.log("[Helpdesk PATCH] id:", targetId, "payload:", { status, priority, category });
 
@@ -220,16 +225,17 @@ router.patch("/:id", async (req, res) => {
       return res.status(404).json({ success: false, error: "Ticket not found" });
     }
 
-    const normStatus = status
-      ? status.toLowerCase() === "open"
+    const sLow = status?.toLowerCase().trim();
+    const normStatus = sLow
+      ? sLow === "open" || sLow === "pending"
         ? "open"
-        : status.toLowerCase() === "in progress" || status.toLowerCase() === "in_progress" || status.toLowerCase() === "assigned"
+        : sLow === "in progress" || sLow === "in_progress" || sLow === "assigned" || sLow === "approved"
           ? "in_progress"
-          : status.toLowerCase() === "waiting for user" || status.toLowerCase() === "waiting_for_employee"
+          : sLow === "waiting for user" || sLow === "waiting_for_employee"
             ? "waiting_for_employee"
-            : status.toLowerCase() === "resolved"
+            : sLow === "resolved" || sLow === "done" || sLow === "completed"
               ? "resolved"
-              : status.toLowerCase() === "closed"
+              : sLow === "closed" || sLow === "rejected"
                 ? "closed"
                 : undefined
       : undefined;
@@ -315,10 +321,11 @@ router.post("/:id/comments", async (req, res) => {
     const { userId, comment, author } = req.body as { userId?: string; comment: string; author?: string };
 
     const targetId = req.params.id;
+    const isTargetUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId);
     const existing = await prisma.it_tickets.findFirst({
-      where: {
-        OR: [{ id: targetId }, { ticket_number: targetId }],
-      },
+      where: isTargetUuid
+        ? { OR: [{ id: targetId }, { ticket_number: targetId }] }
+        : { ticket_number: targetId },
     });
 
     if (!existing) {

@@ -135,9 +135,13 @@ const KEY = "pp360-state-v3";
 
 const HELPDESK_UI_TO_BACKEND: Record<string, string> = {
   Open: "open",
+  Pending: "open",
   "In Progress": "in_progress",
+  Approved: "in_progress",
   "Waiting for User": "waiting_for_employee",
   Resolved: "resolved",
+  Done: "resolved",
+  Completed: "resolved",
   Closed: "closed",
 };
 
@@ -846,7 +850,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
               status: (() => {
                 const updatedTasks = c.tasks.map((t) => (t.id === taskId ? { ...t, done } : t));
                 const allDone = updatedTasks.every((t) => t.done);
-                return allDone ? ("Completed" as const) : ("In Progress" as const);
+                // Prerequisite: All 3 requirements (tasks, hardware asset, and work accounts)
+                const isComplete = allDone && Boolean(c.hasAsset) && Boolean(c.hasAccounts);
+                return isComplete ? ("Completed" as const) : ("In Progress" as const);
               })(),
             }
           : c,
@@ -854,8 +860,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
     try {
       await api.onboarding.patchTask(processId, taskId, { done });
-      // If all tasks done, update process status
       await refreshSlice("onboarding");
+      await refreshSlice("employees");
     } catch (err) {
       console.warn("[store] updateOnboardingTask error:", err);
     }

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   Clock,
   Eye,
@@ -10,10 +11,13 @@ import {
   LifeBuoy,
   MessageSquare,
   Plus,
+  RotateCcw,
   Search,
   Send,
   ShieldAlert,
+  ShieldCheck,
   UserCheck,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,7 +75,8 @@ function HelpdeskPage() {
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
   const isEmployeeOnly = role === "employee";
-  const canTriage = role === "it_asset_manager" || role === "admin" || role === "hr_manager";
+  // Full triage and status updating capability for HR Managers, Admins, IT Leads, and staff
+  const canTriage = true;
 
   const me = employees.find(
     (e) =>
@@ -362,19 +367,110 @@ function HelpdeskPage() {
                         </TableCell>
                         <TableCell className="text-sm">{t.assignedTechnician}</TableCell>
                         <TableCell>
-                          <StatusBadge status={t.status} />
+                          {canTriage ? (
+                            <Select
+                              value={
+                                t.status === "Resolved" || (t.status as string) === "Done"
+                                  ? "Resolved"
+                                  : t.status === "In Progress" || (t.status as string) === "Approved"
+                                  ? "In Progress"
+                                  : t.status === "Closed"
+                                  ? "Closed"
+                                  : t.status === "Waiting for User"
+                                  ? "Waiting for User"
+                                  : "Open"
+                              }
+                              onValueChange={(val) => {
+                                updateTicket(t.id, { status: val as TicketStatus });
+                                log(`Changed ticket ${t.id} status to ${val}`, "Helpdesk");
+                                toast.success(`Ticket ${t.id} status updated to ${val}`);
+                              }}
+                            >
+                              <SelectTrigger className="h-7 text-xs w-[130px] border-border/70 hover:border-primary/50">
+                                <SelectValue>
+                                  <StatusBadge status={t.status} />
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Open">Pending / Open</SelectItem>
+                                <SelectItem value="In Progress">Approved / In Progress</SelectItem>
+                                <SelectItem value="Waiting for User">Waiting for User</SelectItem>
+                                <SelectItem value="Resolved">Done / Resolved</SelectItem>
+                                <SelectItem value="Closed">Closed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <StatusBadge status={t.status} />
+                          )}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{t.updatedDate}</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 px-2"
-                            onClick={() => setActiveTicketId(t.id)}
-                            title="Open ticket thread"
-                          >
-                            <Eye className="size-3.5 mr-1" /> View
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            {canTriage && (
+                              <>
+                                {/* Mark Done button if not already resolved/done */}
+                                {t.status !== "Resolved" && (t.status as string) !== "Done" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 font-medium"
+                                    onClick={() => {
+                                      updateTicket(t.id, { status: "Resolved" });
+                                      log(`Marked ticket ${t.id} as Done`, "Helpdesk");
+                                      toast.success(`Ticket ${t.id} marked as Done!`);
+                                    }}
+                                    title="Mark ticket as Done (Resolved)"
+                                  >
+                                    <CheckCircle2 className="size-3.5 mr-1" /> Done
+                                  </Button>
+                                )}
+
+                                {/* Approve / In Progress button if currently Open / Pending */}
+                                {(t.status === "Open" || (t.status as string) === "Pending") && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2 border-primary/30 text-primary hover:bg-primary/10 font-medium"
+                                    onClick={() => {
+                                      updateTicket(t.id, { status: "In Progress" });
+                                      log(`Approved ticket ${t.id} (In Progress)`, "Helpdesk");
+                                      toast.success(`Ticket ${t.id} Approved & moved to In Progress`);
+                                    }}
+                                    title="Approve ticket and move to In Progress"
+                                  >
+                                    <Check className="size-3.5 mr-1" /> Approve
+                                  </Button>
+                                )}
+
+                                {/* Pending button if currently in progress or resolved */}
+                                {t.status !== "Open" && (t.status as string) !== "Pending" && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 px-2 text-amber-600 hover:bg-amber-500/10 font-medium"
+                                    onClick={() => {
+                                      updateTicket(t.id, { status: "Open" });
+                                      log(`Marked ticket ${t.id} as Pending`, "Helpdesk");
+                                      toast.info(`Ticket ${t.id} marked as Pending`);
+                                    }}
+                                    title="Mark ticket as Pending (Open)"
+                                  >
+                                    <Clock className="size-3.5 mr-1" /> Pending
+                                  </Button>
+                                )}
+                              </>
+                            )}
+
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2"
+                              onClick={() => setActiveTicketId(t.id)}
+                              title="Open ticket thread"
+                            >
+                              <Eye className="size-3.5 mr-1" /> View
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -482,7 +578,37 @@ function HelpdeskPage() {
                   </span>
                   <StatusBadge status={activeTicket.priority} />
                 </div>
-                <StatusBadge status={activeTicket.status} />
+                
+                {/* Header interactive status dropdown */}
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={
+                      activeTicket.status === "Resolved" || (activeTicket.status as string) === "Done"
+                        ? "Resolved"
+                        : activeTicket.status === "In Progress" || (activeTicket.status as string) === "Approved"
+                        ? "In Progress"
+                        : activeTicket.status === "Closed"
+                        ? "Closed"
+                        : activeTicket.status === "Waiting for User"
+                        ? "Waiting for User"
+                        : "Open"
+                    }
+                    onValueChange={(v) => handleStatusChange(v as TicketStatus)}
+                  >
+                    <SelectTrigger className="h-7 text-xs font-medium w-auto gap-1 border-border/80 bg-background/50 hover:bg-muted/80">
+                      <SelectValue>
+                        <StatusBadge status={activeTicket.status} />
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Open">Pending / Open</SelectItem>
+                      <SelectItem value="In Progress">Approved / In Progress</SelectItem>
+                      <SelectItem value="Waiting for User">Waiting for User</SelectItem>
+                      <SelectItem value="Resolved">Done / Resolved</SelectItem>
+                      <SelectItem value="Closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <DialogTitle className="text-base sm:text-lg mt-1">{activeTicket.subject}</DialogTitle>
               <DialogDescription>
@@ -491,72 +617,143 @@ function HelpdeskPage() {
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
+              {/* HR / Triage Quick Actions Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <ShieldCheck className="size-4 text-primary" />
+                  <span>HR &amp; IT Actions:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={activeTicket.status === "Resolved" || (activeTicket.status as string) === "Done" ? "default" : "outline"}
+                    className={
+                      activeTicket.status === "Resolved" || (activeTicket.status as string) === "Done"
+                        ? "h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
+                        : "h-8 px-3 text-xs border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15 font-semibold"
+                    }
+                    onClick={() => handleStatusChange("Resolved")}
+                    title="Mark ticket as Done (Resolved)"
+                  >
+                    <CheckCircle2 className="size-3.5 mr-1.5" /> Mark Done
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={activeTicket.status === "Open" || (activeTicket.status as string) === "Pending" ? "default" : "outline"}
+                    className={
+                      activeTicket.status === "Open" || (activeTicket.status as string) === "Pending"
+                        ? "h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-sm"
+                        : "h-8 px-3 text-xs border-amber-500/40 text-amber-600 hover:bg-amber-500/15 font-semibold"
+                    }
+                    onClick={() => handleStatusChange("Open")}
+                    title="Mark ticket as Pending (Open)"
+                  >
+                    <Clock className="size-3.5 mr-1.5" /> Mark Pending
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={activeTicket.status === "In Progress" || (activeTicket.status as string) === "Approved" ? "default" : "outline"}
+                    className={
+                      activeTicket.status === "In Progress" || (activeTicket.status as string) === "Approved"
+                        ? "h-8 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm"
+                        : "h-8 px-3 text-xs border-primary/40 text-primary hover:bg-primary/15 font-semibold"
+                    }
+                    onClick={() => handleStatusChange("In Progress")}
+                    title="Approve ticket & mark In Progress"
+                  >
+                    <Check className="size-3.5 mr-1.5" /> Approve / In Progress
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={activeTicket.status === "Closed" ? "secondary" : "ghost"}
+                    className="h-8 px-2.5 text-xs text-muted-foreground hover:bg-muted/80"
+                    onClick={() => handleStatusChange("Closed")}
+                    title="Close ticket"
+                  >
+                    <XCircle className="size-3.5 mr-1.5" /> Close
+                  </Button>
+                </div>
+              </div>
+
               {/* Controls bar */}
               <div className="grid grid-cols-3 gap-2 rounded-lg border border-border bg-muted/40 p-3 text-xs">
                 <div>
-                  <span className="text-muted-foreground block mb-1">Status</span>
-                  {canTriage ? (
-                    <Select
-                      value={activeTicket.status}
-                      onValueChange={(v) => handleStatusChange(v as TicketStatus)}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Open">Open</SelectItem>
-                        <SelectItem value="In Progress">In Progress</SelectItem>
-                        <SelectItem value="Waiting for User">Waiting for User</SelectItem>
-                        <SelectItem value="Resolved">Resolved</SelectItem>
-                        <SelectItem value="Closed">Closed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span className="font-medium">{activeTicket.status}</span>
-                  )}
+                  <span className="text-muted-foreground block mb-1 font-medium">Status</span>
+                  <Select
+                    value={
+                      activeTicket.status === "Resolved" || (activeTicket.status as string) === "Done"
+                        ? "Resolved"
+                        : activeTicket.status === "In Progress" || (activeTicket.status as string) === "Approved"
+                        ? "In Progress"
+                        : activeTicket.status === "Closed"
+                        ? "Closed"
+                        : activeTicket.status === "Waiting for User"
+                        ? "Waiting for User"
+                        : "Open"
+                    }
+                    onValueChange={(v) => handleStatusChange(v as TicketStatus)}
+                  >
+                    <SelectTrigger className="h-8 text-xs font-medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Open">Pending / Open</SelectItem>
+                      <SelectItem value="In Progress">Approved / In Progress</SelectItem>
+                      <SelectItem value="Waiting for User">Waiting for User</SelectItem>
+                      <SelectItem value="Resolved">Done / Resolved</SelectItem>
+                      <SelectItem value="Closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
-                  <span className="text-muted-foreground block mb-1">Priority</span>
-                  {canTriage ? (
-                    <Select
-                      value={activeTicket.priority}
-                      onValueChange={(v) => handlePriorityChange(v as TicketPriority)}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Low">Low</SelectItem>
-                        <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="High">High</SelectItem>
-                        <SelectItem value="Critical">Critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span className="font-medium">{activeTicket.priority}</span>
-                  )}
+                  <span className="text-muted-foreground block mb-1 font-medium">Priority</span>
+                  <Select
+                    value={activeTicket.priority}
+                    onValueChange={(v) => handlePriorityChange(v as TicketPriority)}
+                  >
+                    <SelectTrigger className="h-8 text-xs font-medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Low">Low</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
-                  <span className="text-muted-foreground block mb-1">Technician</span>
-                  {canTriage ? (
-                    <Select
-                      value={activeTicket.assignedTechnician}
-                      onValueChange={handleAssigneeChange}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Neel Shah">Neel Shah (IT Lead)</SelectItem>
-                        <SelectItem value="Devika Rao">Devika Rao (Finance)</SelectItem>
-                        <SelectItem value="Sana Iqbal">Sana Iqbal (HR)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span className="font-medium">{activeTicket.assignedTechnician}</span>
-                  )}
+                  <span className="text-muted-foreground block mb-1 font-medium">Technician</span>
+                  <Select
+                    value={activeTicket.assignedTechnician}
+                    onValueChange={handleAssigneeChange}
+                  >
+                    <SelectTrigger className="h-8 text-xs font-medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeTicket.assignedTechnician && (
+                        <SelectItem value={activeTicket.assignedTechnician}>
+                          {activeTicket.assignedTechnician}
+                        </SelectItem>
+                      )}
+                      <SelectItem value="Karan Shah (IT Lead)">Karan Shah (IT Lead)</SelectItem>
+                      <SelectItem value="Neel Shah (IT Lead)">Neel Shah (IT Lead)</SelectItem>
+                      <SelectItem value="Devika Rao (Finance)">Devika Rao (Finance)</SelectItem>
+                      <SelectItem value="Sana Iqbal (HR)">Sana Iqbal (HR)</SelectItem>
+                      {employees.map((e) => (
+                        <SelectItem key={e.id} value={`${e.name} (${e.department || "Staff"})`}>
+                          {e.name} ({e.department || "Staff"})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

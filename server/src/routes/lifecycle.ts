@@ -8,6 +8,103 @@ import {
 
 const router = Router();
 
+// ── Helper: Sync Onboarding Completion & Requirements ─────────────────────────
+export async function checkAndSyncOnboardingCompletion(processId: string): Promise<{
+  isCompleted: boolean;
+  allDone: boolean;
+  hasAsset: boolean;
+  hasAccounts: boolean;
+  assignedAssetsCount: number;
+  provisionedAccountsCount: number;
+  missing: string[];
+}> {
+  const proc = await prisma.onboarding_processes.findUnique({
+    where: { id: processId },
+    include: {
+      onboarding_tasks: true,
+      employees: {
+        include: {
+          assets: true,
+          service_accounts: true,
+        },
+      },
+      service_accounts: true,
+    },
+  });
+
+  if (!proc) {
+    return {
+      isCompleted: false,
+      allDone: false,
+      hasAsset: false,
+      hasAccounts: false,
+      assignedAssetsCount: 0,
+      provisionedAccountsCount: 0,
+      missing: ["Onboarding process not found"],
+    };
+  }
+
+  const allDone = proc.onboarding_tasks.length > 0 && proc.onboarding_tasks.every((t) => t.status === "completed");
+  const assignedAssetsCount = proc.employees?.assets?.length || 0;
+  const hasAsset = assignedAssetsCount > 0;
+
+  const allAccounts = [
+    ...(proc.service_accounts || []),
+    ...(proc.employees?.service_accounts || []),
+  ];
+  const uniqueAccountIds = new Set(allAccounts.map((a) => a.id));
+  const provisionedAccountsCount = uniqueAccountIds.size;
+  const hasAccounts = provisionedAccountsCount > 0;
+
+  const missing: string[] = [];
+  if (!allDone) missing.push("100% checklist tasks");
+  if (!hasAsset) missing.push("Hardware asset allocation");
+  if (!hasAccounts) missing.push("Work accounts credentials generation");
+
+  const isCompleted = allDone && hasAsset && hasAccounts;
+
+  if (isCompleted) {
+    await prisma.onboarding_processes.update({
+      where: { id: processId },
+      data: {
+        status: "completed",
+        completed_at: proc.completed_at || new Date(),
+      },
+    });
+    if (proc.employee_id) {
+      await prisma.employees.update({
+        where: { id: proc.employee_id },
+        data: { status: "active" },
+      });
+    }
+  } else {
+    // If not completed, maintain in_progress and employee in onboarding
+    await prisma.onboarding_processes.update({
+      where: { id: processId },
+      data: {
+        status: "in_progress",
+        completed_at: null,
+      },
+    });
+    if (proc.employee_id) {
+      await prisma.employees.update({
+        where: { id: proc.employee_id },
+        data: { status: "onboarding" },
+      });
+    }
+  }
+
+  return {
+    isCompleted,
+    allDone,
+    hasAsset,
+    hasAccounts,
+    assignedAssetsCount,
+    provisionedAccountsCount,
+    missing,
+  };
+}
+
 // ── GET /api/onboarding ────────────────────────────────────────────────────────
 router.get("/onboarding", async (_req, res) => {
   try {
@@ -21,7 +118,16 @@ router.get("/onboarding", async (_req, res) => {
             email: true,
             joining_date: true,
             reporting_manager_id: true,
+            assets: {
+              select: { id: true, asset_code: true, asset_type: true },
+            },
+            service_accounts: {
+              select: { id: true, service_name: true },
+            },
           },
+        },
+        service_accounts: {
+          select: { id: true, service_name: true },
         },
         onboarding_tasks: {
           orderBy: { sequence: "asc" },
@@ -70,17 +176,55 @@ router.get("/onboarding", async (_req, res) => {
         };
       });
 
+      const assignedAssets = p.employees?.assets || [];
+      const serviceAccounts = [
+        ...(p.service_accounts || []),
+        ...(p.employees?.service_accounts || []),
+      ];
+      const uniqueAccountIds = new Set(serviceAccounts.map((a) => a.id));
+      const accountsCount = uniqueAccountIds.size;
+      const hasAsset = assignedAssets.length > 0;
+      const hasAccounts = accountsCount > 0;
+
       const allDone = tasks.length > 0 && tasks.every((t) => t.done);
       const anyDone = tasks.some((t) => t.done);
       const hasChangedPassword = (p as any).notes?.includes("password_changed") || false;
 
+      // Completion requires ALL THREE conditions: 100% checklist, resource asset allocated, and account credentials generated
+      const isCompleted = allDone && hasAsset && hasAccounts;
+
       let computedStatus: "Invitation Sent" | "Account Created" | "In Progress" | "Completed" | "Overdue" = "Invitation Sent";
-      if (rawStatus === "completed" || allDone) {
+      if (isCompleted) {
         computedStatus = "Completed";
-      } else if (hasChangedPassword || anyDone) {
+      } else if (hasChangedPassword || anyDone || hasAsset || hasAccounts) {
         computedStatus = "In Progress";
       } else {
         computedStatus = "Invitation Sent";
+      }
+
+      // Self-heal DB status
+      if (isCompleted && rawStatus !== "completed") {
+        prisma.onboarding_processes.update({
+          where: { id: p.id },
+          data: { status: "completed", completed_at: new Date() },
+        }).catch(() => {});
+        if (p.employee_id) {
+          prisma.employees.update({
+            where: { id: p.employee_id },
+            data: { status: "active" },
+          }).catch(() => {});
+        }
+      } else if (!isCompleted && rawStatus === "completed") {
+        prisma.onboarding_processes.update({
+          where: { id: p.id },
+          data: { status: "in_progress", completed_at: null },
+        }).catch(() => {});
+        if (p.employee_id) {
+          prisma.employees.update({
+            where: { id: p.employee_id },
+            data: { status: "onboarding" },
+          }).catch(() => {});
+        }
       }
 
       const managerName = p.employees?.reporting_manager_id
@@ -103,6 +247,10 @@ router.get("/onboarding", async (_req, res) => {
         invitationSentDate: p.started_at instanceof Date ? p.started_at.toISOString().slice(0, 10) : String(p.started_at),
         accountCreatedDate: p.completed_at?.toISOString().slice(0, 10),
         tasks,
+        hasAsset,
+        hasAccounts,
+        assignedAssetsCount: assignedAssets.length,
+        provisionedAccountsCount: accountsCount,
       };
     });
 
@@ -199,26 +347,29 @@ router.patch("/onboarding/:id", async (req, res) => {
     const { id } = req.params;
     const { status } = req.body as { status?: string };
 
-    const isCompleted = status === "Completed" || status === "completed";
-    const dbStatus = isCompleted ? "completed" : "in_progress";
+    const isRequestedCompleted = status === "Completed" || status === "completed";
 
-    const updated = await prisma.onboarding_processes.update({
-      where: { id },
-      data: {
-        status: dbStatus,
-        completed_at: isCompleted ? new Date() : null,
-      },
-      include: { employees: true },
-    });
-
-    if (isCompleted && updated.employee_id) {
-      await prisma.employees.update({
-        where: { id: updated.employee_id },
-        data: { status: "active" },
-      });
+    if (isRequestedCompleted) {
+      const completionResult = await checkAndSyncOnboardingCompletion(id);
+      if (!completionResult.isCompleted) {
+        return res.status(400).json({
+          success: false,
+          error: `Cannot complete onboarding. Requirements pending: ${completionResult.missing.join(", ")}.`,
+          details: completionResult,
+        });
+      }
+      return res.json({ success: true, data: { id, status: "completed", isCompleted: true } });
     }
 
-    res.json({ success: true, data: { id } });
+    await prisma.onboarding_processes.update({
+      where: { id },
+      data: {
+        status: "in_progress",
+        completed_at: null,
+      },
+    });
+
+    res.json({ success: true, data: { id, status: "in_progress" } });
   } catch (err) {
     console.error("Update onboarding error:", err);
     res.status(500).json({ success: false, error: "Failed to update onboarding case" });
@@ -239,39 +390,21 @@ router.patch("/onboarding/:id/tasks/:taskId", async (req, res) => {
       },
     });
 
-    // Check if all tasks are completed
-    const allTasks = await prisma.onboarding_tasks.findMany({
-      where: { onboarding_process_id: id },
+    // Sync onboarding completion status strictly based on:
+    // 100% checklist tasks + resource asset allocation + accounts credentials generation
+    const completionResult = await checkAndSyncOnboardingCompletion(id);
+
+    res.json({
+      success: true,
+      data: {
+        id: taskId,
+        allDone: completionResult.allDone,
+        isCompleted: completionResult.isCompleted,
+        hasAsset: completionResult.hasAsset,
+        hasAccounts: completionResult.hasAccounts,
+        missing: completionResult.missing,
+      },
     });
-
-    const allDone = allTasks.length > 0 && allTasks.every((t) => t.status === "completed");
-
-    if (allDone) {
-      const proc = await prisma.onboarding_processes.update({
-        where: { id },
-        data: {
-          status: "completed",
-          completed_at: new Date(),
-        },
-      });
-
-      if (proc.employee_id) {
-        await prisma.employees.update({
-          where: { id: proc.employee_id },
-          data: { status: "active" },
-        });
-      }
-    } else {
-      await prisma.onboarding_processes.update({
-        where: { id },
-        data: {
-          status: "in_progress",
-          completed_at: null,
-        },
-      });
-    }
-
-    res.json({ success: true, data: { id: taskId, allDone } });
   } catch (err) {
     console.error("Update task error:", err);
     res.status(500).json({ success: false, error: "Failed to update task" });
@@ -389,6 +522,9 @@ router.post("/onboarding/:id/service-accounts", async (req, res) => {
       }
     }
 
+    // Re-evaluate completion now that accounts credentials are provisioned
+    const completionResult = await checkAndSyncOnboardingCompletion(id);
+
     res.json({
       success: true,
       data: createdAccounts.map((a) => ({
@@ -398,6 +534,11 @@ router.post("/onboarding/:id/service-accounts", async (req, res) => {
         status: a.status,
         createdDate: a.created_date?.toISOString(),
       })),
+      isCompleted: completionResult.isCompleted,
+      allDone: completionResult.allDone,
+      hasAsset: completionResult.hasAsset,
+      hasAccounts: completionResult.hasAccounts,
+      missing: completionResult.missing,
     });
   } catch (err) {
     console.error("Create service accounts error:", err);
@@ -514,6 +655,9 @@ router.post("/onboarding/:id/allot-asset", async (req, res) => {
       }
     }
 
+    // Re-evaluate completion now that resource asset has been allocated
+    const completionResult = await checkAndSyncOnboardingCompletion(id);
+
     res.json({
       success: true,
       data: {
@@ -525,6 +669,11 @@ router.post("/onboarding/:id/allot-asset", async (req, res) => {
         status: assignedAsset.status,
         location: assignedAsset.location,
       },
+      isCompleted: completionResult.isCompleted,
+      allDone: completionResult.allDone,
+      hasAsset: completionResult.hasAsset,
+      hasAccounts: completionResult.hasAccounts,
+      missing: completionResult.missing,
     });
   } catch (err) {
     console.error("Allot asset error:", err);

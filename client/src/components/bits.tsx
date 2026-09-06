@@ -99,6 +99,7 @@ const statusTone: Record<string, string> = {
   settled: "bg-success/15 text-success border-success/30",
   resolved: "bg-success/15 text-success border-success/30",
   completed: "bg-success/15 text-success border-success/30",
+  done: "bg-success/15 text-success border-success/30",
   present: "bg-success/15 text-success border-success/30",
   cleared: "bg-success/15 text-success border-success/30",
   available: "bg-success/15 text-success border-success/30",

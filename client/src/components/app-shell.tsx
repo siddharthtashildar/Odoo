@@ -190,26 +190,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            {role === "admin" ? (
-              <Select value={role} onValueChange={(v) => { setRole(v as Role); navigate({ to: "/app/dashboard" }); }}>
-                <SelectTrigger className="hidden w-[190px] sm:flex" aria-label="Switch role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {ROLE_LABELS[r]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="hidden items-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground sm:flex">
-                <span className="size-1.5 rounded-full bg-emerald-500" />
-                <span>{ROLE_LABELS[role]}</span>
-                {persona.employeeCode && <span className="text-[10px] text-muted-foreground/70">({persona.employeeCode})</span>}
-              </div>
-            )}
+            <Select value={role} onValueChange={(v) => { setRole(v as Role); }}>
+              <SelectTrigger className="hidden w-[190px] sm:flex" aria-label="Switch role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {ROLE_LABELS[r]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
               {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
