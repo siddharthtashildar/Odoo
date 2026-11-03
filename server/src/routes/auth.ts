@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { prisma } from "../lib/prisma";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { sendCredentialsEmail, emailAuditLog, getDispatchedEmails } from "../lib/email";
+import { performAutoCheckIn, performAutoCheckOut } from "../lib/ip-attendance";
 
 const router = Router();
 
@@ -238,6 +239,17 @@ router.post("/login", async (req, res) => {
         }
       }
 
+      // ── Auto attendance check-in (best-effort, never fails login) ─────────
+      let attendanceResult: Record<string, unknown> | null = null;
+      if (employeeId) {
+        try {
+          const checkIn = await performAutoCheckIn(req, employeeId);
+          attendanceResult = checkIn;
+        } catch (attErr) {
+          console.warn("Auto check-in failed (non-fatal):", attErr);
+        }
+      }
+
       return res.json({
         success: true,
         data: {
@@ -247,6 +259,7 @@ router.post("/login", async (req, res) => {
           employeeId,
           employeeCode,
           employeeName,
+          attendance: attendanceResult,
         },
       });
     }
@@ -264,15 +277,27 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ success: false, error: "User not found or inactive" });
     }
 
+    // Auto check-in for legacy users too
+    let legacyAttendance: Record<string, unknown> | null = null;
+    const legacyEmpId = legacyUser.employees?.id ?? null;
+    if (legacyEmpId) {
+      try {
+        legacyAttendance = await performAutoCheckIn(req, legacyEmpId);
+      } catch (attErr) {
+        console.warn("Auto check-in failed (legacy, non-fatal):", attErr);
+      }
+    }
+
     res.json({
       success: true,
       data: {
         userId: legacyUser.id,
         email: legacyUser.email,
         role: legacyUser.roles.name,
-        employeeId: legacyUser.employees?.id ?? null,
+        employeeId: legacyEmpId,
         employeeCode: legacyUser.employees?.employee_code ?? null,
         employeeName: legacyUser.employees?.full_name ?? legacyUser.email,
+        attendance: legacyAttendance,
       },
     });
   } catch (err) {
@@ -390,6 +415,16 @@ router.post("/change-password", async (req, res) => {
       });
     }
 
+    // Auto check-in on first password setup
+    let cpAttendance: Record<string, unknown> | null = null;
+    if (employeeId) {
+      try {
+        cpAttendance = await performAutoCheckIn(req, employeeId);
+      } catch (attErr) {
+        console.warn("Auto check-in on password change failed (non-fatal):", attErr);
+      }
+    }
+
     res.json({
       success: true,
       message: "Password changed successfully! You may now sign in with your new permanent password.",
@@ -400,11 +435,36 @@ router.post("/change-password", async (req, res) => {
         employeeId,
         employeeCode,
         employeeName,
+        attendance: cpAttendance,
       },
     });
   } catch (err) {
     console.error("Change password error:", err);
     res.status(500).json({ success: false, error: "Failed to change password" });
+  }
+});
+
+// ── 6. POST /api/auth/logout ───────────────────────────────────────────────────
+// Triggers automatic check-out for the employee on logout.
+router.post("/logout", async (req, res) => {
+  try {
+    const { employeeId } = req.body as { employeeId?: string };
+
+    if (!employeeId) {
+      // Nothing to do — user may not be an employee (admin without employee record)
+      return res.json({ success: true, attendance: null });
+    }
+
+    const checkOut = await performAutoCheckOut(req, employeeId).catch((e) => {
+      console.warn("Auto check-out failed (non-fatal):", e);
+      return null;
+    });
+
+    res.json({ success: true, attendance: checkOut });
+  } catch (err) {
+    console.error("Logout checkout error:", err);
+    // Never fail logout due to attendance
+    res.json({ success: true, attendance: null });
   }
 });
 

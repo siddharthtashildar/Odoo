@@ -38,11 +38,15 @@ async function request<T>(
 export const api = {
   auth: {
     login: (email: string, password?: string) =>
-      request<{ userId: string; email: string; role: string; employeeId: string | null; employeeCode: string | null; employeeName: string }>(
-        "POST",
-        "/api/auth/login",
-        { email, password },
-      ),
+      request<{
+        userId: string;
+        email: string;
+        role: string;
+        employeeId: string | null;
+        employeeCode: string | null;
+        employeeName: string;
+        attendance?: Record<string, unknown> | null;
+      }>("POST", "/api/auth/login", { email, password }),
     provisionUser: (
       data: { employeeId?: string | undefined; email?: string | undefined; role?: string | undefined; customPassword?: string | undefined },
       callerRole: string,
@@ -78,7 +82,14 @@ export const api = {
         employeeId: string | null;
         employeeCode: string | null;
         employeeName: string;
+        attendance?: Record<string, unknown> | null;
       }>("POST", "/api/auth/change-password", data),
+    logout: (employeeId: string | null | undefined) =>
+      request<{ attendance: Record<string, unknown> | null }>(
+        "POST",
+        "/api/auth/logout",
+        { employeeId: employeeId ?? null },
+      ).catch(() => ({ attendance: null })),
   },
 
   // ── Employees ─────────────────────────────────────────────────────────────
@@ -355,6 +366,37 @@ export const api = {
       request<{ id: string }>("PATCH", `/api/offboarding/${id}`, data),
     patchClearance: (processId: string, taskId: string, data: { cleared: boolean }) =>
       request<{ id: string }>("PATCH", `/api/offboarding/${processId}/clearance/${taskId}`, data),
+  },
+
+  // ── Microsoft 365 ─────────────────────────────────────────────────────────
+  ms365: {
+    list: () =>
+      request<
+        Array<{
+          enabled: boolean;
+          upn: string | null;
+          microsoftUserId: string | null;
+          accountStatus: string;
+          licenseStatus: string;
+          mailboxStatus: string;
+          credentialEmailStatus: string;
+          lastError: string | null;
+          outlookUrl: string;
+        }>
+      >("GET", "/api/ms365/users"),
+    create: (data: { firstName: string; lastName: string }) =>
+      request<{
+        enabled: boolean;
+        upn: string | null;
+        microsoftUserId: string | null;
+        accountStatus: string;
+        licenseStatus: string;
+        mailboxStatus: string;
+        credentialEmailStatus: string;
+        lastError: string | null;
+        temporaryPassword?: string;
+        outlookUrl: string;
+      }>("POST", "/api/ms365/users", data),
   },
 
   // ── Health check ──────────────────────────────────────────────────────────

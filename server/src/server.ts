@@ -20,6 +20,7 @@ import schedulesRouter from "./routes/schedules";
 import authRouter from "./routes/auth";
 import lifecycleRouter from "./routes/lifecycle";
 import adminRouter from "./routes/admin";
+import ms365Router from "./routes/ms365";
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use("/api/helpdesk", helpdeskRouter);
 app.use("/api/schedules", schedulesRouter);
 app.use("/api", lifecycleRouter);
 app.use("/api", adminRouter);
+app.use("/api/ms365", ms365Router);
 
 // 404 handler
 app.use((_req, res) => {

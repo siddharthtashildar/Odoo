@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  Building2,
   Edit2,
   Eye,
   Plus,
@@ -399,9 +400,16 @@ function EmployeesPage() {
         actions={
           <div className="flex gap-2">
             {isHR && (
-              <Button variant="outline" onClick={handleLoadDispatchedEmails}>
-                <Mail className="mr-2 size-4" /> Dispatched Emails
-              </Button>
+              <>
+                <Button variant="outline" asChild>
+                  <Link to="/app/ms365">
+                    <Building2 className="mr-2 size-4" /> Microsoft 365 Users
+                  </Link>
+                </Button>
+                <Button variant="outline" onClick={handleLoadDispatchedEmails}>
+                  <Mail className="mr-2 size-4" /> Dispatched Emails
+                </Button>
+              </>
             )}
           </div>
         }

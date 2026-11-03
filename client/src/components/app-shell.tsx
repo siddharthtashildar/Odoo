@@ -55,6 +55,7 @@ const NAV: { to: string; label: string; icon: typeof Users; roles: Role[]; group
   { to: "/app/onboarding", label: "Onboarding", icon: UserPlus, group: "People", roles: ["hr_manager", "payroll_user", "payroll_manager", "admin"] },
   { to: "/app/offboarding", label: "Offboarding", icon: UserMinus, group: "People", roles: ["hr_manager", "payroll_user", "payroll_manager", "admin"] },
   { to: "/app/contracts", label: "Contracts", icon: FileSignature, group: "People", roles: ["hr_manager", "payroll_user", "payroll_manager", "admin"] },
+  { to: "/app/ms365", label: "Microsoft 365", icon: Building2, group: "People", roles: ["hr_manager", "admin"] },
 
   // Time & Attendance
   { to: "/app/attendance", label: "Attendance", icon: Clock, group: "Time & Leave", roles: ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"] },

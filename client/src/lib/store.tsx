@@ -227,7 +227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Poll all key data slices to keep the UI in sync across all roles
   useEffect(() => {
     if (!hydrated) return;
-    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5001";
+    const API = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:5000";
     const isManager = state.role === "hr_manager" || state.role === "admin";
     const intervalMs = isManager ? 5000 : 10000;
 
@@ -820,16 +820,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       onboarding: s.onboarding.map((c) =>
         c.id === processId
           ? {
-              ...c,
-              tasks: c.tasks.map((t) => (t.id === taskId ? { ...t, done } : t)),
-              status: (() => {
-                const updatedTasks = c.tasks.map((t) => (t.id === taskId ? { ...t, done } : t));
-                const allDone = updatedTasks.every((t) => t.done);
-                // Prerequisite: All 3 requirements (tasks, hardware asset, and work accounts)
-                const isComplete = allDone && Boolean(c.hasAsset) && Boolean(c.hasAccounts);
-                return isComplete ? ("Completed" as const) : ("In Progress" as const);
-              })(),
-            }
+            ...c,
+            tasks: c.tasks.map((t) => (t.id === taskId ? { ...t, done } : t)),
+            status: (() => {
+              const updatedTasks = c.tasks.map((t) => (t.id === taskId ? { ...t, done } : t));
+              const allDone = updatedTasks.every((t) => t.done);
+              // Prerequisite: All 3 requirements (tasks, hardware asset, and work accounts)
+              const isComplete = allDone && Boolean(c.hasAsset) && Boolean(c.hasAccounts);
+              return isComplete ? ("Completed" as const) : ("In Progress" as const);
+            })(),
+          }
           : c,
       ),
     }));
@@ -993,6 +993,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, signedIn: true, role, currentUser: newUser }));
       },
       signOut: () => {
+        const empId = state.currentUser?.employeeId;
+        if (empId) {
+          api.auth.logout(empId).catch((err) => console.warn("[store] logout auto-checkout error:", err));
+        }
         setState((s) => ({ ...s, signedIn: false, currentUser: null }));
         try {
           localStorage.removeItem(KEY);
@@ -1139,6 +1143,7 @@ export const ROLE_ACCESS: Record<string, Role[]> = {
   "/app/onboarding": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/offboarding": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
   "/app/contracts": ["hr_manager", "payroll_user", "payroll_manager", "admin"],
+  "/app/ms365": ["hr_manager", "admin"],
   "/app/attendance": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
   "/app/schedule": ["employee", "hr_manager", "payroll_user", "payroll_manager", "it_asset_manager", "admin"],
   "/app/leave": ["employee", "hr_manager", "payroll_user", "payroll_manager", "admin"],

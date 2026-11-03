@@ -184,6 +184,71 @@ async function deliverEmailCore(params: DeliverOptions): Promise<{
   return { delivered, messageId, previewUrl, via };
 }
 
+export async function sendMicrosoftCredentialsEmail(payload: {
+  to: string;
+  employeeName: string;
+  workEmail: string;
+  temporaryPassword: string;
+  loginUrl: string;
+}): Promise<{ success: boolean; messageId: string; previewUrl?: string; error?: string }> {
+  const { to, employeeName, workEmail, temporaryPassword, loginUrl } = payload;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: Segoe UI, Roboto, sans-serif; background:#f8fafc; padding:24px; color:#1e293b;">
+      <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+        <div style="background:#0f172a;color:#fff;padding:24px;">
+          <h1 style="margin:0;font-size:20px;">Microsoft 365 work account</h1>
+          <p style="margin:6px 0 0;opacity:.85;font-size:13px;">PeoplePay360 HR provisioning</p>
+        </div>
+        <div style="padding:24px;">
+          <p>Hi <strong>${employeeName}</strong>,</p>
+          <p>Your Microsoft 365 / Outlook work account has been created. Sign in at Outlook and change this temporary password on first login.</p>
+          <div style="background:#f1f5f9;border-left:4px solid #2563eb;border-radius:6px;padding:16px;margin:20px 0;">
+            <div style="font-size:12px;text-transform:uppercase;color:#64748b;font-weight:600;">Work email</div>
+            <div style="font-family:monospace;font-size:16px;font-weight:700;margin:4px 0 12px;">${workEmail}</div>
+            <div style="font-size:12px;text-transform:uppercase;color:#64748b;font-weight:600;">Temporary password</div>
+            <div style="font-family:monospace;font-size:16px;font-weight:700;">${temporaryPassword}</div>
+          </div>
+          <p><a href="${loginUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Open Outlook</a></p>
+          <p style="font-size:13px;color:#64748b;">You will be asked to change your password on first sign-in. This Microsoft password is separate from your PeoplePay360 login.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const delivery = await deliverEmailCore({
+    to,
+    subject: "Your Microsoft 365 / Outlook work account — PeoplePay360",
+    html,
+    defaultSender: "PeoplePay360 HR",
+    employeeName,
+    idPrefix: "ms365",
+  });
+
+  recordDispatchedEmail({
+    id: delivery.messageId,
+    to,
+    subject: "Your Microsoft 365 / Outlook work account — PeoplePay360",
+    employeeName,
+    role: "microsoft365",
+    temporaryPassword: "REDACTED",
+    sentAt: new Date().toISOString(),
+    previewUrl: delivery.previewUrl,
+  });
+
+  const smtpConfigured = !!(process.env.SMTP_HOST?.trim() && process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim());
+  const success = delivery.delivered && (!smtpConfigured || delivery.via === "smtp");
+  return {
+    success,
+    messageId: delivery.messageId,
+    previewUrl: delivery.previewUrl,
+    error: success ? undefined : "SMTP delivery failed. Credentials were not emailed.",
+  };
+}
+
 export async function sendCredentialsEmail(payload: CredentialsEmailPayload): Promise<{
   success: boolean;
   messageId: string;

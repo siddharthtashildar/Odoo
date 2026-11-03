@@ -20,6 +20,7 @@ import { Route as AppDashboardRouteImport } from './routes/app.dashboard'
 import { Route as AppHelpdeskRouteImport } from './routes/app.helpdesk'
 import { Route as AppLeaveRouteImport } from './routes/app.leave'
 import { Route as AppMeRouteImport } from './routes/app.me'
+import { Route as AppMs365RouteImport } from './routes/app.ms365'
 import { Route as AppOffboardingRouteImport } from './routes/app.offboarding'
 import { Route as AppOnboardingRouteImport } from './routes/app.onboarding'
 import { Route as AppPayslipsRouteImport } from './routes/app.payslips'
@@ -87,6 +88,11 @@ const AppLeaveRoute = AppLeaveRouteImport.update({
 const AppMeRoute = AppMeRouteImport.update({
   id: '/me',
   path: '/me',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMs365Route = AppMs365RouteImport.update({
+  id: '/ms365',
+  path: '/ms365',
   getParentRoute: () => AppRoute,
 } as any)
 const AppOffboardingRoute = AppOffboardingRouteImport.update({
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/app/helpdesk': typeof AppHelpdeskRoute
   '/app/leave': typeof AppLeaveRoute
   '/app/me': typeof AppMeRoute
+  '/app/ms365': typeof AppMs365Route
   '/app/offboarding': typeof AppOffboardingRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/payslips': typeof AppPayslipsRoute
@@ -193,6 +200,7 @@ export interface FileRoutesByTo {
   '/app/helpdesk': typeof AppHelpdeskRoute
   '/app/leave': typeof AppLeaveRoute
   '/app/me': typeof AppMeRoute
+  '/app/ms365': typeof AppMs365Route
   '/app/offboarding': typeof AppOffboardingRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/payslips': typeof AppPayslipsRoute
@@ -220,6 +228,7 @@ export interface FileRoutesById {
   '/app/helpdesk': typeof AppHelpdeskRoute
   '/app/leave': typeof AppLeaveRoute
   '/app/me': typeof AppMeRoute
+  '/app/ms365': typeof AppMs365Route
   '/app/offboarding': typeof AppOffboardingRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/payslips': typeof AppPayslipsRoute
@@ -248,6 +257,7 @@ export interface FileRouteTypes {
     | '/app/helpdesk'
     | '/app/leave'
     | '/app/me'
+    | '/app/ms365'
     | '/app/offboarding'
     | '/app/onboarding'
     | '/app/payslips'
@@ -274,6 +284,7 @@ export interface FileRouteTypes {
     | '/app/helpdesk'
     | '/app/leave'
     | '/app/me'
+    | '/app/ms365'
     | '/app/offboarding'
     | '/app/onboarding'
     | '/app/payslips'
@@ -300,6 +311,7 @@ export interface FileRouteTypes {
     | '/app/helpdesk'
     | '/app/leave'
     | '/app/me'
+    | '/app/ms365'
     | '/app/offboarding'
     | '/app/onboarding'
     | '/app/payslips'
@@ -397,6 +409,13 @@ declare module '@tanstack/react-router' {
       path: '/me'
       fullPath: '/app/me'
       preLoaderRoute: typeof AppMeRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/ms365': {
+      id: '/app/ms365'
+      path: '/ms365'
+      fullPath: '/app/ms365'
+      preLoaderRoute: typeof AppMs365RouteImport
       parentRoute: typeof AppRoute
     }
     '/app/offboarding': {
@@ -503,6 +522,7 @@ interface AppRouteChildren {
   AppHelpdeskRoute: typeof AppHelpdeskRoute
   AppLeaveRoute: typeof AppLeaveRoute
   AppMeRoute: typeof AppMeRoute
+  AppMs365Route: typeof AppMs365Route
   AppOffboardingRoute: typeof AppOffboardingRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
   AppPayslipsRoute: typeof AppPayslipsRoute
@@ -528,6 +548,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppHelpdeskRoute: AppHelpdeskRoute,
   AppLeaveRoute: AppLeaveRoute,
   AppMeRoute: AppMeRoute,
+  AppMs365Route: AppMs365Route,
   AppOffboardingRoute: AppOffboardingRoute,
   AppOnboardingRoute: AppOnboardingRoute,
   AppPayslipsRoute: AppPayslipsRoute,

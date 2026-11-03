@@ -1,5 +1,167 @@
 [
   {
+    "id": "<cd0d29b7-f7b8-b56e-067e-1b728fabc15d@gmail.com>",
+    "to": "charmi.patel@peoplepay360.io",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Charmi Patel",
+    "role": "employee",
+    "temporaryPassword": "PP360!JX1L288",
+    "sentAt": "2026-11-03T22:08:04.285Z"
+  },
+  {
+    "id": "<1ef5f7d4-e77e-53f8-d57a-161fa6eaba4a@gmail.com>",
+    "to": "charmi.patel@peoplepay360.io",
+    "subject": "Your Work Accounts are Ready (GitHub, Slack, etc.) — PeoplePay360",
+    "employeeName": "Charmi Patel",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T22:07:52.028Z"
+  },
+  {
+    "id": "<5673f07e-1aed-ed26-4c77-73005f6fc852@gmail.com>",
+    "to": "charmi.patel@peoplepay360.io",
+    "subject": "Company Asset Allocated — MacBook Pro 16\" M3 Max (AST-8094)",
+    "employeeName": "Charmi Patel",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T22:07:44.872Z"
+  },
+  {
+    "id": "<33ef8162-8a54-dc67-df4a-41c88c905b4d@gmail.com>",
+    "to": "priya.sharma@peoplepay360.io",
+    "subject": "Company Asset Allocated — MacBook Pro 16\" M3 Max (AST-8715)",
+    "employeeName": "Priya Sharma",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T22:07:04.233Z"
+  },
+  {
+    "id": "<3b72deae-d6d1-db8b-37ed-5a04e80cde17@gmail.com>",
+    "to": "priya.sharma@peoplepay360.io",
+    "subject": "Your Work Accounts are Ready (GitHub, Slack, etc.) — PeoplePay360",
+    "employeeName": "Priya Sharma",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T22:06:52.566Z"
+  },
+  {
+    "id": "<b187c4fd-bf0b-cd45-d6b8-03f0e142eb57@gmail.com>",
+    "to": "arhamshaikh@peoplepay360.io",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Arham Shaikh",
+    "role": "employee",
+    "temporaryPassword": "PP360!5FGR235",
+    "sentAt": "2026-11-03T21:07:42.152Z"
+  },
+  {
+    "id": "<cfe26a80-16be-4835-80af-15f6456cff98@gmail.com>",
+    "to": "arhamshaikh@peoplepay360.io",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Arham Shaikh",
+    "role": "employee",
+    "temporaryPassword": "PP360!CBN3266",
+    "sentAt": "2026-11-03T20:48:01.301Z"
+  },
+  {
+    "id": "<02eb38c4-003c-f22e-abf6-6bcc57692ae6@gmail.com>",
+    "to": "arhamshaikh@peoplepay360.io",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Arham Shaikh",
+    "role": "employee",
+    "temporaryPassword": "PP360!4UJ9644",
+    "sentAt": "2026-11-03T20:46:53.238Z"
+  },
+  {
+    "id": "<0352f255-464f-6db6-6ec2-688d784dc2d8@gmail.com>",
+    "to": "priya.sharma@peoplepay360.io",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Priya Sharma",
+    "role": "employee",
+    "temporaryPassword": "PP360!N5ED206",
+    "sentAt": "2026-11-03T20:45:29.186Z"
+  },
+  {
+    "id": "<80286986-bb0e-4a62-ae18-fff84816fcc9@gmail.com>",
+    "to": "sarham985@gmail.com",
+    "subject": "Your Work Accounts are Ready (GitHub, Slack, etc.) — PeoplePay360",
+    "employeeName": "Arham",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T20:45:22.060Z"
+  },
+  {
+    "id": "<1b16f5c9-5189-3979-61d4-64f57f1a8ea1@gmail.com>",
+    "to": "sarham985@gmail.com",
+    "subject": "Company Asset Allocated — MacBook Pro 16\" M3 Max (AST-4773)",
+    "employeeName": "Arham",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T20:45:10.703Z"
+  },
+  {
+    "id": "<c93c67a8-da36-4238-7f68-7b02179e27fa@gmail.com>",
+    "to": "sarham985@gmail.com",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Arham",
+    "role": "employee",
+    "temporaryPassword": "PP360!BBFR338",
+    "sentAt": "2026-11-03T20:43:14.806Z"
+  },
+  {
+    "id": "<f67edd6e-9116-c103-0219-8201127a092c@gmail.com>",
+    "to": "202451151@iiitvadodara.ac.in",
+    "subject": "Company Asset Allocated — MacBook Pro 16\" M3 Max (AST-3960)",
+    "employeeName": "GAYLORD",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T20:43:05.687Z"
+  },
+  {
+    "id": "<dadc80e9-de9e-b2a4-a7cf-750dcab420a7@gmail.com>",
+    "to": "202451151@iiitvadodara.ac.in",
+    "subject": "Your Work Accounts are Ready (GitHub, Slack, etc.) — PeoplePay360",
+    "employeeName": "GAYLORD",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T20:42:54.036Z"
+  },
+  {
+    "id": "<c18f7192-cd53-912d-f397-720117ba0e7a@gmail.com>",
+    "to": "202451153@iiitvadodara,ac.in",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Arham",
+    "role": "employee",
+    "temporaryPassword": "PP360!PE3E450",
+    "sentAt": "2026-11-03T17:19:26.829Z"
+  },
+  {
+    "id": "<48aabfd3-497d-1a6d-90a8-3c5050eb6f12@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Time-Off Request Approved — Unpaid Leave",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T14:38:07.746Z"
+  },
+  {
+    "id": "<d54e7eec-e1ea-7b72-92af-2de9cc6e7346@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Time-Off Request Approved — Unpaid Leave",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T14:38:03.260Z"
+  },
+  {
+    "id": "<a1742772-29a0-6408-1598-d92b5cba08b2@gmail.com>",
+    "to": "code.sid17@gmail.com",
+    "subject": "Expense Claim Approved — Food",
+    "employeeName": "Jeffrey Epstien",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-03T14:31:01.785Z"
+  },
+  {
     "id": "<160e86db-28e8-628b-7615-e36ca15d8fab@gmail.com>",
     "to": "code.sid17@gmail.com",
     "subject": "Payslip Statement for 2026-10 — Jeffrey Epstien",
@@ -757,167 +919,5 @@
     "role": "employee",
     "temporaryPassword": "N/A",
     "sentAt": "2026-09-05T22:44:24.920Z"
-  },
-  {
-    "id": "<2cce1e9a-baf2-d6a1-e168-0dae7b208606@gmail.com>",
-    "to": "code.sid17@gmail.com",
-    "subject": "Payslip Statement for 2026-10 — Jeffrey Epstien",
-    "employeeName": "Jeffrey Epstien",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T22:44:24.224Z"
-  },
-  {
-    "id": "<e44b29ff-4d61-e2d2-ab58-daec62fbb004@gmail.com>",
-    "to": "code.sid17@gmail.com",
-    "subject": "Payslip Statement for 2026-10 — Jeffrey Epstien",
-    "employeeName": "Jeffrey Epstien",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T22:44:22.076Z"
-  },
-  {
-    "id": "<a9d9f646-6981-2e02-dc82-99fba6ea73f0@gmail.com>",
-    "to": "hmtgroup267@gmail.com",
-    "subject": "Payslip Statement for 2026-10 — Joseph Stalin",
-    "employeeName": "Joseph Stalin",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T22:44:16.269Z"
-  },
-  {
-    "id": "<c6f9207c-35e3-bb4b-b24b-0d17f433156b@gmail.com>",
-    "to": "hmtgroup267@gmail.com",
-    "subject": "Payslip Statement for 2026-10 — Joseph Stalin",
-    "employeeName": "Joseph Stalin",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T22:44:13.813Z"
-  },
-  {
-    "id": "<7813ab59-75b6-10d0-99ff-29495e44e0ef@gmail.com>",
-    "to": "sidtheminerofficial@gmail.com",
-    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
-    "employeeName": "Charlie Kirk",
-    "role": "employee",
-    "temporaryPassword": "PP360!I0AO835",
-    "sentAt": "2026-09-05T22:23:11.653Z"
-  },
-  {
-    "id": "<56ec3aae-93e5-4750-76ca-c81cf818a007@gmail.com>",
-    "to": "siddharthtashildar17@gmail.com",
-    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
-    "employeeName": "Test",
-    "role": "employee",
-    "temporaryPassword": "TestPassword123!",
-    "sentAt": "2026-09-05T22:12:45.821Z"
-  },
-  {
-    "id": "<c2db367d-3457-28ea-0568-51a6e735649f@gmail.com>",
-    "to": "hmtgroup267@gmail.com",
-    "subject": "Payslip Statement for 2026-10 — Joseph Stalin",
-    "employeeName": "Joseph Stalin",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T21:36:52.405Z"
-  },
-  {
-    "id": "<b9d209f5-86a1-fc4a-7648-32e9c9569bab@gmail.com>",
-    "to": "karan.shah@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-09 — Karan Shah",
-    "employeeName": "Karan Shah",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:44:22.810Z"
-  },
-  {
-    "id": "<323eff6e-9d21-4ab3-602e-154915a8471b@gmail.com>",
-    "to": "premsharma@gmail.com",
-    "subject": "Payslip Statement for 2026-09 — Prem Sharma",
-    "employeeName": "Prem Sharma",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:43:58.744Z"
-  },
-  {
-    "id": "<098852b3-11f9-86d2-0a95-01f4a7840b56@gmail.com>",
-    "to": "rohan.mehta@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-09 — Rohan Mehta",
-    "employeeName": "Rohan Mehta",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:43:34.559Z"
-  },
-  {
-    "id": "<ef6dc834-012b-3a20-3a27-9969d8950ba7@gmail.com>",
-    "to": "code.sid17@gmail.com",
-    "subject": "Payslip Statement for 2026-09 — Jeffrey Epstien",
-    "employeeName": "Jeffrey Epstien",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:43:31.437Z"
-  },
-  {
-    "id": "<948ad7da-a986-774c-8474-36aa54ee88e1@gmail.com>",
-    "to": "arjun.nair@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-09 — Arjun Nair",
-    "employeeName": "Arjun Nair",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:43:07.197Z"
-  },
-  {
-    "id": "<5ceb7f6f-fd7e-cde7-5bed-bddabf87fe74@gmail.com>",
-    "to": "devika.rao@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-09 — Devika Rao",
-    "employeeName": "Devika Rao",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:43:03.538Z"
-  },
-  {
-    "id": "<37ea534b-dd83-2133-b3be-b60786f4eaff@gmail.com>",
-    "to": "sana.iqbal@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-09 — Sana Iqbal",
-    "employeeName": "Sana Iqbal",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:43:00.141Z"
-  },
-  {
-    "id": "<962d9710-c758-0472-f27f-7c6e87d85c66@gmail.com>",
-    "to": "vikram.rao@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-09 — Vikramaditya Rao",
-    "employeeName": "Vikramaditya Rao",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:42:56.520Z"
-  },
-  {
-    "id": "<2b1a5354-20b2-20f6-5b14-8bce36fe99a6@gmail.com>",
-    "to": "siddharthtashildar17@gmail.com",
-    "subject": "Payslip Statement for 2026-09 — Siddharth Tashildar",
-    "employeeName": "Siddharth Tashildar",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:42:32.178Z"
-  },
-  {
-    "id": "<6a878636-0eec-9c49-4fb7-d03373b86c30@gmail.com>",
-    "to": "priya.sharma@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-09 — Priya Sharma",
-    "employeeName": "Priya Sharma",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:42:03.985Z"
-  },
-  {
-    "id": "<133d74b8-f429-547b-f271-22be2d006c95@gmail.com>",
-    "to": "ananya.deshmukh@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-09 — Ananya Deshmukh",
-    "employeeName": "Ananya Deshmukh",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T18:41:39.769Z"
   }
 ]

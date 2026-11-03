@@ -97,6 +97,33 @@ function LoginPage() {
       toast.success(`Welcome back, ${userRes.employeeName || userRes.email}`, {
         description: ROLE_LABELS[matchedRole] || matchedRole,
       });
+
+      // Auto IP-based attendance feedback
+      const att = userRes.attendance as {
+        success?: boolean;
+        action?: string;
+        status?: string;
+        reason?: string;
+        detectedIp?: string;
+      } | null | undefined;
+
+      if (att) {
+        if (att.success) {
+          if (att.action === "checked_in") {
+            toast.success(
+              `Checked in automatically (${att.status === "late" ? "Late" : "Present"})`,
+              { description: `Network IP: ${att.detectedIp || "Verified"}` },
+            );
+          } else if (att.action === "already_checked_in") {
+            toast.info(`Already checked in for today (${att.status})`);
+          }
+        } else if (att.reason) {
+          toast.warning("Auto check-in skipped", {
+            description: att.reason,
+          });
+        }
+      }
+
       navigate({ to: "/app/dashboard" });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Authentication failed";
@@ -142,6 +169,32 @@ function LoginPage() {
       toast.success("Password successfully established!", {
         description: `Welcome to PeoplePay360, ${userRes.employeeName || userRes.email}!`,
       });
+
+      // Auto IP-based attendance feedback
+      const att = userRes.attendance as {
+        success?: boolean;
+        action?: string;
+        status?: string;
+        reason?: string;
+        detectedIp?: string;
+      } | null | undefined;
+
+      if (att) {
+        if (att.success) {
+          if (att.action === "checked_in") {
+            toast.success(
+              `Checked in automatically (${att.status === "late" ? "Late" : "Present"})`,
+              { description: `Network IP: ${att.detectedIp || "Verified"}` },
+            );
+          } else if (att.action === "already_checked_in") {
+            toast.info(`Already checked in for today (${att.status})`);
+          }
+        } else if (att.reason) {
+          toast.warning("Auto check-in skipped", {
+            description: att.reason,
+          });
+        }
+      }
 
       navigate({ to: "/app/dashboard" });
     } catch (err: unknown) {
