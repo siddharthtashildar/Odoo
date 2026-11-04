@@ -301,6 +301,7 @@ model employees {
   payslips                                             payslips[]
   reimbursements                                       reimbursements[]
   service_accounts                                     service_accounts[]
+  employee_microsoft_accounts                         employee_microsoft_accounts?
   users                                                users?
   employee_schedules                                   employee_schedules?
 
@@ -828,6 +829,7 @@ model employee_microsoft_accounts {
   last_error               String?
   provisioned_at           DateTime? @db.Timestamptz(6)
   updated_at               DateTime  @default(now()) @db.Timestamptz(6)
+  employees                employees @relation(fields: [employee_id], references: [id], onDelete: Cascade)
 
   @@index([employee_id], map: "idx_ms365_employee")
 }

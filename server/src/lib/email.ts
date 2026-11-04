@@ -12,6 +12,7 @@ export interface CredentialsEmailPayload {
   role: string;
   temporaryPassword: string;
   loginUrl: string;
+  microsoft?: { workEmail: string; temporaryPassword: string; outlookUrl: string };
 }
 
 // In-memory + persistent log of dispatched emails for audit & testing inspection
@@ -299,6 +300,7 @@ export async function sendCredentialsEmail(payload: CredentialsEmailPayload): Pr
         <div class="content">
           <p style="font-size: 16px; margin-top: 0;">Hi <strong>${employeeName}</strong>,</p>
           <p style="color: #475569; line-height: 1.6;">Your official PeoplePay360 account has been provisioned by the HR department. You have been assigned the <strong>${roleTitle}</strong> role.</p>
+          <h2>SECTION 1: PEOPLEPAY360 ACCOUNT</h2>
           
           <div class="credential-box">
             <div class="credential-item">
@@ -311,12 +313,14 @@ export async function sendCredentialsEmail(payload: CredentialsEmailPayload): Pr
             </div>
           </div>
 
+          ${payload.microsoft ? `<h2>SECTION 2: MICROSOFT 365 WORK ACCOUNT</h2><div class="credential-box"><div class="credential-item"><span class="credential-label">Work Email</span><span class="credential-value">${payload.microsoft.workEmail}</span></div><div class="credential-item"><span class="credential-label">Temporary Password</span><span class="credential-value">${payload.microsoft.temporaryPassword}</span></div><p><a href="${payload.microsoft.outlookUrl}">Outlook Login</a></p></div>` : ""}
+
           <div class="btn-wrapper">
             <a href="${loginUrl}" class="btn" target="_blank">Activate Account &amp; Set Password</a>
           </div>
 
           <p class="note">
-            ⚠️ <strong>Security Notice:</strong> Please use your temporary password above to activate your account and establish your secure permanent password.
+            ⚠️ <strong>Security Notice:</strong> Change each temporary password on first login. Your PeoplePay360 and Microsoft passwords are separate.
           </p>
         </div>
         <div class="footer">
@@ -329,7 +333,7 @@ export async function sendCredentialsEmail(payload: CredentialsEmailPayload): Pr
 
   const delivery = await deliverEmailCore({
     to,
-    subject: "Welcome to PeoplePay360 — Your Login Credentials",
+    subject: payload.microsoft ? "Welcome to PeoplePay360 - Your Work Accounts Are Ready" : "Welcome to PeoplePay360 — Your Login Credentials",
     html: htmlContent,
     defaultSender: "PeoplePay360 HR",
     employeeName,
@@ -340,7 +344,7 @@ export async function sendCredentialsEmail(payload: CredentialsEmailPayload): Pr
   const record: DispatchedEmailRecord = {
     id: delivery.messageId,
     to,
-    subject: "Welcome to PeoplePay360 — Your Login Credentials",
+    subject: payload.microsoft ? "Welcome to PeoplePay360 - Your Work Accounts Are Ready" : "Welcome to PeoplePay360 — Your Login Credentials",
     employeeName,
     role,
     temporaryPassword,

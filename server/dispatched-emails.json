@@ -1,5 +1,41 @@
 [
   {
+    "id": "<ba889f8d-70d8-899d-8f65-1884e1810af5@gmail.com>",
+    "to": "charmi.patel@peoplepay360.io",
+    "subject": "Company Asset Allocated — MacBook Pro 16\" M3 Max (AST-3451)",
+    "employeeName": "Charmi Patel",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-04T04:37:19.792Z"
+  },
+  {
+    "id": "<18480436-591d-8546-2112-4de4a7286676@gmail.com>",
+    "to": "charmi.patel@peoplepay360.io",
+    "subject": "Your Work Accounts are Ready (GitHub, Slack, etc.) — PeoplePay360",
+    "employeeName": "Charmi Patel",
+    "role": "employee",
+    "temporaryPassword": "N/A",
+    "sentAt": "2026-11-04T04:37:07.962Z"
+  },
+  {
+    "id": "<b4214e64-f4b9-b43f-43ba-041932a086d7@gmail.com>",
+    "to": "charmi.patel@peoplepay360.io",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Charmi Patel",
+    "role": "employee",
+    "temporaryPassword": "PP360!AAQE623",
+    "sentAt": "2026-11-04T04:36:58.490Z"
+  },
+  {
+    "id": "<0e7b68e0-4dc0-0d77-611d-b954f23f6f1b@gmail.com>",
+    "to": "arhamshaikh@peoplepay360.io",
+    "subject": "Welcome to PeoplePay360 — Your Login Credentials",
+    "employeeName": "Arham Shaikh",
+    "role": "employee",
+    "temporaryPassword": "PP360!W0CG867",
+    "sentAt": "2026-11-03T22:53:10.380Z"
+  },
+  {
     "id": "<cd0d29b7-f7b8-b56e-067e-1b728fabc15d@gmail.com>",
     "to": "charmi.patel@peoplepay360.io",
     "subject": "Welcome to PeoplePay360 — Your Login Credentials",
@@ -883,41 +919,5 @@
     "role": "employee",
     "temporaryPassword": "N/A",
     "sentAt": "2026-09-05T22:44:38.122Z"
-  },
-  {
-    "id": "<149335da-839e-de2b-8b14-af01d1e6184e@gmail.com>",
-    "to": "shreeya@gmail.com",
-    "subject": "Payslip Statement for 2026-10 — SHreeya",
-    "employeeName": "SHreeya",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T22:44:35.216Z"
-  },
-  {
-    "id": "<05a46d78-52a9-9592-916d-bf0a1632d202@gmail.com>",
-    "to": "shreeya@gmail.com",
-    "subject": "Payslip Statement for 2026-10 — SHreeya",
-    "employeeName": "SHreeya",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T22:44:32.686Z"
-  },
-  {
-    "id": "<abfe54ae-029a-2771-3ca0-141b7421366f@gmail.com>",
-    "to": "ananya.deshmukh@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-10 — Ananya Deshmukh",
-    "employeeName": "Ananya Deshmukh",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T22:44:32.391Z"
-  },
-  {
-    "id": "<de4e78af-9920-5195-1a51-4adf07787e5a@gmail.com>",
-    "to": "ananya.deshmukh@peoplepay360.io",
-    "subject": "Payslip Statement for 2026-10 — Ananya Deshmukh",
-    "employeeName": "Ananya Deshmukh",
-    "role": "employee",
-    "temporaryPassword": "N/A",
-    "sentAt": "2026-09-05T22:44:24.920Z"
   }
 ]

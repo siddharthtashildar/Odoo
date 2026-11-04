@@ -41,6 +41,7 @@ export const api = {
       request<{
         userId: string;
         email: string;
+        microsoftWorkEmail?: string | null;
         role: string;
         employeeId: string | null;
         employeeCode: string | null;
@@ -129,6 +130,7 @@ export const api = {
           userId: string;
           credentials: { email: string; temporaryPassword: string; loginUrl: string };
           emailDispatched: boolean;
+          microsoft?: { upn: string | null; accountStatus: string; licenseStatus: string; mailboxStatus: string; credentialEmailStatus: string; lastError: string | null };
           previewUrl?: string;
         } | null;
       }>("POST", "/api/employees", data),

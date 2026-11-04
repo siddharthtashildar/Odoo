@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { hashPassword } from "better-auth/crypto";
 import { sendCredentialsEmail } from "../lib/email";
 import { resolveEmployee } from "../lib/resolve-employee";
+import { provisionMicrosoftAccount } from "../lib/ms365";
 
 const router = Router();
 
@@ -28,6 +29,7 @@ router.get("/", async (req, res) => {
       },
       orderBy: { created_at: "desc" },
       include: {
+        employee_microsoft_accounts: { select: { upn: true, account_status: true, license_status: true, mailbox_status: true, credential_email_status: true, last_error: true } },
         departments_employees_department_idTodepartments: { select: { name: true } },
         designations: { select: { title: true } },
         employees: { select: { full_name: true } }, // reporting manager
@@ -40,6 +42,8 @@ router.get("/", async (req, res) => {
       code: e.employee_code,
       name: e.full_name,
       email: e.email,
+      microsoftWorkEmail: e.employee_microsoft_accounts?.upn ?? null,
+      microsoftProvisioning: e.employee_microsoft_accounts ?? null,
       phone: e.phone ?? "",
       department: e.departments_employees_department_idTodepartments?.name ?? "Engineering",
       designation: e.designations?.title ?? "Staff",
@@ -74,6 +78,7 @@ router.get("/:id", async (req, res) => {
       where: { employee_id: e.id, status: "active" },
       orderBy: { created_at: "desc" },
     });
+    const microsoft = await prisma.employee_microsoft_accounts.findUnique({ where: { employee_id: e.id }, select: { upn: true, account_status: true, license_status: true, mailbox_status: true, credential_email_status: true, last_error: true } });
 
     res.json({
       success: true,
@@ -82,6 +87,8 @@ router.get("/:id", async (req, res) => {
         code: e.employee_code,
         name: e.full_name,
         email: e.email,
+        microsoftWorkEmail: microsoft?.upn ?? null,
+        microsoftProvisioning: microsoft,
         phone: e.phone ?? "",
         department: e.departments_employees_department_idTodepartments?.name ?? "",
         designation: e.designations?.title ?? "",
@@ -296,13 +303,17 @@ router.post("/", async (req, res) => {
 
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8081";
       const changePasswordUrl = `${frontendUrl}/?action=change-password&email=${encodeURIComponent(employee.email)}`;
+      const microsoft = await provisionMicrosoftAccount({ employeeId: employee.id, fullName: employee.full_name, personalEmail: employee.email, sendCredentialEmail: false });
       const emailResult = await sendCredentialsEmail({
         to: employee.email,
         employeeName: employee.full_name,
         role,
         temporaryPassword,
         loginUrl: changePasswordUrl,
+        ...(microsoft.upn && microsoft.temporaryPassword ? { microsoft: { workEmail: microsoft.upn, temporaryPassword: microsoft.temporaryPassword, outlookUrl: microsoft.outlookUrl } } : {}),
       });
+
+      if (microsoft.upn) await prisma.employee_microsoft_accounts.update({ where: { employee_id: employee.id }, data: { credential_email_status: emailResult.success ? "sent" : "failed" } });
 
       provisionData = {
         userId: betterUser.id,
@@ -312,6 +323,7 @@ router.post("/", async (req, res) => {
           loginUrl: changePasswordUrl,
         },
         emailDispatched: emailResult.success,
+        microsoft,
         previewUrl: emailResult.previewUrl,
       };
     }

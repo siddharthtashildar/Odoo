@@ -159,6 +159,7 @@ export async function provisionMicrosoftAccount(params: {
   personalEmail?: string | null;
   firstName?: string;
   lastName?: string;
+  sendCredentialEmail?: boolean;
 }): Promise<MicrosoftProvisionResult> {
   if (!isEnabled()) {
     return {
@@ -296,7 +297,7 @@ export async function provisionMicrosoftAccount(params: {
       await upsertRecord(params.employeeId, { mailbox_status: mailboxStatus });
     }
 
-    if (accountStatus === "created" && temporaryPassword) {
+    if (accountStatus === "created" && temporaryPassword && params.sendCredentialEmail !== false) {
       const personal = params.personalEmail?.trim();
       if (!personal) {
         credentialEmailStatus = "shown_to_hr";
